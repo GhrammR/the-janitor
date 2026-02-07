@@ -81,7 +81,7 @@ Linters tell you there's a problem. **The Janitor solves it.**
 
 ---
 
-[Insert Terminal Demo Here]
+![The Janitor in Action](docs/assets/demo.gif)
 
 ---
 
