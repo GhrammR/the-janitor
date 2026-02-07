@@ -6,7 +6,7 @@ from libcst import matchers as m
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from analyzer.extractor import Entity
+from src.analyzer.extractor import Entity
 
 
 class SymbolRemovalTransformer(cst.CSTTransformer):

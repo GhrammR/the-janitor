@@ -6,7 +6,7 @@ import sys
 import ast
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from analyzer.extractor import Entity
+from src.analyzer.extractor import Entity
 
 
 @dataclass

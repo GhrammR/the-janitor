@@ -29,22 +29,22 @@ from rich.markup import escape
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Import Windows-safe Console wrapper
-from utils.safe_console import SafeConsole
+from src.utils.safe_console import SafeConsole
 from rich.console import Console as RichConsole
 
-from analyzer.graph_builder import DependencyGraphBuilder
-from analyzer.orphan_detector import OrphanDetector
-from analyzer.parser import LanguageParser
-from analyzer.extractor import EntityExtractor, Entity
-from analyzer.reference_tracker import ReferenceTracker
-from analyzer.cache import AnalysisCache
-from reaper.safe_delete import SafeDeleter
-from reaper.sandbox import TestSandbox
-from reaper.symbol_remover import SymbolRemover
-from reaper.js_remover import JSSymbolRemover
-from brain.memory import SemanticMemory
-from brain.llm import LLMClient
-from brain.refactor import SemanticRefactor
+from src.analyzer.graph_builder import DependencyGraphBuilder
+from src.analyzer.orphan_detector import OrphanDetector
+from src.analyzer.parser import LanguageParser
+from src.analyzer.extractor import EntityExtractor, Entity
+from src.analyzer.reference_tracker import ReferenceTracker
+from src.analyzer.cache import AnalysisCache
+from src.reaper.safe_delete import SafeDeleter
+from src.reaper.sandbox import TestSandbox
+from src.reaper.symbol_remover import SymbolRemover
+from src.reaper.js_remover import JSSymbolRemover
+from src.brain.memory import SemanticMemory
+from src.brain.llm import LLMClient
+from src.brain.refactor import SemanticRefactor
 
 app = typer.Typer(
     name="janitor",

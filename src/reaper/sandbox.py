@@ -10,8 +10,8 @@ from rich.markup import escape
 
 # Add parent directory to path for utils imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from utils.safe_console import SafeConsole
-from utils.logger import sanitize_for_terminal
+from src.utils.safe_console import SafeConsole
+from src.utils.logger import sanitize_for_terminal
 
 from .safe_delete import SafeDeleter
 

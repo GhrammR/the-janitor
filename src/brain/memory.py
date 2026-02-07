@@ -31,7 +31,7 @@ except (ImportError, AttributeError):
 
 import hashlib
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from analyzer.extractor import Entity
+from src.analyzer.extractor import Entity
 
 
 class SemanticMemory:

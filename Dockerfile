@@ -9,18 +9,21 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# 2. Install Python dependencies
+# 2. Set Python path for absolute imports
+ENV PYTHONPATH=/app
+
+# 3. Install Python dependencies (cached layer)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copy source code (Respects .dockerignore)
+# 4. Copy source code (Respects .dockerignore)
 COPY . .
 
-# 4. Setup Entrypoint
+# 5. Setup Entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# 5. Install the Janitor package
+# 6. Install the Janitor package
 RUN pip install .
 
 ENTRYPOINT ["/entrypoint.sh"]
