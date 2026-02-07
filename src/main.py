@@ -58,6 +58,23 @@ console = SafeConsole(force_terminal=True)
 cache_app = typer.Typer(name="cache", help="Manage the Janitor analysis cache")
 
 
+def is_ci_environment() -> bool:
+    """Detect if running in CI/CD environment (GitHub Actions, GitLab CI, etc.).
+
+    Returns:
+        True if running in CI, False otherwise
+    """
+    ci_indicators = [
+        'GITHUB_ACTIONS',  # GitHub Actions
+        'CI',              # Generic CI indicator
+        'GITLAB_CI',       # GitLab CI
+        'CIRCLECI',        # CircleCI
+        'TRAVIS',          # Travis CI
+        'JENKINS_HOME',    # Jenkins
+    ]
+    return any(os.getenv(indicator) for indicator in ci_indicators)
+
+
 def analyze_project(project_path: Path, language: str, library_mode: bool = False,
                     grep_shield: bool = False, show_progress: bool = True):
     """Shared analysis logic for both audit and clean commands.
