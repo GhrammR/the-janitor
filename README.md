@@ -118,7 +118,7 @@ janitor audit .
 # → Phase 2-3: Partial analysis (~6s)
 
 # Clear cache if needed
-janitor audit . --clear-cache
+janitor cache clear .
 ```
 
 **Performance Impact**:
@@ -372,6 +372,24 @@ Identify copy-pasted logic.
 ```bash
 janitor dedup . --threshold 0.9
 ```
+
+### 5. Cache Management
+Manage the analysis cache for performance optimization.
+
+```bash
+# Clear cache (forces full re-analysis on next run)
+janitor cache clear .
+
+# View cache statistics
+janitor cache stats .
+```
+
+**When to clear cache:**
+- After major refactoring
+- When switching between branches
+- If audit results seem stale
+
+**Performance:** The TURBO cache delivers sub-second repeat audits. Clear only when needed.
 
 ---
 

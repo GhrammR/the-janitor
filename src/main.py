@@ -54,6 +54,9 @@ app = typer.Typer(
 # Use SafeConsole for Windows Unicode compatibility
 console = SafeConsole(force_terminal=True)
 
+# Cache management sub-command
+cache_app = typer.Typer(name="cache", help="Manage the Janitor analysis cache")
+
 
 def analyze_project(project_path: Path, language: str, library_mode: bool = False,
                     grep_shield: bool = False, show_progress: bool = True):
@@ -354,7 +357,6 @@ def audit(
     show_protected: bool = typer.Option(False, "--show-protected", help="Display the Protected Symbols table"),
     include_vendored: bool = typer.Option(False, "--include-vendored", help="Include vendored/3rd-party code in analysis"),
     grep_shield: bool = typer.Option(False, "--grep-shield", help="Enable grep shield (dynamic usage detection). WARNING: Slow on large codebases."),
-    clear_cache: bool = typer.Option(False, "--clear-cache", help="Clear analysis cache before running (forces full re-analysis)"),
 ):
     """Scan project and list dead files and dead symbols."""
 
@@ -363,14 +365,6 @@ def audit(
     if not project_path.exists():
         console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
         raise typer.Exit(1)
-
-    # Clear cache if requested
-    if clear_cache:
-        from .analyzer.cache import AnalysisCache
-        cache = AnalysisCache(project_path)
-        cache.clear_cache()
-        cache.close()
-        console.print(f"[green]✓ Analysis cache cleared[/green]\n")
 
     console.print(f"[bold blue]Analyzing project:[/bold blue] {project_path}\n")
 
@@ -544,7 +538,6 @@ def clean(
     test_command: str = typer.Option(None, "--test-command", help="Custom test command (default: pytest)"),
     include_vendored: bool = typer.Option(False, "--include-vendored", help="Include vendored/3rd-party code in cleanup"),
     grep_shield: bool = typer.Option(False, "--grep-shield", help="Enable grep shield (dynamic usage detection). WARNING: Slow on large codebases."),
-    clear_cache: bool = typer.Option(False, "--clear-cache", help="Clear analysis cache before running (forces full re-analysis)"),
 ):
     """Remove dead code (files or symbols) after running tests for safety."""
 
@@ -553,14 +546,6 @@ def clean(
     if not project_path.exists():
         console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
         raise typer.Exit(1)
-
-    # Clear cache if requested
-    if clear_cache:
-        from .analyzer.cache import AnalysisCache
-        cache = AnalysisCache(project_path)
-        cache.clear_cache()
-        cache.close()
-        console.print(f"[green]✓ Analysis cache cleared[/green]\n")
 
     # Prompt for mode if not provided
     if mode is None:
@@ -1098,6 +1083,70 @@ def dedup(
     console.print(f"  Total entities analyzed: {len(all_entities)}")
     console.print(f"  Duplicate pairs found: {len(duplicates)}")
     console.print(f"  Similarity threshold: {threshold:.0%}")
+
+
+# =========================================================================
+# CACHE MANAGEMENT COMMANDS
+# =========================================================================
+
+@cache_app.command("clear")
+def cache_clear(
+    project_path: str = typer.Argument(".", help="Project root path"),
+):
+    """Clear the analysis cache for a project.
+
+    This forces a full re-analysis on the next audit or clean command.
+    Completes in <200ms without running any analysis phases.
+    """
+    project_path = Path(project_path).resolve()
+
+    if not project_path.exists():
+        console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
+        raise typer.Exit(1)
+
+    # Initialize cache and clear
+    cache = AnalysisCache(project_path)
+    cache.clear_cache()
+    cache.close()
+
+    console.print(f"[green]✓ Cache cleared for {escape(str(project_path))}[/green]")
+
+
+@cache_app.command("stats")
+def cache_stats(
+    project_path: str = typer.Argument(".", help="Project root path"),
+):
+    """Display cache statistics for a project.
+
+    Shows the number of cached files, symbols, and dependencies.
+    """
+    project_path = Path(project_path).resolve()
+
+    if not project_path.exists():
+        console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
+        raise typer.Exit(1)
+
+    # Initialize cache and get stats
+    cache = AnalysisCache(project_path)
+    stats = cache.get_cache_stats()
+    cache.close()
+
+    # Display stats in a table
+    table = Table(title=f"Cache Statistics: {project_path}", show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Files Cached", str(stats['total_files']))
+    table.add_row("Symbol Definitions", str(stats['symbol_definitions_cached']))
+    table.add_row("File References", str(stats['file_references_cached']))
+    table.add_row("File Dependencies", str(stats['dependencies_cached']))
+    table.add_row("Metaprogramming Danger", str(stats['metaprogramming_danger_cached']))
+
+    console.print(table)
+
+
+# Register cache sub-command
+app.add_typer(cache_app)
 
 
 @app.callback()
