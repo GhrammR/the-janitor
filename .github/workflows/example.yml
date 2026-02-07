@@ -1,0 +1,64 @@
+# Example GitHub Actions workflow for The Janitor
+# This file demonstrates how to use The Janitor as a GitHub Action
+
+name: Code Cleanup Check
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  audit:
+    name: Audit Dead Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Janitor Audit
+        uses: ./  # Use local action (or replace with 'GhrammR/the-janitor@v1' when published)
+        with:
+          command: 'audit'
+          path: '.'
+          language: 'python'
+          library: 'false'
+
+  dedup:
+    name: Check for Duplicates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Janitor Dedup
+        uses: ./  # Use local action (or replace with 'GhrammR/the-janitor@v1' when published)
+        with:
+          command: 'dedup'
+          path: '.'
+          language: 'python'
+          threshold: '0.9'
+          ai_api_key: ${{ secrets.JANITOR_AI_KEY }}  # Optional: for LLM refactoring suggestions
+
+  # Example: Multi-language project
+  audit-multi:
+    name: Audit Multiple Languages
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        language: [python, javascript, typescript]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Audit ${{ matrix.language }} code
+        uses: ./
+        with:
+          command: 'audit'
+          path: '.'
+          language: ${{ matrix.language }}

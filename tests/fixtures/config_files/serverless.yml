@@ -1,0 +1,70 @@
+# Real-world Serverless Framework configuration
+# Based on typical AWS Lambda microservice deployment
+
+service: image-processing-service
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    BUCKET_NAME: ${self:custom.bucketName}
+    DYNAMODB_TABLE: ${self:custom.dynamoTable}
+
+custom:
+  bucketName: my-images-${self:provider.stage}
+  dynamoTable: image-metadata-${self:provider.stage}
+
+functions:
+  # Image upload handler
+  uploadImage:
+    handler: handlers.image_upload.upload_image
+    events:
+      - http:
+          path: /upload
+          method: post
+          cors: true
+
+  # Image processing handler (triggered by S3)
+  processImage:
+    handler: handlers.image_processor.process_image
+    events:
+      - s3:
+          bucket: ${self:custom.bucketName}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .jpg
+
+  # Thumbnail generation
+  generateThumbnail:
+    handler: handlers.thumbnail.generate_thumbnail
+    events:
+      - sns:
+          arn: !Ref ImageProcessedTopic
+          topicName: ImageProcessed
+
+  # Async analytics worker
+  analyticsWorker:
+    handler: workers.analytics_worker.process_analytics
+    events:
+      - sqs:
+          arn: !GetAtt AnalyticsQueue.Arn
+
+  # Scheduled cleanup job
+  cleanupOldImages:
+    handler: jobs.cleanup.cleanup_old_images
+    events:
+      - schedule: cron(0 2 * * ? *)
+
+  # API Gateway authorizer
+  customAuthorizer:
+    handler: auth.authorizer.validate_token
+
+resources:
+  Resources:
+    ImageProcessedTopic:
+      Type: AWS::SNS::Topic
+    AnalyticsQueue:
+      Type: AWS::SQS::Queue

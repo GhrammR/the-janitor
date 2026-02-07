@@ -1,0 +1,153 @@
+# Real-world Docker Compose configuration
+# Microservices architecture with multiple Python services
+
+version: '3.8'
+
+services:
+  # Main API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+
+  # Celery worker for async tasks
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m celery -A tasks.celery_app worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./src:/app/src
+
+  # Celery beat scheduler
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m celery -A tasks.celery_app beat --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - ./src:/app/src
+
+  # Background analytics processor
+  analytics_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.analytics
+    command: python -m workers.analytics_processor
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - db
+      - kafka
+
+  # Data ingestion service
+  data_ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python ingest_service.py
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - S3_BUCKET=data-ingest-bucket
+    volumes:
+      - ./data:/app/data
+
+  # ETL pipeline runner
+  etl_pipeline:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    command: python -m pipeline.runner
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
+    depends_on:
+      - db
+
+  # Django management command for migrations
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py migrate
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
+    depends_on:
+      - db
+
+  # Flask admin dashboard
+  admin_dashboard:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    command: ["python", "dashboard_app.py"]
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=dashboard_app.py
+      - FLASK_ENV=production
+    depends_on:
+      - db
+
+  # Database
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Kafka (for event streaming)
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+    ports:
+      - "2181:2181"
+
+volumes:
+  postgres_data:
+  redis_data:

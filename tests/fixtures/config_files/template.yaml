@@ -1,0 +1,121 @@
+# Real-world AWS SAM template
+# Based on production serverless application
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: E-commerce order processing system
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.11
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        LOG_LEVEL: INFO
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+  # Order creation API
+  CreateOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      CodeUri: order_service/
+      Events:
+        CreateOrder:
+          Type: Api
+          Properties:
+            Path: /orders
+            Method: post
+
+  # Order processing workflow
+  ProcessOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: order_processor.process_order
+      CodeUri: order_service/
+      Events:
+        OrderCreated:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OrderQueue.Arn
+
+  # Payment processing
+  ProcessPaymentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: payment.process_payment_handler
+      CodeUri: payment_service/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PaymentsTable
+
+  # Inventory management
+  UpdateInventoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: inventory.update_inventory
+      CodeUri: inventory_service/
+
+  # Email notification service
+  SendEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: notifications.email_handler.send_order_confirmation
+      CodeUri: notification_service/
+      Environment:
+        Variables:
+          SENDGRID_API_KEY: !Ref SendGridApiKey
+
+  # Fraud detection
+  FraudCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: fraud_detection.check_order
+      CodeUri: fraud_service/
+      Timeout: 10
+
+  # Order status API
+  GetOrderStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: api.orders.get_order_status
+      CodeUri: order_service/
+      Events:
+        GetStatus:
+          Type: Api
+          Properties:
+            Path: /orders/{orderId}
+            Method: get
+
+  # Resources
+  OrderQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Stage}-orders-queue'
+
+  PaymentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-payments'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH
+
+  SendGridApiKey:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: sendgrid-api-key

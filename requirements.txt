@@ -1,0 +1,25 @@
+# Core Logic
+tree-sitter>=0.22.0
+tree-sitter-python
+tree-sitter-javascript
+tree-sitter-typescript
+networkx
+libcst
+
+# CLI & UI
+typer
+rich
+python-dotenv
+
+# AI & Brain
+chromadb>=0.6.0
+sentence-transformers
+openai
+tenacity
+
+# Your Dev Tools (Remove before selling to enterprise)
+google-genai
+google-cloud-aiplatform
+
+# Testing
+pytest

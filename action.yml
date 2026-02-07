@@ -1,0 +1,52 @@
+name: 'The Janitor'
+description: 'Stop the slop, start the engineering. Autonomous dead-code deletion and semantic deduplication.'
+author: 'github.com/GhrammR'
+branding:
+  icon: 'trash-2'
+  color: 'gray-dark'
+
+inputs:
+  command:
+    description: 'Command to run (audit, clean, dedup)'
+    required: false
+    default: 'audit'
+  path:
+    description: 'Path to analyze'
+    required: false
+    default: '.'
+  language:
+    description: 'Language (python, javascript, typescript)'
+    required: false
+    default: 'python'
+  library:
+    description: 'Enable library mode (protects public API)'
+    required: false
+    default: 'false'
+  include_vendored:
+    description: 'Scan vendored directories (vendor, dist, etc)'
+    required: false
+    default: 'false'
+  mode:
+    description: 'Clean mode: files, symbols, or both'
+    required: false
+    default: 'symbols'
+  threshold:
+    description: 'Dedup similarity threshold (0.0-1.0)'
+    required: false
+    default: '0.9'
+  ai_api_key:
+    description: 'API key for AI features'
+    required: false
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    JANITOR_AI_KEY: ${{ inputs.ai_api_key }}
+    INPUT_COMMAND: ${{ inputs.command }}
+    INPUT_PATH: ${{ inputs.path }}
+    INPUT_LANGUAGE: ${{ inputs.language }}
+    INPUT_LIBRARY: ${{ inputs.library }}
+    INPUT_INCLUDE_VENDORED: ${{ inputs.include_vendored }}
+    INPUT_MODE: ${{ inputs.mode }}
+    INPUT_THRESHOLD: ${{ inputs.threshold }}

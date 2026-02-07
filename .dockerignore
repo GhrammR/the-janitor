@@ -1,0 +1,21 @@
+# Environmental Trash
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Local Data (The 1.4GB culprit)
+.janitor_trash/
+.janitor_db/
+
+# Large Audit Payloads
+requests_payload.txt
+repo_context.xml
+*.xml
+
+# Git History
+.git/
+
+# Self-Exclusion
+Dockerfile
+.dockerignore
