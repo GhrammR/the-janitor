@@ -1,21 +1,27 @@
-# Environmental Trash
+# 1. Environment & Cache (Bloat)
 venv/
 .venv/
 __pycache__/
 *.pyc
-
-# Local Data (The 1.4GB culprit)
-.janitor_trash/
+.janitor_cache/
 .janitor_db/
+.janitor_trash/
 
-# Large Audit Payloads
-requests_payload.txt
+# 2. PROPRIETARY DATA (The "Money" files)
+# Do NOT include these in the public Docker image
+rules/premium/
+
+# 3. Development Artifacts
+tools/
 repo_context.xml
-*.xml
+requests_payload.txt
+docs/assets/
+*.cast
+*.gif
 
-# Git History
+# 4. Git & Metadata
 .git/
-
-# Self-Exclusion
+.github/
 Dockerfile
 .dockerignore
+.env

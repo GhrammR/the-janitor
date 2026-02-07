@@ -1,8 +1,6 @@
-# 🧹 The Janitor
+# 🧹 The Janitor: Stop the slop, start the engineering.
 
-**Stop the slop, start the engineering.**
-
-[![Release: v3.7.0](https://img.shields.io/badge/release-v3.7.0-blue.svg)](https://github.com/the-janitor/the-janitor/releases)
+[![Release: v3.8.0](https://img.shields.io/badge/release-v3.8.0-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker: Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/thejanitor/janitor)
 
@@ -393,7 +391,7 @@ The Janitor uses an **Open Core** licensing model to protect our intellectual pr
 
 The engine runs perfectly with Community Rules. Premium rules make the immortality detection more intelligent for complex, production codebases.
 
-**Want Premium?** Contact: [sales@thejanitor.dev](mailto:sales@thejanitor.dev)
+**Want Premium?** Contact: [sales@thejanitor.app](mailto:sales@thejanitor.app)
 
 ---
 

@@ -23,3 +23,6 @@ google-cloud-aiplatform
 
 # Testing
 pytest
+
+# Documentation
+mkdocs-material
