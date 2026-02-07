@@ -1,5 +1,7 @@
 # Stop the Slop, Start the Engineering
 
+![The Janitor in Action](https://raw.githubusercontent.com/GhrammR/the-janitor/main/docs/assets/demo.gif)
+
 ## The Problem: AI-Generated Code Bloat
 
 We are drowning in **AI-generated code bloat**. Large Language Models hallucinate dependencies, duplicate logic, and generate functions that are never called. Every coding session with AI assistants leaves behind:

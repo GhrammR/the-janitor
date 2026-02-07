@@ -81,7 +81,7 @@ Linters tell you there's a problem. **The Janitor solves it.**
 
 ---
 
-![The Janitor in Action](docs/assets/demo.gif)
+![The Janitor in Action](https://raw.githubusercontent.com/GhrammR/the-janitor/main/docs/assets/demo.gif)
 
 ---
 
