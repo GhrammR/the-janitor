@@ -1,4 +1,4 @@
-name: 'The Janitor'
+name: 'The Janitor: Stop the Slop'
 description: 'Stop the slop, start the engineering. Autonomous dead-code deletion and semantic deduplication.'
 author: 'github.com/GhrammR'
 branding:
