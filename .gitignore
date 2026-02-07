@@ -70,3 +70,6 @@ rules/premium/
 
 # Tools
 tools/
+
+# MkDocs build output
+site/

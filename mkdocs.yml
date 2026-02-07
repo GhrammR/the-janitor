@@ -1,4 +1,4 @@
-site_name: The Janitor Documentation
+site_name: The Janitor (v3.8.0)
 site_url: https://thejanitor.app
 site_description: Stop the slop, start the engineering. Autonomous dead-code deletion and semantic deduplication.
 site_author: GhrammR
@@ -8,22 +8,23 @@ repo_url: https://github.com/GhrammR/the-janitor
 
 theme:
   name: material
+  font:
+    text: Roboto
+    code: Fira Code
   palette:
-    # Light mode
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: indigo
-      accent: deep orange
+    # Light mode (Default - Professional Standard)
+    - scheme: default
+      primary: blue-grey
+      accent: teal
       toggle:
-        icon: material/brightness-7
+        icon: material/lightbulb-outline
         name: Switch to dark mode
-    # Dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: indigo
-      accent: deep orange
+    # Dark mode (Fallback)
+    - scheme: slate
+      primary: blue-grey
+      accent: teal
       toggle:
-        icon: material/brightness-4
+        icon: material/lightbulb
         name: Switch to light mode
   features:
     - navigation.tabs
@@ -57,11 +58,11 @@ markdown_extensions:
   - md_in_html
 
 extra:
+  version: v3.8.0
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/GhrammR/the-janitor
-  analytics:
-    provider: google
-    property: G-XXXXXXXXXX
+      name: GitHub Repository
+
 
 copyright: Copyright &copy; 2026 The Janitor
