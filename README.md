@@ -1,6 +1,6 @@
-# 🧹 The Janitor: Stop the slop, start the engineering.
+# 🧹 The Janitor: Stop the Slop. Start the Engineering.
 
-[![Release: v3.8.0](https://img.shields.io/badge/release-v3.8.0-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
+[![Release: v3.8.2](https://img.shields.io/badge/release-v3.8.2-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker: Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/thejanitor/janitor)
 
@@ -18,6 +18,66 @@ We are drowning in **AI-generated code bloat**. LLMs hallucinate dependencies, d
 The best developers measure success in **Negative Net Lines of Code**. Every line deleted is one less bug, one less security vulnerability, and one less cognitive burden.
 
 **The Janitor makes negative LOC your default.**
+
+---
+
+## 💰 ROI: The Business Case for Negative LOC
+
+**Break-even point: 0.5 developer hours.** After that, you're printing money.
+
+At **$100/hr**, preventing a single production hotfix yields an immediate **800% ROI**. Here's why:
+
+| Scenario | Cost Without Janitor | Cost With Janitor | Savings |
+|----------|---------------------|-------------------|---------|
+| **Production Hotfix** | $800 (8 hours debugging dead imports) | $100 (1 hour automated cleanup) | **$700** |
+| **Onboarding Delay** | $400 (4 hours navigating zombie code) | $50 (30 min clean codebase) | **$350** |
+| **Security Audit** | $1,200 (12 hours auditing unused attack surface) | $200 (2 hours validated by Janitor) | **$1,000** |
+
+**Every unused function is:**
+- **1 more attack vector** for security vulnerabilities
+- **1 more file** slowing down your IDE's autocomplete
+- **1 more cognitive burden** for new developers
+- **1 more import** breaking when you upgrade dependencies
+
+The Janitor eliminates this tax **before** it compounds.
+
+---
+
+## 🔬 Why The Janitor Beats a Linter
+
+**Traditional linters (Ruff, Knip, ESLint) merely identify mess. The Janitor executes surgical deletions with a transactional sandbox guarantee.**
+
+| Feature | Traditional Linters | The Janitor |
+|---------|-------------------|-------------|
+| **Analysis Depth** | Text patterns | AST + type inference |
+| **Action** | Report warnings | **Execute deletions** |
+| **Safety** | None | Sandbox + auto-rollback |
+| **Framework Support** | Generic rules | 100+ framework patterns |
+| **False Positives** | High | Near-zero |
+
+Linters tell you there's a problem. **The Janitor solves it.**
+
+---
+
+## ⚙️ The Three Pillars
+
+### 🔬 The Anatomist: Multi-Language AST Dependency Mapping
+- **Tree-sitter parsers** for Python, JavaScript, TypeScript
+- **Type-aware tracking** with Variable Type Registry
+- **Cross-module resolution** with compiler-grade import analysis
+- **Inheritance mapping** for framework lifecycle protection
+
+### 🧠 The Brain: Safe-Proxy Deduplication (v3.8+)
+- **Vector embeddings** detect semantic duplicates (not just syntax)
+- **Safe Proxy Pattern** preserves function signatures (zero breaking changes)
+- **AST validation** rejects invalid LLM suggestions before they reach your code
+- **Wrapper functions** extract shared logic without touching call sites
+
+### ⚔️ The Reaper: Sandbox-Verified Cleanup
+- **Backup first**: Files staged in `.janitor_trash` before modification
+- **AST-based surgery**: Surgical removal (not regex replacement)
+- **Test verification**: Your test suite runs in an isolated sandbox
+- **100% auto-rollback**: If tests fail, changes are instantly reverted
 
 ---
 
@@ -244,49 +304,6 @@ class MainWindow(QMainWindow):
 ```
 
 **Performance**: FastAPI analysis went from **3 hours 38 minutes → 10 seconds** (99.95% faster) with these optimizations.
-
----
-
-## 💰 ROI: The Business Case for Negative LOC
-
-### Every Line Deleted Pays for Itself
-
-**Break-even point: 0.5 developer hours.** After that, you're printing money.
-
-At **$100/hr**, preventing a single production hotfix yields an immediate **800% ROI**. Here's why:
-
-| Scenario | Cost Without Janitor | Cost With Janitor | Savings |
-|----------|---------------------|-------------------|---------|
-| **Production Hotfix** | $800 (8 hours debugging dead imports) | $100 (1 hour automated cleanup) | **$700** |
-| **Onboarding Delay** | $400 (4 hours navigating zombie code) | $50 (30 min clean codebase) | **$350** |
-| **Security Audit** | $1,200 (12 hours auditing unused attack surface) | $200 (2 hours validated by Janitor) | **$1,000** |
-
-### The Hidden Cost of Code Bloat
-
-Every unused function is:
-- **1 more attack vector** for security vulnerabilities
-- **1 more file** slowing down your IDE's autocomplete
-- **1 more cognitive burden** for new developers
-- **1 more import** breaking when you upgrade dependencies
-
-The Janitor eliminates this tax **before** it compounds.
-
-### Surgical Precision at Scale
-
-**v3.4.0 JS Export Logic** achieves **99.9% accuracy** on production codebases with **application-aware tree shaking**:
-
-**Library Mode** (public APIs):
-- **Axios**: 0 false positives, 0 dead symbols (all exports protected)
-- **React**: 0 false positives (Hook dependencies protected)
-- **Express**: 0 false positives (Route handlers preserved)
-
-**Application Mode** (internal code):
-- **lodash**: 15 dead exports detected (unused named exports safely identified)
-- **export default** always protected (your entry point is safe)
-
-**Traditional tools delete your exports. The Janitor knows which ones matter.**
-
-When your build passes after cleanup, you didn't get lucky—you got **semantic intelligence**.
 
 ---
 

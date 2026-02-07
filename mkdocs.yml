@@ -1,6 +1,6 @@
-site_name: The Janitor (v3.8.0)
+site_name: The Janitor (v3.8.2)
 site_url: https://thejanitor.app
-site_description: Stop the slop, start the engineering. Autonomous dead-code deletion and semantic deduplication.
+site_description: Stop the Slop. Start the Engineering. High-fidelity technical debt reduction with AST-based surgical deletions.
 site_author: GhrammR
 
 repo_name: GhrammR/the-janitor
@@ -58,7 +58,7 @@ markdown_extensions:
   - md_in_html
 
 extra:
-  version: v3.8.0
+  version: v3.8.2
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/GhrammR/the-janitor

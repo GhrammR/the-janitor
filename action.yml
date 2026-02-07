@@ -1,5 +1,5 @@
 name: 'The Janitor: Stop the Slop'
-description: 'Stop the slop, start the engineering. Autonomous dead-code deletion and semantic deduplication.'
+description: 'High-fidelity technical debt reduction. Deletes dead code and merges duplicate logic with a safety-guaranteed sandbox. Stop the slop.'
 author: 'github.com/GhrammR'
 branding:
   icon: 'trash-2'
