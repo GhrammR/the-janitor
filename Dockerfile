@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir .
 # STAGE 2: Runner (Minimal runtime image)
 # ============================================================================
 FROM python:3.11-slim
-LABEL version="3.9.3"
+LABEL version="3.9.4"
 
 # Environment variables
 ENV PYTHONPATH=/app \

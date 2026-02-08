@@ -1,6 +1,6 @@
 # 🧹 The Janitor: Stop the Slop. Start the Engineering.
 
-[![Release: v3.9.3](https://img.shields.io/badge/release-v3.9.3-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
+[![Release: v3.9.4](https://img.shields.io/badge/release-v3.9.4-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker: Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/ghrammr/the-janitor)
 

@@ -4,6 +4,7 @@ from typing import List, Optional
 from .llm import LLMClient
 import sys
 import ast
+import re
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.analyzer.extractor import Entity
@@ -30,6 +31,43 @@ class SemanticRefactor:
             llm_client: LLM client (creates one if None)
         """
         self.llm = llm_client or LLMClient()
+
+    def _clean_response(self, response: str) -> str:
+        """Strip Markdown artifacts and explanatory text from LLM response.
+
+        Handles:
+        - Markdown code blocks (```python ... ```)
+        - Explanatory text before code
+        - Multiple code blocks
+        - Text interspersed with code
+
+        Args:
+            response: Raw LLM response
+
+        Returns:
+            Clean Python code only
+        """
+        # Remove Markdown code blocks (```python ... ``` or ``` ... ```)
+        # Use re.DOTALL to match across newlines
+        cleaned = re.sub(r'```(?:python)?\s*\n?(.*?)\n?```', r'\1', response, flags=re.DOTALL)
+
+        # If no markdown blocks found, use original response
+        if cleaned == response:
+            cleaned = response
+
+        # Strip leading/trailing whitespace
+        cleaned = cleaned.strip()
+
+        # If the response starts with explanatory text before 'def', remove it
+        # Find the first 'def', 'class', 'import', or 'from' keyword
+        match = re.search(r'^\s*(def|class|import|from)\s', cleaned, re.MULTILINE)
+        if match:
+            # There's text before the first Python keyword - strip it
+            start_pos = match.start()
+            if start_pos > 0:
+                cleaned = cleaned[start_pos:]
+
+        return cleaned.strip()
 
     def merge_similar_functions(self, entity1: Entity, entity2: Entity, similarity: float) -> RefactorPlan:
         """Merge two similar functions into one generic function.
@@ -84,8 +122,15 @@ CRITICAL REQUIREMENTS (Brain Safety):
      ```
 3. **DO NOT remove any side effects, logging, or defensive try/except blocks**
 4. **Preserve all error handling and telemetry**
-5. **Return ONLY valid Python code** - no explanations, no markdown formatting
-6. **The code must be syntactically valid** (parseable by ast.parse)
+5. **The code must be syntactically valid** (parseable by ast.parse)
+
+OUTPUT REQUIREMENTS (CRITICAL):
+- OUTPUT ONLY THE RAW PYTHON CODE
+- DO NOT INCLUDE MARKDOWN CODE BLOCKS (no ``` markers)
+- DO NOT INCLUDE COMMENTS OR EXPLANATIONS
+- DO NOT INCLUDE ANY TEXT BEFORE OR AFTER THE CODE
+- IF YOU INCLUDE ANYTHING OTHER THAN PURE PYTHON CODE, THE SYSTEM WILL REJECT YOUR OUTPUT
+- START YOUR RESPONSE IMMEDIATELY WITH 'def' OR 'class'
 
 The goal is ZERO BREAKING CHANGES to existing call sites."""
 
@@ -108,7 +153,10 @@ Generate:
 Return ONLY the Python code with all three functions."""
 
         # Call LLM
-        merged_code = self.llm.ask_llm_with_fallback(system_prompt, user_prompt)
+        raw_response = self.llm.ask_llm_with_fallback(system_prompt, user_prompt)
+
+        # v3.9.4: AGGRESSIVE CLEANING - Strip Markdown and explanatory text
+        merged_code = self._clean_response(raw_response) if raw_response else None
 
         # v3.7.0: SYNTAX VALIDATION - Prevent LLM slop from entering the system
         if merged_code:
@@ -116,6 +164,8 @@ Return ONLY the Python code with all three functions."""
                 ast.parse(merged_code)
             except SyntaxError as e:
                 print(f"[BRAIN SAFETY] LLM generated invalid syntax: {e}")
+                print(f"[BRAIN SAFETY] Raw response preview: {raw_response[:200]}...")
+                print(f"[BRAIN SAFETY] Cleaned code preview: {merged_code[:200]}...")
                 print(f"[BRAIN SAFETY] Discarding unsafe refactor plan for {entity1.name} + {entity2.name}")
                 # Return plan with no merged_code (treated as failed merge)
                 return RefactorPlan(
