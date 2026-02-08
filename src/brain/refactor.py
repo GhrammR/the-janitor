@@ -256,7 +256,11 @@ class SemanticRefactor:
         # Use LLM to merge similar (but not identical) functions
         # v3.7.0: Safe Proxy Pattern - Preserves original function signatures
         # v4.0.0-beta.2: State & Scope Awareness
+        # v4.1.1: Billing constraint for frontier-tier reliability
         system_prompt = """You are a code refactoring expert. Your task is to merge two similar functions using the SAFE PROXY PATTERN.
+
+BILLING CONSTRAINT (v4.1.1 - CRITICAL):
+You are being billed per character. Any conversational text, markdown formatting, or comments in your response will be considered a security breach. Output ONLY the executable Python code. No explanations, no code blocks, no markdown - just raw Python that can be immediately parsed by ast.parse().
 
 CRITICAL REQUIREMENTS (Brain Safety):
 1. **DO NOT change the original function names or signatures**

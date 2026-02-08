@@ -50,24 +50,27 @@ class Config:
 
         Priority:
         1. JANITOR_MODEL environment variable
-        2. Fallback to default model
+        2. Fallback to default model (anthropic/claude-3.5-sonnet)
 
         Returns:
             Model identifier string
         """
-        return os.getenv("JANITOR_MODEL", "arcee-ai/trinity-large-preview:free")
+        return os.getenv("JANITOR_MODEL", "anthropic/claude-3.5-sonnet")
 
     @property
     def ai_fallback_models(self) -> list[str]:
         """Get fallback models for rate limit handling.
 
+        v4.1.1: Migrated to paid frontier-tier models for reliability.
+        All :free suffixes removed to ensure professional code generation.
+
         Returns:
             List of model identifiers to try in sequence
         """
         return [
-            "arcee-ai/trinity-large-preview:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "google/gemma-2-9b-it:free"
+            "anthropic/claude-3.5-sonnet",
+            "meta-llama/llama-3.3-70b-instruct",
+            "anthropic/claude-3-haiku"
         ]
 
     @property
