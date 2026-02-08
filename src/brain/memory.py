@@ -30,8 +30,77 @@ except (ImportError, AttributeError):
     pass  # Telemetry module not available or already disabled
 
 import hashlib
+import torch
+from transformers import AutoTokenizer, AutoModel
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.analyzer.extractor import Entity
+
+
+class UniXcoderEmbeddingFunction:
+    """Code-native embedding function using microsoft/unixcoder-base.
+
+    v4.1.0: Replaces all-MiniLM (NLP model) with UniXcoder (code-specific model).
+
+    ARCHITECTURE:
+    - Model: microsoft/unixcoder-base (768-dim vs 384-dim MiniLM)
+    - Training: CodeSearchNet dataset (code understanding)
+    - Advantage: Understands AST structure, not just text tokens
+
+    CRITICAL: CPU-only environment constraint enforced.
+    """
+
+    def __init__(self, model_name: str = "microsoft/unixcoder-base", device: str = "cpu"):
+        """Initialize UniXcoder embedding function.
+
+        Args:
+            model_name: HuggingFace model identifier
+            device: Device to run on ('cpu' or 'cuda')
+        """
+        print(f"[BRAIN v4.1] Loading {model_name} on {device}...")
+
+        self.device = torch.device(device)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name).to(self.device)
+        self.model.eval()  # Set to evaluation mode
+
+        print(f"[BRAIN v4.1] UniXcoder loaded successfully (768-dimensional embeddings)")
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        """Generate embeddings for input texts.
+
+        Args:
+            input: List of code snippets to embed (ChromaDB interface requirement)
+
+        Returns:
+            List of 768-dimensional embedding vectors
+        """
+        embeddings = []
+
+        # Process in batches to avoid memory issues
+        batch_size = 8
+        for i in range(0, len(input), batch_size):
+            batch = input[i:i + batch_size]
+
+            # Tokenize with truncation (UniXcoder max length is 512)
+            inputs = self.tokenizer(
+                batch,
+                padding=True,
+                truncation=True,
+                max_length=512,
+                return_tensors="pt"
+            ).to(self.device)
+
+            # Generate embeddings (no gradient computation for inference)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                # Use [CLS] token embedding (first token) as sentence representation
+                batch_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+
+            embeddings.extend(batch_embeddings.tolist())
+
+        return embeddings
 
 
 class SemanticMemory:
@@ -52,10 +121,12 @@ class SemanticMemory:
             settings=Settings(anonymized_telemetry=False)
         )
 
-        # Initialize embedding function (all-MiniLM-L6-v2)
-        self.embedding_fn = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2",
-            normalize_embeddings=True
+        # v4.1.0: CODE-NATIVE BRAIN UPGRADE
+        # Initialize embedding function (microsoft/unixcoder-base)
+        # Replaces all-MiniLM (384-dim NLP) with UniXcoder (768-dim code-specific)
+        self.embedding_fn = UniXcoderEmbeddingFunction(
+            model_name="microsoft/unixcoder-base",
+            device="cpu"
         )
 
     def index_entities(self, entities: List[Entity], language: str = "python"):
@@ -71,7 +142,7 @@ class SemanticMemory:
         if not entities:
             return
 
-        collection_name = f"{language}_entities"
+        collection_name = f"janitor_v4_deep_{language}"
         collection = self.client.get_or_create_collection(
             name=collection_name,
             embedding_function=self.embedding_fn,
@@ -131,7 +202,7 @@ class SemanticMemory:
         Returns:
             List of similar entities with similarity scores
         """
-        collection_name = f"{language}_entities"
+        collection_name = f"janitor_v4_deep_{language}"
 
         try:
             collection = self.client.get_collection(
@@ -201,7 +272,7 @@ class SemanticMemory:
         Returns:
             Dictionary with collection statistics
         """
-        collection_name = f"{language}_entities"
+        collection_name = f"janitor_v4_deep_{language}"
 
         try:
             collection = self.client.get_collection(name=collection_name)
@@ -225,7 +296,7 @@ class SemanticMemory:
         Args:
             language: Programming language
         """
-        collection_name = f"{language}_entities"
+        collection_name = f"janitor_v4_deep_{language}"
 
         try:
             self.client.delete_collection(name=collection_name)
