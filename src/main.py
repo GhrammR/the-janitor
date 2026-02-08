@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Import Windows-safe Console wrapper
 from src.utils.safe_console import SafeConsole
+from src.utils.logger import sanitize_code_for_display
 from rich.console import Console as RichConsole
 
 from src.analyzer.graph_builder import DependencyGraphBuilder
@@ -1072,14 +1073,18 @@ def dedup(
         console.print(f"[bold cyan]Duplicate #{idx}[/bold cyan] - Similarity: {similarity:.1%}")
 
         # Show original functions in panels
+        # v3.9.6: Sanitize code for Windows console display (emoji/unicode handling)
+        sanitized_code1 = sanitize_code_for_display(entity.full_text)
+        sanitized_code2 = sanitize_code_for_display(sim['full_text'])
+
         console.print(Panel(
-            Syntax(entity.full_text, language, theme="monokai", line_numbers=True),
+            Syntax(sanitized_code1, language, theme="monokai", line_numbers=True),
             title=f"Function 1: {entity.name} ({path1}:{entity.start_line})",
             border_style="cyan"
         ))
 
         console.print(Panel(
-            Syntax(sim['full_text'], language, theme="monokai", line_numbers=True),
+            Syntax(sanitized_code2, language, theme="monokai", line_numbers=True),
             title=f"Function 2: {sim['name']} ({path2}:{sim['start_line']})",
             border_style="cyan"
         ))
@@ -1134,8 +1139,10 @@ def dedup(
             plan = refactor.merge_similar_functions(entity, similar_entity, similarity)
 
             if plan.merged_code:
+                # v3.9.6: Sanitize merged code for Windows console display
+                sanitized_merged = sanitize_code_for_display(plan.merged_code)
                 console.print(Panel(
-                    Syntax(plan.merged_code, language, theme="monokai", line_numbers=True),
+                    Syntax(sanitized_merged, language, theme="monokai", line_numbers=True),
                     title=f"Suggested Merge (saves ~{plan.estimated_lines_saved} lines)",
                     border_style="green"
                 ))

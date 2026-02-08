@@ -126,6 +126,42 @@ def sanitize_for_terminal(text: str) -> str:
     return sanitized
 
 
+def sanitize_code_for_display(code: str) -> str:
+    """Aggressively sanitize code containing emojis/unicode for Windows console display.
+
+    This function handles ANY unicode character that cannot be encoded in the terminal's
+    encoding (e.g., cp1252 on Windows). It's specifically designed for code snippets
+    that may contain emojis or other unicode characters.
+
+    Args:
+        code: Source code potentially containing emojis or unicode
+
+    Returns:
+        str: Sanitized code safe for Rich Syntax display on any terminal
+
+    Example:
+        >>> sanitize_code_for_display('print("🛰️  Satellite")')
+        'print("?  Satellite")'
+    """
+    if is_utf8_capable():
+        return code
+
+    # Get terminal encoding (e.g., 'cp1252' on Windows)
+    encoding = detect_terminal_encoding()
+
+    # Try to encode and replace unencodable characters with '?'
+    try:
+        # Encode with 'replace' error handler (replaces unencodable chars with '?')
+        sanitized_bytes = code.encode(encoding, errors='replace')
+        # Decode back to string
+        sanitized = sanitized_bytes.decode(encoding)
+        return sanitized
+    except Exception:
+        # Fallback: aggressively strip to ASCII
+        # This is more brutal but guaranteed to work
+        return code.encode('ascii', errors='replace').decode('ascii')
+
+
 def create_safe_print() -> Callable:
     """Create a print function that automatically sanitizes output.
 
