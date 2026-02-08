@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Version - Managed by tools/sync_version.py (DO NOT EDIT MANUALLY)
+__version__ = "3.9.0"
+
 
 class Config:
     """Configuration loader with environment variable support."""
