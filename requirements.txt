@@ -12,6 +12,10 @@ rich
 python-dotenv
 
 # AI & Brain
+# CRITICAL: Install CPU-only PyTorch BEFORE sentence-transformers to avoid CUDA bloat
+# The --extra-index-url flag in Dockerfile will pull these from PyTorch CPU repo
+torch>=2.0.0
+torchvision>=0.15.0
 chromadb>=0.6.0
 sentence-transformers
 openai
