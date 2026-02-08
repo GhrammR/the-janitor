@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 env:
-  DOCKER_IMAGE: thejanitor/janitor
+  DOCKER_IMAGE: ghrammr/the-janitor
 
 jobs:
   build-and-push:

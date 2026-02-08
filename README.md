@@ -1,8 +1,8 @@
 # 🧹 The Janitor: Stop the Slop. Start the Engineering.
 
-[![Release: v3.9.1](https://img.shields.io/badge/release-v3.9.1-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
+[![Release: v3.9.2](https://img.shields.io/badge/release-v3.9.2-blue.svg)](https://github.com/GhrammR/the-janitor/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker: Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/thejanitor/janitor)
+[![Docker: Ready](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/ghrammr/the-janitor)
 
 ---
 
@@ -314,13 +314,13 @@ Guaranteed environment compatibility. No dependency hell.
 
 ```bash
 # Pull the image
-docker pull thejanitor/janitor:latest
+docker pull ghrammr/the-janitor:latest
 
 # Run audit on current directory
-docker run --rm -v $(pwd):/app/src thejanitor/janitor audit /app/src
+docker run --rm -v $(pwd):/app/src ghrammr/the-janitor audit /app/src
 
 # Run clean (interactive mode needed for confirmation)
-docker run --rm -it -v $(pwd):/app/src thejanitor/janitor clean /app/src
+docker run --rm -it -v $(pwd):/app/src ghrammr/the-janitor clean /app/src
 ```
 
 ### Option 2: Pip (Local)

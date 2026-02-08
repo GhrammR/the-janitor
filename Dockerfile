@@ -1,5 +1,5 @@
 FROM python:3.11-slim
-LABEL version="3.9.1"
+LABEL version="3.9.2"
 
 # Environment variables (prevent .pyc files and enable unbuffered output)
 ENV PYTHONPATH=/app \
