@@ -162,6 +162,78 @@ class SemanticRefactor:
 
         return imports
 
+    @staticmethod
+    def _check_global_state_leak(code: str) -> tuple[bool, list[str]]:
+        """Check if merged code references unsafe global state.
+
+        v4.2.0: PRIVATE MEMBER & GLOBAL STATE GUARD
+        Performs static analysis to detect references to variables that are:
+        - NOT in the helper function's parameters
+        - NOT in the safe globals list (builtins, common libraries)
+
+        Args:
+            code: Merged Python code to analyze
+
+        Returns:
+            Tuple of (is_safe, unsafe_references)
+            - is_safe: False if unsafe state leak detected
+            - unsafe_references: List of variable names that are unsafe
+        """
+        # Safe global modules/names that are allowed
+        SAFE_GLOBALS = {
+            # Python builtins
+            'True', 'False', 'None', 'len', 'range', 'str', 'int', 'float', 'bool',
+            'list', 'dict', 'set', 'tuple', 'type', 'isinstance', 'hasattr', 'getattr',
+            'setattr', 'print', 'input', 'open', 'enumerate', 'zip', 'map', 'filter',
+            'sum', 'min', 'max', 'abs', 'round', 'sorted', 'reversed', 'all', 'any',
+            # Common standard library modules
+            'os', 'sys', 'json', 'time', 'datetime', 'math', 're', 'Path', 'pathlib',
+            'typing', 'Optional', 'List', 'Dict', 'Set', 'Tuple', 'Union', 'Any',
+        }
+
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            # If code doesn't parse, it will be caught by syntax validation elsewhere
+            return True, []
+
+        # Find the helper function (typically named _merged_logic, _shared_impl, etc.)
+        helper_func = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                # Helper functions typically start with '_' and contain 'merge' or 'shared' in name
+                if node.name.startswith('_') and ('merge' in node.name.lower() or 'shared' in node.name.lower()):
+                    helper_func = node
+                    break
+
+        if not helper_func:
+            # No helper function found - code might be malformed, but syntax validator will catch it
+            return True, []
+
+        # Extract parameter names from helper function
+        param_names = {arg.arg for arg in helper_func.args.args}
+        # Add 'self' and 'cls' as they might be used in parameters
+        param_names.add('self')
+        param_names.add('cls')
+
+        # Collect all Name nodes (variable references) in the helper function
+        unsafe_refs = []
+        for node in ast.walk(helper_func):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                var_name = node.id
+                # Check if this variable is NOT safe
+                if (var_name not in param_names and
+                    var_name not in SAFE_GLOBALS and
+                    not var_name.startswith('_merged') and  # Allow recursive calls
+                    not var_name.startswith('_shared')):
+                    unsafe_refs.append(var_name)
+
+        # Deduplicate and return
+        unsafe_refs = sorted(set(unsafe_refs))
+        is_safe = len(unsafe_refs) == 0
+
+        return is_safe, unsafe_refs
+
     def _clean_response(self, response: str) -> str:
         """Strip Markdown artifacts and explanatory text from LLM response.
 
@@ -253,10 +325,17 @@ class SemanticRefactor:
         parent_context1 = f"(class: {entity1.parent_class})" if entity1.parent_class else "(standalone function)"
         parent_context2 = f"(class: {entity2.parent_class})" if entity2.parent_class else "(standalone function)"
 
+        # v4.2.0: METADATA PRESERVATION - Extract decorator information
+        decorators1 = entity1.decorators if entity1.decorators else []
+        decorators2 = entity2.decorators if entity2.decorators else []
+        decorators_context1 = ", ".join(decorators1) if decorators1 else "no decorators"
+        decorators_context2 = ", ".join(decorators2) if decorators2 else "no decorators"
+
         # Use LLM to merge similar (but not identical) functions
         # v3.7.0: Safe Proxy Pattern - Preserves original function signatures
         # v4.0.0-beta.2: State & Scope Awareness
         # v4.1.1: Billing constraint for frontier-tier reliability
+        # v4.2.0: Metadata preservation & private member safety
         system_prompt = """You are a code refactoring expert. Your task is to merge two similar functions using the SAFE PROXY PATTERN.
 
 BILLING CONSTRAINT (v4.1.1 - CRITICAL):
@@ -298,6 +377,39 @@ STATE & SCOPE AWARENESS (v4.0.0-beta.2):
 7. **If functions use different imports**, you MUST include ALL required imports at the top of your response
 8. **Maintain variable scope** - do not introduce global variables or closure leaks
 
+METADATA PRESERVATION (v4.2.0 - ENTERPRISE CRITICAL):
+9. **DECORATORS MUST BE PRESERVED**:
+   - You MUST preserve all decorators (e.g., @property, @staticmethod, @classmethod, @lru_cache) on the wrapper functions
+   - The wrapper functions MUST retain their original decorators to maintain identical behavior
+   - If both functions share the same decorator, it stays on BOTH wrappers (not moved to helper)
+   - The `_merged_logic` helper is NEVER decorated (it's an internal implementation detail)
+   - Example:
+     ```python
+     def _merged_logic(instance, x):
+         return x * 2
+
+     @property
+     def prop_a(self):
+         return _merged_logic(self, self.value_a)
+
+     @property
+     def prop_b(self):
+         return _merged_logic(self, self.value_b)
+     ```
+
+PRIVATE MEMBER SAFETY (v4.2.0 - NAME MANGLING GUARD):
+10. **PRIVATE ATTRIBUTES** (self.__var):
+    - If methods access private attributes (self.__var), you MUST pass them as explicit arguments to the helper
+    - This avoids Python name mangling issues (ClassName__var)
+    - Example:
+      ```python
+      def _merged_logic(private_val, x):
+          return private_val + x
+
+      def method_a(self, x):
+          return _merged_logic(self.__private, x)
+      ```
+
 OUTPUT REQUIREMENTS (CRITICAL):
 - OUTPUT ONLY THE RAW PYTHON CODE
 - DO NOT INCLUDE MARKDOWN CODE BLOCKS (no ``` markers)
@@ -316,20 +428,25 @@ CONTEXT:
 {imports_context}
 ```
 
-FUNCTION 1 {parent_context1} from {entity1.file_path}:{entity1.start_line}:
+FUNCTION 1 {parent_context1} [{decorators_context1}] from {entity1.file_path}:{entity1.start_line}:
 ```python
 {entity1.full_text}
 ```
 
-FUNCTION 2 {parent_context2} from {entity2.file_path}:{entity2.start_line}:
+FUNCTION 2 {parent_context2} [{decorators_context2}] from {entity2.file_path}:{entity2.start_line}:
 ```python
 {entity2.full_text}
 ```
 
+CRITICAL REQUIREMENTS:
+- Function 1 decorators ({decorators_context1}) MUST be preserved on wrapper 1
+- Function 2 decorators ({decorators_context2}) MUST be preserved on wrapper 2
+- If methods access private attributes (self.__var), pass them as arguments to helper
+
 Generate:
 1. ALL required imports (if any) at the top
-2. One internal helper function with shared logic
-3. Both original functions as wrappers (unchanged signatures)
+2. One internal helper function with shared logic (NO decorators on helper)
+3. Both original functions as wrappers (unchanged signatures WITH original decorators)
 
 Return ONLY the Python code (imports + three functions)."""
 
@@ -348,6 +465,23 @@ Return ONLY the Python code (imports + three functions)."""
                 print(f"[BRAIN SAFETY] Raw response preview: {raw_response[:200]}...")
                 print(f"[BRAIN SAFETY] Cleaned code preview: {merged_code[:200]}...")
                 print(f"[BRAIN SAFETY] Discarding unsafe refactor plan for {entity1.name} + {entity2.name}")
+                # Return plan with no merged_code (treated as failed merge)
+                return RefactorPlan(
+                    entity1=entity1,
+                    entity2=entity2,
+                    similarity=similarity,
+                    merged_code=None,
+                    is_identical=False,
+                    estimated_lines_saved=0
+                )
+
+            # v4.2.0: GLOBAL STATE LEAK DETECTION - Prevent unsafe variable references
+            is_safe, unsafe_refs = self._check_global_state_leak(merged_code)
+            if not is_safe:
+                print(f"[STATE GUARD] Unsafe global state leak detected in merge: {', '.join(unsafe_refs)}")
+                print(f"[STATE GUARD] Helper function references variables not in its parameters")
+                print(f"[STATE GUARD] Unsafe variables: {unsafe_refs}")
+                print(f"[STATE GUARD] Discarding unsafe refactor plan for {entity1.name} + {entity2.name}")
                 # Return plan with no merged_code (treated as failed merge)
                 return RefactorPlan(
                     entity1=entity1,

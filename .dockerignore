@@ -25,3 +25,7 @@ docs/assets/
 Dockerfile
 .dockerignore
 .env
+
+# 5. Claude Code Context (Local Only)
+CLAUDE.md
+.claude/

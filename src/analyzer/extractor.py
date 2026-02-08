@@ -18,6 +18,7 @@ class Entity:
     parent_class: str = None  # Parent class name if this is a method
     base_classes: List[str] = None  # Base classes if this is a class (e.g., ['BaseClass', 'Mixin'])
     protected_by: str = ""  # Rule or directory that protected this symbol
+    decorators: List[str] = None  # v4.2.0: Decorator names (e.g., ['@property', '@staticmethod'])
 
 
 @dataclass
@@ -120,6 +121,9 @@ class EntityExtractor:
                         if inner_def.type in ['class_definition', 'class_declaration']:
                             base_classes = self._extract_base_classes(inner_def, source_code)
 
+                        # v4.2.0: Extract decorators for metadata preservation
+                        decorators = self._extract_decorators(node, source_code)
+
                         # Use inner_def type for entity type
                         entities.append(Entity(
                             name=name,
@@ -130,7 +134,8 @@ class EntityExtractor:
                             file_path=str(file_path),
                             qualified_name=qualified_name,
                             parent_class=parent_class,
-                            base_classes=base_classes
+                            base_classes=base_classes,
+                            decorators=decorators
                         ))
 
                         # If this is a class, set it as parent for nested entities
@@ -166,6 +171,9 @@ class EntityExtractor:
                     if node.type in ['class_definition', 'class_declaration']:
                         base_classes = self._extract_base_classes(node, source_code)
 
+                    # v4.2.0: No decorators for non-decorated entities
+                    decorators = None
+
                     entities.append(Entity(
                         name=name,
                         type=node.type,
@@ -175,7 +183,8 @@ class EntityExtractor:
                         file_path=str(file_path),
                         qualified_name=qualified_name,
                         parent_class=parent_class,
-                        base_classes=base_classes
+                        base_classes=base_classes,
+                        decorators=decorators
                     ))
 
                     # If this is a class, set it as parent for nested entities
@@ -282,6 +291,31 @@ class EntityExtractor:
                             base_classes.append(base_name)
 
         return base_classes
+
+    def _extract_decorators(self, node: Node, source_code: bytes) -> List[str]:
+        """Extract decorator names from decorated_definition node.
+
+        v4.2.0: METADATA PRESERVATION - Extracts @property, @staticmethod, @lru_cache, etc.
+
+        Args:
+            node: decorated_definition node (parent of function/class)
+            source_code: Original source code bytes
+
+        Returns:
+            List of decorator strings (e.g., ['@property', '@staticmethod'])
+        """
+        decorators = []
+
+        # Only Python supports decorators via decorated_definition
+        if self.language == 'python' and node.type == 'decorated_definition':
+            # decorated_definition children: [decorator, decorator, ..., function_definition]
+            for child in node.children:
+                if child.type == 'decorator':
+                    # Extract full decorator text (e.g., '@lru_cache(maxsize=128)')
+                    decorator_text = source_code[child.start_byte:child.end_byte].decode('utf-8', errors='ignore')
+                    decorators.append(decorator_text.strip())
+
+        return decorators
 
     def _extract_import_info(self, node: Node, source_code: bytes) -> Optional[Import]:
         """Extract import information from import node.

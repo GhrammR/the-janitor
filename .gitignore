@@ -73,3 +73,7 @@ tools/
 
 # MkDocs build output
 site/
+
+# Claude Code context (local only)
+CLAUDE.md
+.claude/
