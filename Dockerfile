@@ -1,29 +1,36 @@
 FROM python:3.11-slim
+LABEL version="3.9.1"
 
-# 1. Install System Dependencies + Node.js
-RUN apt-get update && apt-get install -y \
-    gcc g++ curl python3-dev build-essential \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Environment variables (prevent .pyc files and enable unbuffered output)
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# 2. Set Python path for absolute imports
-ENV PYTHONPATH=/app
+# Install system dependencies + Node.js in a single layer
+# Clean up immediately to minimize image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ curl build-essential \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# 3. Install Python dependencies (cached layer)
+# Copy requirements first for layer caching
 COPY requirements.txt .
+
+# Install Python dependencies with no cache
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copy source code (Respects .dockerignore)
+# Copy source code (respects .dockerignore)
 COPY . .
 
-# 5. Setup Entrypoint
+# Setup entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# 6. Install the Janitor package
-RUN pip install .
+# Install Janitor package with no cache
+RUN pip install --no-cache-dir .
 
 ENTRYPOINT ["/entrypoint.sh"]

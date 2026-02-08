@@ -4,8 +4,9 @@
 Reads the VERSION file and synchronizes version strings across:
 - README.md (badges and text)
 - mkdocs.yml (site_name and extra.version)
-- action.yml (description)
 - src/config.py (__version__ constant)
+- action.yml (description version)
+- Dockerfile (version label)
 """
 
 import re
@@ -85,6 +86,46 @@ __version__ = "{version}"
     print(f"[OK] Updated src/config.py to v{version}")
 
 
+def update_action_yml(version: str, project_root: Path) -> None:
+    """Update version in action.yml description."""
+    action_path = project_root / "action.yml"
+    content = action_path.read_text(encoding="utf-8")
+
+    # Update description if it contains a version
+    content = re.sub(
+        r"(description: .*)(v[\d.]+)(.*)",
+        rf"\1v{version}\3",
+        content
+    )
+
+    action_path.write_text(content, encoding="utf-8")
+    print(f"[OK] Updated action.yml to v{version}")
+
+
+def update_dockerfile(version: str, project_root: Path) -> None:
+    """Update version label in Dockerfile."""
+    dockerfile_path = project_root / "Dockerfile"
+    content = dockerfile_path.read_text(encoding="utf-8")
+
+    # Add or update LABEL version
+    if "LABEL version=" in content:
+        content = re.sub(
+            r'LABEL version="[\d.]+"',
+            f'LABEL version="{version}"',
+            content
+        )
+    else:
+        # Add LABEL after FROM line
+        content = re.sub(
+            r'(FROM python:[\d.]+-slim\n)',
+            rf'\1LABEL version="{version}"\n',
+            content
+        )
+
+    dockerfile_path.write_text(content, encoding="utf-8")
+    print(f"[OK] Updated Dockerfile to v{version}")
+
+
 def main():
     """Synchronize version across all project files."""
     project_root = Path(__file__).parent.parent
@@ -96,6 +137,8 @@ def main():
     update_readme(version, project_root)
     update_mkdocs(version, project_root)
     update_config(version, project_root)
+    update_action_yml(version, project_root)
+    update_dockerfile(version, project_root)
 
     print("=" * 60)
     print(f"[OK] All files synchronized to v{version}")
