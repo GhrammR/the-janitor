@@ -14,9 +14,43 @@ from pathlib import Path
 
 
 def read_version() -> str:
-    """Read version from VERSION file."""
+    """Read version from VERSION file with robust encoding handling.
+
+    Handles:
+    - UTF-8 with BOM (utf-8-sig)
+    - UTF-16 encoding artifacts
+    - Hidden whitespace, newlines, and null bytes
+
+    Returns:
+        Validated semantic version string (X.Y.Z)
+
+    Raises:
+        ValueError: If version format is invalid
+    """
     version_file = Path(__file__).parent.parent / "VERSION"
-    return version_file.read_text().strip()
+
+    # Try UTF-8 with BOM handling first (most common on Windows)
+    try:
+        raw_version = version_file.read_text(encoding='utf-8-sig')
+    except UnicodeDecodeError:
+        # Fallback to UTF-16 if UTF-8 fails (rare Windows artifact)
+        try:
+            raw_version = version_file.read_bytes().decode('utf-16')
+        except UnicodeDecodeError:
+            # Last resort: Latin-1 (always succeeds but may be garbage)
+            raw_version = version_file.read_text(encoding='latin-1')
+
+    # Sanitize: Remove whitespace, newlines, null bytes, and non-printable chars
+    version = raw_version.strip().strip('\x00').strip()
+
+    # Validation: Ensure semantic versioning format (X.Y.Z)
+    if not re.match(r'^\d+\.\d+\.\d+$', version):
+        raise ValueError(
+            f"Invalid version format detected: '{version}' (raw: {raw_version!r})\n"
+            f"Expected semantic version format: X.Y.Z (e.g., 3.9.1)"
+        )
+
+    return version
 
 
 def update_readme(version: str, project_root: Path) -> None:
