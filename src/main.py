@@ -5,7 +5,15 @@ import os
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 os.environ["CHROMA_DB_TELEMETRY_OPTOUT"] = "True"
 
+# CRITICAL: Load environment variables BEFORE any src imports
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file from project root
+_project_root = Path(__file__).parent.parent
+_env_path = _project_root / ".env"
+load_dotenv(_env_path)
+
 import sys
 import time
 import typer
@@ -909,6 +917,13 @@ def dedup(
         console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
         raise typer.Exit(1)
 
+    # Explicit validation: Check if JANITOR_AI_KEY is available
+    if not os.getenv('JANITOR_AI_KEY'):
+        console.print("[bold red]ERROR:[/bold red] .env file loaded but JANITOR_AI_KEY is missing.")
+        console.print("[yellow]Hint:[/yellow] Create a .env file in the project root with:")
+        console.print("  JANITOR_AI_KEY=your_api_key_here")
+        raise typer.Exit(1)
+
     console.print(f"[bold blue]Semantic Deduplication:[/bold blue] {escape(str(project_path))}\n")
 
     # =========================================================================
@@ -960,17 +975,17 @@ def dedup(
                 if pair_id not in seen_pairs:
                     seen_pairs.add(pair_id)
 
-                    # SMART FILTER: Ignore class vs its own __init__ method
-                    # Prevent suggesting to merge a class with its constructor
-                    entity_is_class = entity.type == 'class'
-                    sim_is_init = sim['name'] == '__init__'
-                    entity_is_init = entity.name == '__init__'
-                    sim_is_class = sim['type'] == 'class'
+                    # SMART FILTER: Ignore class vs its own methods
+                    # Prevent suggesting to merge a class with its methods (constructor or any other method)
+                    entity_is_class = entity.type in ['class_definition', 'class_declaration']
+                    sim_is_function = sim['type'] in ['function_definition', 'method_definition']
+                    entity_is_function = entity.type in ['function_definition', 'method_definition']
+                    sim_is_class = sim['type'] in ['class_definition', 'class_declaration']
 
-                    # Skip if one is a class and the other is __init__ within that class
-                    if (entity_is_class and sim_is_init and sim.get('parent_class') == entity.name):
+                    # Skip if one is a class and the other is ANY method within that class
+                    if (entity_is_class and sim_is_function and sim.get('parent_class') == entity.name):
                         continue
-                    if (sim_is_class and entity_is_init and entity.parent_class == sim['name']):
+                    if (sim_is_class and entity_is_function and entity.parent_class == sim['name']):
                         continue
 
                     duplicates.append((entity, sim))

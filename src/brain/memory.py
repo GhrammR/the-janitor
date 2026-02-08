@@ -102,7 +102,8 @@ class SemanticMemory:
                 "qualified_name": qualified_name,
                 "type": entity.type,
                 "start_line": entity.start_line,
-                "end_line": entity.end_line
+                "end_line": entity.end_line,
+                "parent_class": entity.parent_class or ""  # Include parent_class for smart filtering
             })
 
         # Upsert (idempotent operation)
@@ -182,6 +183,7 @@ class SemanticMemory:
                 "type": result_metadata['type'],
                 "start_line": result_metadata['start_line'],
                 "end_line": result_metadata['end_line'],
+                "parent_class": result_metadata.get('parent_class', ''),  # Include parent_class for smart filtering
                 "full_text": results['documents'][0][i]
             })
 
