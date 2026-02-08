@@ -909,99 +909,141 @@ def dedup(
         console.print(f"[bold red]Error:[/bold red] Project path does not exist: {escape(str(project_path))}")
         raise typer.Exit(1)
 
-    console.print(f"[bold blue]Analyzing code for duplicates:[/bold blue] {project_path}\n")
+    console.print(f"[bold blue]Semantic Deduplication:[/bold blue] {escape(str(project_path))}\n")
 
-    # Build dependency graph to get all files
-    console.print("Discovering source files...")
-    graph_builder = DependencyGraphBuilder(project_path)
-    graph = graph_builder.build_graph()
-    all_files = list(graph.nodes())
-
-    console.print(f"Found {len(all_files)} files")
-
-    # Parse all files and extract entities
-    console.print(f"Extracting {language} functions and classes...")
-    all_entities = []
-
-    for file_path in all_files:
-        file_path = Path(file_path)
-
-        # Check if file matches language
-        parser = LanguageParser.from_file_extension(file_path)
-        if not parser or parser.language != language:
-            continue
-
-        # Parse file
-        tree = parser.parse_file(file_path)
-        if not tree:
-            continue
-
-        # Extract entities
-        try:
-            with open(file_path, 'rb') as f:
-                source_code = f.read()
-
-            extractor = EntityExtractor(language)
-            entities = extractor.extract_entities(tree, source_code, str(file_path))
-            all_entities.extend(entities)
-
-        except (IOError, OSError):
-            continue
-
-    console.print(f"Extracted {len(all_entities)} entities")
+    # =========================================================================
+    # PHASE 1-3: Reuse Unified Analysis Pipeline
+    # =========================================================================
+    orphans, dead_symbols, all_entities, reference_tracker, graph = analyze_project(
+        project_path, language, library_mode=False, grep_shield=False, show_progress=True
+    )
 
     if not all_entities:
         console.print("[yellow]No functions or classes found to analyze[/yellow]")
         return
 
-    # Index entities in ChromaDB
-    console.print("Building semantic index with ChromaDB...")
-    memory = SemanticMemory(project_path / ".janitor_db")
-    memory.index_entities(all_entities, language)
+    # =========================================================================
+    # PHASE 4: Semantic Comparison (ChromaDB)
+    # =========================================================================
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        transient=True
+    ) as progress:
+        task = progress.add_task("[magenta]Phase 4/4: Semantic Comparison (ChromaDB)...", total=len(all_entities))
 
-    # Find duplicates
-    console.print(f"Finding duplicates (threshold: {threshold:.0%})...")
-    duplicates = []
-    seen_pairs = set()
+        # Index entities in ChromaDB
+        memory = SemanticMemory(project_path / ".janitor_db")
+        memory.index_entities(all_entities, language)
+        progress.update(task, advance=len(all_entities) // 2)
 
-    for entity in all_entities:
-        similar = memory.find_similar_entities(entity, language, threshold)
+        # Find duplicates
+        duplicates = []
+        seen_pairs = set()
 
-        for sim in similar:
-            # Create unique pair ID to avoid duplicates
-            # Use qualified_name and start_line for globally unique identification
-            entity_qualified = entity.qualified_name if entity.qualified_name else entity.name
-            sim_qualified = sim.get('qualified_name', sim['name'])
+        for entity in all_entities:
+            similar = memory.find_similar_entities(entity, language, threshold)
 
-            pair_id = tuple(sorted([
-                f"{entity.file_path}::{entity_qualified}::{entity.start_line}",
-                f"{sim['file_path']}::{sim_qualified}::{sim['start_line']}"
-            ]))
+            for sim in similar:
+                # Create unique pair ID to avoid duplicates
+                entity_qualified = entity.qualified_name if entity.qualified_name else entity.name
+                sim_qualified = sim.get('qualified_name', sim['name'])
 
-            if pair_id not in seen_pairs:
-                seen_pairs.add(pair_id)
-                duplicates.append((entity, sim))
+                pair_id = tuple(sorted([
+                    f"{entity.file_path}::{entity_qualified}::{entity.start_line}",
+                    f"{sim['file_path']}::{sim_qualified}::{sim['start_line']}"
+                ]))
+
+                if pair_id not in seen_pairs:
+                    seen_pairs.add(pair_id)
+
+                    # SMART FILTER: Ignore class vs its own __init__ method
+                    # Prevent suggesting to merge a class with its constructor
+                    entity_is_class = entity.type == 'class'
+                    sim_is_init = sim['name'] == '__init__'
+                    entity_is_init = entity.name == '__init__'
+                    sim_is_class = sim['type'] == 'class'
+
+                    # Skip if one is a class and the other is __init__ within that class
+                    if (entity_is_class and sim_is_init and sim.get('parent_class') == entity.name):
+                        continue
+                    if (sim_is_class and entity_is_init and entity.parent_class == sim['name']):
+                        continue
+
+                    duplicates.append((entity, sim))
+
+            progress.advance(task, advance=1)
+
+        progress.update(task, completed=len(all_entities))
 
     if not duplicates:
-        console.print("[bold green]No duplicate code found! Your codebase is well-organized.[/bold green]")
+        console.print("\n[bold green]No duplicate code found! Your codebase is well-organized.[/bold green]")
         return
 
-    # Limit results
-    duplicates = duplicates[:limit]
+    # =========================================================================
+    # PHASE 5: Summary Table (UI Condensation)
+    # =========================================================================
+    console.print(f"\n[bold yellow]Found {len(duplicates)} duplicate/similar code pair(s)[/bold yellow]")
+    console.print(f"[dim]Showing top {min(limit, len(duplicates))} results (threshold: {threshold:.0%})[/dim]\n")
 
-    console.print(f"\n[bold yellow]Found {len(duplicates)} duplicate/similar code pair(s)[/bold yellow]\n")
+    # Create summary table
+    summary_table = Table(title="Duplicate Code Summary", show_header=True, header_style="bold cyan")
+    summary_table.add_column("Rank", justify="right", style="cyan", width=6)
+    summary_table.add_column("Similarity", justify="center", style="yellow", width=12)
+    summary_table.add_column("Symbol A", style="green", width=30)
+    summary_table.add_column("Symbol B", style="green", width=30)
+    summary_table.add_column("File", style="dim", width=40)
 
-    # Analyze duplicates with LLM
+    # Sort by similarity descending
+    sorted_duplicates = sorted(duplicates[:limit], key=lambda x: x[1]['similarity'], reverse=True)
+
+    for idx, (entity, sim) in enumerate(sorted_duplicates, 1):
+        similarity = sim['similarity']
+
+        try:
+            rel_path_a = Path(entity.file_path).relative_to(project_path)
+            rel_path_b = Path(sim['file_path']).relative_to(project_path)
+            file_display = str(rel_path_a) if entity.file_path == sim['file_path'] else f"{rel_path_a} / {rel_path_b}"
+        except ValueError:
+            file_display = f"{entity.file_path} / {sim['file_path']}"
+
+        entity_name = entity.qualified_name or entity.name
+        sim_name = sim.get('qualified_name', sim['name'])
+
+        summary_table.add_row(
+            str(idx),
+            f"{similarity:.1%}",
+            entity_name[:28] + ".." if len(entity_name) > 28 else entity_name,
+            sim_name[:28] + ".." if len(sim_name) > 28 else sim_name,
+            str(file_display)[:38] + ".." if len(str(file_display)) > 38 else str(file_display)
+        )
+
+    console.print(summary_table)
+    console.print()
+
+    # =========================================================================
+    # PHASE 6: Refactor Suggestions (Detailed Analysis)
+    # =========================================================================
+    # Ask user if they want detailed refactor suggestions
+    if not sorted_duplicates:
+        return
+
+    console.print("[bold blue]Generating refactor suggestions...[/bold blue]\n")
+
+    # Initialize LLM client for refactor suggestions
     try:
         llm_client = LLMClient()
         refactor = SemanticRefactor(llm_client)
     except ValueError as e:
         console.print(f"[bold red]Error:[/bold red] {escape(str(e))}")
-        console.print("[yellow]Showing duplicates without refactoring suggestions[/yellow]\n")
-        refactor = None
+        console.print("[yellow]Showing duplicates without refactoring suggestions[/yellow]")
+        return
 
-    # Display duplicates
-    for idx, (entity, sim) in enumerate(duplicates, 1):
+    # Show detailed suggestions for each duplicate pair
+    for idx, (entity, sim) in enumerate(sorted_duplicates, 1):
         similarity = sim['similarity']
 
         # Create relative paths for display
@@ -1027,75 +1069,70 @@ def dedup(
             border_style="cyan"
         ))
 
-        # Get refactoring suggestion if LLM available
-        if refactor:
-            # Use 0.9999 threshold to catch floating-point precision issues
-            if similarity >= 0.9999:
-                # Exact duplicate (1.0 similarity)
-                # Check if both entities are in the same file
-                same_file = entity.file_path == sim['file_path']
+        # Get refactoring suggestion
+        if similarity >= 0.9999:
+            # Exact duplicate
+            same_file = entity.file_path == sim['file_path']
 
-                if same_file:
-                    # Both in same file - suggest removing one function
-                    entity_display = entity.qualified_name if entity.qualified_name else entity.name
-                    sim_display = sim.get('qualified_name', sim['name'])
-                    suggestion = (
-                        f"[bold green]IDENTICAL DUPLICATE[/bold green]\n\n"
-                        f"These functions have 100% identical code within the same file.\n\n"
-                        f"[bold yellow]Recommendation:[/bold yellow]\n"
-                        f"1. Remove the duplicate function: {sim_display} (line {sim['start_line']})\n"
-                        f"2. Keep: {entity_display} (line {entity.start_line})\n"
-                        f"3. Update all references to use the remaining function\n"
-                        f"4. Run tests to verify no regressions"
-                    )
-                else:
-                    # Different files - suggest deleting one file or consolidating
-                    suggestion = (
-                        f"[bold green]IDENTICAL DUPLICATE[/bold green]\n\n"
-                        f"These functions have 100% identical code.\n\n"
-                        f"[bold yellow]Recommendation:[/bold yellow]\n"
-                        f"1. Delete the duplicate from: {path2}\n"
-                        f"2. Update all imports to use: {path1}\n"
-                        f"3. Run tests to verify no regressions"
-                    )
+            if same_file:
+                entity_display = entity.qualified_name if entity.qualified_name else entity.name
+                sim_display = sim.get('qualified_name', sim['name'])
+                suggestion = (
+                    f"[bold green]IDENTICAL DUPLICATE[/bold green]\n\n"
+                    f"These functions have 100% identical code within the same file.\n\n"
+                    f"[bold yellow]Recommendation:[/bold yellow]\n"
+                    f"1. Remove the duplicate function: {sim_display} (line {sim['start_line']})\n"
+                    f"2. Keep: {entity_display} (line {entity.start_line})\n"
+                    f"3. Update all references to use the remaining function\n"
+                    f"4. Run tests to verify no regressions"
+                )
+            else:
+                suggestion = (
+                    f"[bold green]IDENTICAL DUPLICATE[/bold green]\n\n"
+                    f"These functions have 100% identical code.\n\n"
+                    f"[bold yellow]Recommendation:[/bold yellow]\n"
+                    f"1. Delete the duplicate from: {path2}\n"
+                    f"2. Update all imports to use: {path1}\n"
+                    f"3. Run tests to verify no regressions"
+                )
 
+            console.print(Panel(
+                suggestion,
+                title="[bold green]IDENTICAL DUPLICATE[/bold green]",
+                border_style="green"
+            ))
+        else:
+            # Use LLM to merge
+            console.print("[dim]Generating AI-powered refactoring suggestion...[/dim]")
+
+            # Create entity from sim dict
+            from src.analyzer.extractor import Entity as EntityClass
+            similar_entity = EntityClass(
+                name=sim['name'],
+                type=sim['type'],
+                full_text=sim['full_text'],
+                start_line=sim['start_line'],
+                end_line=sim['end_line'],
+                file_path=sim['file_path']
+            )
+
+            plan = refactor.merge_similar_functions(entity, similar_entity, similarity)
+
+            if plan.merged_code:
                 console.print(Panel(
-                    suggestion,
-                    title="[bold green]IDENTICAL DUPLICATE[/bold green]",
+                    Syntax(plan.merged_code, language, theme="monokai", line_numbers=True),
+                    title=f"Suggested Merge (saves ~{plan.estimated_lines_saved} lines)",
                     border_style="green"
                 ))
             else:
-                # Use LLM to merge
-                console.print("[dim]Generating refactoring suggestion with AI...[/dim]")
-
-                # Create entity from sim dict
-                from analyzer.extractor import Entity as EntityClass
-                similar_entity = EntityClass(
-                    name=sim['name'],
-                    type=sim['type'],
-                    full_text=sim['full_text'],
-                    start_line=sim['start_line'],
-                    end_line=sim['end_line'],
-                    file_path=sim['file_path']
-                )
-
-                plan = refactor.merge_similar_functions(entity, similar_entity, similarity)
-
-                if plan.merged_code:
-                    console.print(Panel(
-                        Syntax(plan.merged_code, language, theme="monokai", line_numbers=True),
-                        title=f"Suggested Merge (saves ~{plan.estimated_lines_saved} lines)",
-                        border_style="green"
-                    ))
-                else:
-                    console.print(Panel(
-                        "[red]Failed to generate merge suggestion[/red]",
-                        border_style="red"
-                    ))
+                console.print(Panel(
+                    "[red]Failed to generate merge suggestion[/red]",
+                    border_style="red"
+                ))
 
         console.print()  # Blank line between duplicates
 
-    # Summary
+    # Final Summary
     console.print(f"[bold yellow]Summary:[/bold yellow]")
     console.print(f"  Total entities analyzed: {len(all_entities)}")
     console.print(f"  Duplicate pairs found: {len(duplicates)}")

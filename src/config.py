@@ -7,7 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Version - Managed by tools/sync_version.py (DO NOT EDIT MANUALLY)
-__version__ = "3.9.4"
+__version__ = "4.0.0-alpha"
 
 
 class Config:

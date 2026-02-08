@@ -43,11 +43,12 @@ def read_version() -> str:
     # Sanitize: Remove whitespace, newlines, null bytes, and non-printable chars
     version = raw_version.strip().strip('\x00').strip()
 
-    # Validation: Ensure semantic versioning format (X.Y.Z)
-    if not re.match(r'^\d+\.\d+\.\d+$', version):
+    # Validation: Ensure semantic versioning format (X.Y.Z or X.Y.Z-prerelease)
+    # Allows: 3.9.1, 4.0.0-alpha, 4.0.0-beta.1, 4.0.0-rc1, etc.
+    if not re.match(r'^\d+\.\d+\.\d+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$', version):
         raise ValueError(
             f"Invalid version format detected: '{version}' (raw: {raw_version!r})\n"
-            f"Expected semantic version format: X.Y.Z (e.g., 3.9.1)"
+            f"Expected semantic version format: X.Y.Z or X.Y.Z-prerelease (e.g., 3.9.1 or 4.0.0-alpha)"
         )
 
     return version
