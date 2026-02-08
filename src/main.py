@@ -906,7 +906,7 @@ def clean(
 def dedup(
     project_path: str = typer.Argument(".", help="Project root path to analyze"),
     language: str = typer.Option("python", "--language", "-l", help="Language to analyze (python, javascript, typescript)"),
-    threshold: float = typer.Option(0.90, "--threshold", "-t", help="Similarity threshold (0.0-1.0)"),
+    threshold: float = typer.Option(0.80, "--threshold", "-t", help="Similarity threshold (0.0-1.0) - lowered to 0.80 with AST pre-filter"),
     limit: int = typer.Option(10, "--limit", help="Maximum number of duplicates to show")
 ):
     """Find and suggest merges for duplicate/similar functions using AI."""
