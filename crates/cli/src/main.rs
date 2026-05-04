@@ -21,6 +21,7 @@ mod hunt;
 mod jira;
 mod report;
 mod sarif_enterprise;
+mod submit_formatter;
 mod verify_asset;
 mod warg_client;
 
@@ -1153,6 +1154,12 @@ enum Commands {
         /// `--format bugcrowd` is also set.  Fails gracefully when the token is absent.
         #[arg(long, default_value_t = false)]
         submit: bool,
+        /// Cross-reference every finding against the program's scope rules in
+        /// `tools/campaign/targets/<program>_targets.md`, emit `[SCOPE: IN]` /
+        /// `[SCOPE: OUT]` labels to stderr, and write `SUBMISSION_<id>.md` for
+        /// every in-scope finding with a populated `repro_cmd`.
+        #[arg(long, default_value_t = false)]
+        submit_check: bool,
     },
 
     /// Deploy a Labyrinth deception forest to exhaust adversarial AI agent context windows.
@@ -1667,6 +1674,7 @@ async fn main() -> anyhow::Result<()> {
             live_tenant_domain,
             live_tenant_client_id,
             submit,
+            submit_check,
         } => {
             hunt::cmd_hunt(hunt::HuntArgs {
                 scan_root: path.as_deref(),
@@ -1686,6 +1694,7 @@ async fn main() -> anyhow::Result<()> {
                 live_tenant_domain: live_tenant_domain.as_deref(),
                 live_tenant_client_id: live_tenant_client_id.as_deref(),
                 submit: *submit,
+                submit_check: *submit_check,
             })?;
         }
         Commands::DeployLabyrinth {

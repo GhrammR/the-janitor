@@ -44478,5 +44478,55 @@
     "language_tags": [],
     "matched_attack_keywords": [],
     "priority_score": 12
+  },
+  {
+    "engagement": "immunefi_targets",
+    "source_file": "targets/immunefi_targets.md",
+    "line_number": 1,
+    "target": "Uniswap v3/v4 core \u2014 Immunefi max $2,250,000 Critical bounty. Solidity AMM contracts: reentrancy, price oracle manipulation, flash loan callbacks.",
+    "urls": [
+      "https://github.com/Uniswap/v3-core",
+      "https://github.com/Uniswap/v4-core"
+    ],
+    "language_tags": ["Solidity"],
+    "matched_attack_keywords": ["reentrancy", "delegatecall", "oracle_manipulation", "flash_loan"],
+    "priority_score": 98,
+    "hunted": true,
+    "hunt_result": "no_findings",
+    "platform": "immunefi",
+    "max_payout_usd": 2250000
+  },
+  {
+    "engagement": "immunefi_targets",
+    "source_file": "targets/immunefi_targets.md",
+    "line_number": 50,
+    "target": "Aave v3 core \u2014 Immunefi max $250,000 Critical bounty. Lending protocol: liquidation overflow, flash loan executeOperation, price oracle TWAP bypass.",
+    "urls": [
+      "https://github.com/aave/aave-v3-core",
+      "https://github.com/aave/aave-v3-periphery"
+    ],
+    "language_tags": ["Solidity"],
+    "matched_attack_keywords": ["reentrancy", "flash_loan", "oracle_manipulation", "integer_overflow"],
+    "priority_score": 95,
+    "hunted": true,
+    "hunt_result": "no_findings",
+    "platform": "immunefi",
+    "max_payout_usd": 250000
+  },
+  {
+    "engagement": "immunefi_targets",
+    "source_file": "targets/immunefi_targets.md",
+    "line_number": 95,
+    "target": "Chainlink contracts \u2014 Immunefi max $100,000 Critical bounty. Oracle aggregation: access control, reentrancy in callbacks, off-chain data integrity.",
+    "urls": [
+      "https://github.com/smartcontractkit/chainlink",
+      "https://github.com/smartcontractkit/chainlink-contracts"
+    ],
+    "language_tags": ["Solidity", "Go"],
+    "matched_attack_keywords": ["reentrancy", "delegatecall", "oracle_manipulation", "signature_replay"],
+    "priority_score": 90,
+    "hunted": false,
+    "platform": "immunefi",
+    "max_payout_usd": 100000
   }
 ]

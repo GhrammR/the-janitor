@@ -3,6 +3,38 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-04 — Sprint Batch 101: Monetization Pipeline — Bugcrowd Formatter & Immunefi Lane
+
+**Directive**: P0-REV-1 Bugcrowd Submission Formatter + P0-REV-2 Immunefi Smart Contract Audit Lane.
+
+**Phase 1 — P0-REV-1 Bugcrowd Submission Formatter**:
+`crates/cli/src/submit_formatter.rs` (new module: `ScopeRules::load/from_markdown/check`,
+  `ScopeRules::load_permissive`, `annotate_scope`, `write_submissions`, `print_scope_report`,
+  `format_submission_md`; AhoCorasick-style section-aware scope extraction from `_targets.md`;
+  `[SCOPE: IN]` / `[SCOPE: OUT]` tagging; SUBMISSION_<id>.md auto-generation for in-scope
+  findings with `repro_cmd`; 7 tests all passing);
+`--submit-check` flag added to `janitor hunt` (`HuntArgs::submit_check`, `Commands::Hunt`);
+`run_submit_check` in `hunt.rs` looks up `tools/campaign/targets/<program>_targets.md`.
+
+**Phase 2 — P0-REV-2 Immunefi Smart Contract Lane**:
+`--format immunefi` added to `janitor hunt` (format validation + dispatch);
+`format_immunefi_report` in `hunt.rs`: groups findings by rule_id, maps to Immunefi VCS tier
+  (`immunefi_vcs_map`: Critical $50k–$1M for reentrancy/delegatecall, High $10k–$50k for
+  oracle_manipulation, flash_loan $50k–$500k), emits Title/Severity/Payout/PoC/Fix/Impact
+  sections; `immunefi_impact` per-class descriptions;
+`tools/campaign/targets/immunefi_targets.md` (Uniswap max $2.25M, Aave max $250k, Chainlink
+  max $100k — scope URLs, payout tables, focus areas);
+3 Immunefi entries added to `target_ledger.json`.
+
+**Phase 3 — Live-Fire Hunts**:
+Uniswap v3-core (github.com/Uniswap/v3-core) → no_findings (expected: heavily audited);
+Aave v3-core (github.com/aave/aave-v3-core) → no_findings (expected: prod-grade with guards);
+mattermost-plugin-msteams → submit-check verified (permissive scope, no repro_cmd findings);
+
+**Phase 4 — Innovation Log Hygiene**: P0-REV-1 and P0-REV-2 blocks physically deleted.
+
+**Phase 5 — Audit**: `just audit` exit 0; 7 new `submit_formatter` tests passing.
+
 ## 2026-05-03 — Sprint Batch 100: Swarm Graph, FFI Taint, Target Analysis & RC.1 Release
 
 **Directive**: Phase 1 (governance) — MEV Exploitation Law refused (contradicts existing Delivery
