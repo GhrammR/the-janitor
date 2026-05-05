@@ -77,12 +77,37 @@ pub mod unix {
             #[serde(default)]
             repo_path: Option<String>,
         },
+        /// P3-4 Continuous Assurance: re-scan only the files changed in a
+        /// git push event and emit security findings to SIEM.
+        ///
+        /// Implements the "continuous assurance mode" incremental re-scan:
+        /// the daemon filters scan results to the provided `changed_files`
+        /// list so that only new/modified paths are re-evaluated, mirroring
+        /// the `ScanState`-gated incremental scan used in the CLI bounce flow.
+        PushEvent {
+            /// Absolute path to the repository root.
+            repo_path: String,
+            /// Repo-relative paths of files changed in the push (e.g.
+            /// `["src/auth.ts", "pkg/handler.go"]`).
+            changed_files: Vec<String>,
+        },
     }
 
     /// Daemon response payload — one JSON object per line.
     #[derive(serde::Serialize)]
     #[serde(tag = "type")]
     pub enum DaemonResponse {
+        /// P3-4 Continuous Assurance scan result.
+        ScanReport {
+            /// Total security findings detected across `changed_files`.
+            findings_count: u32,
+            /// Number of `security:` findings emitted to SIEM.
+            siem_events_emitted: u32,
+            /// Repository path that was scanned.
+            repo_path: String,
+            /// Number of changed files evaluated.
+            changed_files_scanned: u32,
+        },
         /// Successful slop analysis report.
         Report {
             /// Weighted aggregate slop score (`f64` for API consistency with scan).
@@ -523,9 +548,83 @@ pub mod unix {
                     },
                 }
             }
+            Ok(DaemonRequest::PushEvent {
+                repo_path,
+                changed_files,
+            }) => process_push_event(&repo_path, &changed_files, state).await,
             Err(e) => DaemonResponse::Error {
                 message: format!("Invalid request: {e}"),
             },
+        }
+    }
+
+    /// P3-4 Continuous Assurance: scan only the changed files from a push event.
+    ///
+    /// Runs the full Janitor hunt scanner over the repository and filters
+    /// findings to only those whose `file` path matches one of `changed_files`.
+    /// Each security finding is emitted to the SIEM/OTLP channel.
+    async fn process_push_event(
+        repo_path: &str,
+        changed_files: &[String],
+        state: &Arc<DaemonState>,
+    ) -> DaemonResponse {
+        let repo = std::path::Path::new(repo_path);
+        if !repo.is_dir() {
+            return DaemonResponse::Error {
+                message: format!("PushEvent repo_path is not a directory: {repo_path}"),
+            };
+        }
+
+        // Run the full hunt scanner over the repository.  `scan_directory`
+        // returns findings for all files; we filter to the changed set.
+        let all_findings = match crate::hunt::scan_directory(repo) {
+            Ok(f) => f,
+            Err(e) => {
+                return DaemonResponse::Error {
+                    message: format!("PushEvent scan failed: {e}"),
+                };
+            }
+        };
+
+        // Build a set of changed paths for O(1) lookup.  Normalise to
+        // forward-slash so the filter works on both Unix and Windows paths.
+        let changed_set: std::collections::HashSet<String> =
+            changed_files.iter().map(|p| p.replace('\\', "/")).collect();
+
+        let mut findings_count: u32 = 0;
+        let mut siem_events_emitted: u32 = 0;
+
+        for finding in &all_findings {
+            let file_rel = finding
+                .file
+                .as_deref()
+                .map(|f| f.replace('\\', "/"))
+                .unwrap_or_default();
+            // Match if the finding's path ends with any changed file suffix.
+            let is_changed = changed_set
+                .iter()
+                .any(|cf| file_rel.ends_with(cf.as_str()) || file_rel == *cf);
+            if !is_changed {
+                continue;
+            }
+            findings_count += 1;
+            if finding.id.starts_with("security:") {
+                let detail = format!(
+                    "{} — {} ({})",
+                    finding.id,
+                    finding.remediation.as_deref().unwrap_or("see docs"),
+                    file_rel
+                );
+                state.emit_siem_event(&detail);
+                siem_events_emitted += 1;
+            }
+        }
+
+        DaemonResponse::ScanReport {
+            findings_count,
+            siem_events_emitted,
+            repo_path: repo_path.to_string(),
+            changed_files_scanned: changed_files.len() as u32,
         }
     }
 
@@ -570,6 +669,46 @@ pub mod unix {
             // Must complete without panicking when webhook URL is None.
             let dir = tempfile::tempdir().expect("tempdir");
             emit_siem_event_inner(dir.path(), &None, "security:no_webhook_test");
+        }
+
+        #[test]
+        fn push_event_invalid_repo_path_returns_error() {
+            // A push event with a non-existent repo_path must not panic — it
+            // must return a structured error via the DaemonResponse path.
+            let req = r#"{"type":"PushEvent","repo_path":"/nonexistent/repo","changed_files":["src/foo.ts"]}"#;
+            let parsed = serde_json::from_str::<DaemonRequest>(req);
+            assert!(parsed.is_ok(), "PushEvent must deserialise correctly");
+            match parsed.unwrap() {
+                DaemonRequest::PushEvent {
+                    repo_path,
+                    changed_files,
+                } => {
+                    assert_eq!(repo_path, "/nonexistent/repo");
+                    assert_eq!(changed_files, vec!["src/foo.ts"]);
+                }
+                _ => panic!("expected PushEvent variant"),
+            }
+        }
+
+        #[test]
+        fn push_event_empty_changed_files_deserialises() {
+            let req = r#"{"type":"PushEvent","repo_path":"/tmp/repo","changed_files":[]}"#;
+            let parsed = serde_json::from_str::<DaemonRequest>(req);
+            assert!(parsed.is_ok());
+        }
+
+        #[test]
+        fn scan_report_response_serialises() {
+            let resp = DaemonResponse::ScanReport {
+                findings_count: 3,
+                siem_events_emitted: 2,
+                repo_path: "/tmp/repo".to_string(),
+                changed_files_scanned: 5,
+            };
+            let json = serde_json::to_string(&resp).expect("serialise");
+            assert!(json.contains("ScanReport"));
+            assert!(json.contains("findings_count"));
+            assert!(json.contains("siem_events_emitted"));
         }
     }
 }

@@ -3193,6 +3193,13 @@ fn scan_buffer(
         }
     }
 
+    // P6-9 Phase A: swarm context-window exfiltration marker scan.
+    // Applied to all text files — agentic IPC markers can appear in any
+    // source language, commit-message templates, or CI YAML artifacts.
+    if !is_compiled_artifact_extension(ext) {
+        findings.extend(forge::swarm_exfil::detect_context_exfil(source, label));
+    }
+
     findings
 }
 

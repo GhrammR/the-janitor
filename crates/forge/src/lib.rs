@@ -86,6 +86,7 @@ pub mod slop_filter;
 pub mod slop_hunter;
 pub mod solidity_taint;
 pub mod swarm;
+pub mod swarm_exfil;
 pub mod symbex;
 pub mod taint_catalog;
 pub mod taint_propagate;

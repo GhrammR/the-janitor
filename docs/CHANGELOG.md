@@ -3,6 +3,30 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-05 — Sprint Batch 103: Monetization Trial, Continuous Assurance Daemon (P3-4), Swarm Exfil Detector (P6-9), Ledger Hydration
+
+**Directive**: Phase 1 Monetization Trial (generate audit reports for ts-immutable-sdk and mattermost-boards) + P3-4 Continuous Assurance Daemon + P6-9 Swarm Context-Window Exfil Detector + Phase 4 Ledger Hydration.
+
+**Phase 1 — Monetization Trial (SUCCESS)**:
+`cargo run -p cli -- audit-report /tmp/ts-immutable-sdk --output .janitor/audit_reports/` → **60 findings** (58 KevCritical, 2 Critical); DOM XSS at `packages/auth/src/overlay/embeddedLoginPromptOverlay.ts:25` cleanly documented with full AEG HTML harness and IFDS taint-flow — trial confirmed successful;
+`cargo run -p cli -- audit-report /tmp/mattermost-boards --output .janitor/audit_reports/` → **56 findings** (45 KevCritical, 11 Critical); Stored XSS and DOM XSS cleanly rendered with remediation;
+Reports saved to `.janitor/audit_reports/ts-immutable-sdk-audit-report.md` and `.janitor/audit_reports/mattermost-boards-audit-report.md`.
+
+**Phase 2 — P3-4 Continuous Assurance Daemon**:
+`crates/cli/src/daemon.rs`: `DaemonRequest::PushEvent { repo_path, changed_files }` variant added; `DaemonResponse::ScanReport { findings_count, siem_events_emitted, repo_path, changed_files_scanned }` variant added; `process_push_event` async handler — calls `hunt::scan_directory`, filters findings to `changed_files` set, emits `security:*` findings to SIEM via `state.emit_siem_event`; 3 new tests (`push_event_invalid_repo_path_returns_error`, `push_event_empty_changed_files_deserialises`, `scan_report_response_serialises`).
+
+**Phase 3 — P6-9 Swarm Context-Window Exfiltration Detector**:
+`crates/forge/src/swarm_exfil.rs` (new module): `detect_context_exfil(source, file_path)` — AhoCorasick scan over 26 Mythos/Kimi/Devin/generic IPC serialization patterns including `<<SYSTEM_EXFIL>>`, `<thought_process>`, `<tool_result>`, `<function_calls>`, `DEVIN_EXFIL:`, `MYTHOS_PAYLOAD:`, `KIMI_EXFIL_BLOB:`, `Ignore all previous instructions`, `<|im_start|>system`; per-pattern deduplication; line-number accurate; emits `security:swarm_context_exfiltration` at `KevCritical`; 7 deterministic tests; wired into `scan_buffer` in `hunt.rs` for all non-compiled-artifact file types;
+`crates/forge/src/lib.rs`: `pub mod swarm_exfil` added.
+
+**Phase 4 — Ledger Hydration**:
+Cloned auth0/auth0.js and openai/codex; re-ran `janitor hunt` with v10.2.0-rc.1 engine; confirmed no engine-upgrade-driven severity changes; new SSRF entry added for `immutable/ts-immutable-sdk` server-side `packages/auth-next-server/src/config.ts` dynamic URL (server-side confirmed); `tools/campaign/BOUNTY_LEDGER.md` updated with 3 new re-evaluation rows.
+
+**Phase 5 — Innovation Log Hygiene**:
+`.INNOVATION_LOG.md`: P6-9 block (Agentic Swarm Context-Window Exfiltration Detector) physically deleted; P3-4 block (Enterprise Moat Endgame — Continuous Assurance Mode) physically deleted; "Phase 3: The Autonomous Weapon" section header removed (section now empty).
+
+**just audit**: exit 0, System Clean.
+
 ## 2026-05-04 — Sprint Batch 102: OOM Shield & P0-REV-3 Private Audit Report Generator
 
 **Directive**: Phase 1 OOM compilation shield + P0-REV-3 `janitor audit-report` subcommand.
