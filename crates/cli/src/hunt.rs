@@ -602,6 +602,7 @@ fn run_submit_check(
     findings: &[StructuredFinding],
     scan_root: Option<&Path>,
 ) -> anyhow::Result<()> {
+    use crate::audit_report::extract_git_remote;
     use crate::submit_formatter::{
         annotate_scope, print_scope_report, write_submissions, ScopeRules,
     };
@@ -630,7 +631,10 @@ fn run_submit_check(
     let output_dir = scan_root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let written = write_submissions(&annotated, &output_dir, program_name)?;
+    let canonical_target = scan_root
+        .map(extract_git_remote)
+        .unwrap_or_else(|| program_name.to_string());
+    let written = write_submissions(&annotated, &output_dir, &canonical_target)?;
     if written > 0 {
         eprintln!(
             "[submit-check] {written} SUBMISSION.md file(s) written to {}",

@@ -26,12 +26,13 @@ pub fn cmd_audit_report(repo: &Path, output_dir: &Path) -> anyhow::Result<()> {
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
+    let canonical_target = extract_git_remote(&repo);
 
     let component_info = format!("{} ({})", repo_name, repo.display());
     let findings = FindingRanker::rank_findings(raw_findings, Some(&component_info));
     let deduplicated = deduplicate_findings(findings);
 
-    let report = render_report(&deduplicated, repo_name, &repo);
+    let report = render_report(&deduplicated, repo_name, &canonical_target);
 
     let out_path = output_dir.join("audit_report.md");
     std::fs::write(&out_path, report.as_bytes())
@@ -45,7 +46,11 @@ pub fn cmd_audit_report(repo: &Path, output_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn render_report(findings: &[DeduplicatedFinding], repo_name: &str, repo: &Path) -> String {
+fn render_report(
+    findings: &[DeduplicatedFinding],
+    repo_name: &str,
+    canonical_target: &str,
+) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let now = chrono_date_utc();
 
@@ -58,7 +63,7 @@ fn render_report(findings: &[DeduplicatedFinding], repo_name: &str, repo: &Path)
          **Date**: {now} UTC  \n\
          **Target**: `{}`  \n\n\
          ---\n\n",
-        repo.display()
+        canonical_target
     ));
 
     // ── Executive Summary ────────────────────────────────────────────────────
@@ -209,10 +214,65 @@ fn render_report(findings: &[DeduplicatedFinding], repo_name: &str, repo: &Path)
          _The Janitor is not a substitute for manual review by a credentialed \
          security engineer. This report constitutes automated pre-audit triage \
          and reduces the scope of a full human engagement._\n",
-        repo.display()
+        canonical_target
     ));
 
     out
+}
+
+pub(crate) fn extract_git_remote(dir: &Path) -> String {
+    std::fs::read_to_string(dir.join(".git").join("config"))
+        .ok()
+        .and_then(|config| parse_git_remote_config(&config))
+        .unwrap_or_else(|| fallback_target_name(dir))
+}
+
+fn parse_git_remote_config(config: &str) -> Option<String> {
+    let mut in_origin = false;
+    for line in config.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_origin = trimmed == "[remote \"origin\"]";
+            continue;
+        }
+        if !in_origin {
+            continue;
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        if key.trim() == "url" {
+            return normalize_remote_url(value.trim());
+        }
+    }
+    None
+}
+
+fn normalize_remote_url(remote: &str) -> Option<String> {
+    let trimmed = remote.trim().trim_end_matches(".git");
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(rest) = trimmed.strip_prefix("git@github.com:") {
+        return Some(format!("https://github.com/{rest}"));
+    }
+    if let Some(rest) = trimmed.strip_prefix("ssh://git@github.com/") {
+        return Some(format!("https://github.com/{rest}"));
+    }
+    if trimmed.starts_with("http://github.com/") {
+        return Some(trimmed.replacen("http://", "https://", 1));
+    }
+    if trimmed.starts_with("https://github.com/") {
+        return Some(trimmed.to_string());
+    }
+    Some(trimmed.to_string())
+}
+
+fn fallback_target_name(dir: &Path) -> String {
+    dir.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 fn severity_counts(findings: &[DeduplicatedFinding]) -> Vec<(String, usize)> {
@@ -344,7 +404,6 @@ fn days_to_ymd(mut z: u64) -> (u32, u32, u32) {
 mod tests {
     use super::*;
     use forge::dedup::deduplicate_findings;
-    use std::path::PathBuf;
 
     fn make_finding(id: &str, severity: &str, file: &str) -> StructuredFinding {
         StructuredFinding {
@@ -394,11 +453,7 @@ mod tests {
             });
             f
         }];
-        let report = render_report(
-            &deduplicate_findings(findings),
-            "test-repo",
-            &PathBuf::from("/tmp/test-repo"),
-        );
+        let report = render_report(&deduplicate_findings(findings), "test-repo", "test-repo");
         assert!(report.contains("cast send 0xDEAD"));
         assert!(report.contains("Reproduction Command"));
     }
@@ -431,7 +486,7 @@ mod tests {
             make_finding("security:xss", "KevCritical", "src/b.ts"),
         ];
         let deduplicated = deduplicate_findings(findings);
-        let report = render_report(&deduplicated, "test-repo", &PathBuf::from("/tmp/test-repo"));
+        let report = render_report(&deduplicated, "test-repo", "test-repo");
         assert!(
             report.contains("identified **1** distinct vulnerability class(es)"),
             "executive summary must report deduplicated class count"
@@ -444,6 +499,21 @@ mod tests {
         assert!(
             report.contains("`src/a.ts`") && report.contains("`src/b.ts`"),
             "all duplicate locations must survive as occurrence entries"
+        );
+    }
+
+    #[test]
+    fn parse_git_remote_config_extracts_origin_url() {
+        let config = r#"
+[core]
+    repositoryformatversion = 0
+[remote "origin"]
+    url = git@github.com:mattermost/mattermost-plugin-boards.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+"#;
+        assert_eq!(
+            parse_git_remote_config(config).as_deref(),
+            Some("https://github.com/mattermost/mattermost-plugin-boards")
         );
     }
 }

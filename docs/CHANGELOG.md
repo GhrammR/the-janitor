@@ -3,6 +3,27 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-05 — Sprint Batch 105: Egress Harmonization & Canonical Target Attribution
+
+**Directive**: Unblock StepSecurity egress for GitHub release asset downloads, remove local path leakage from enterprise reporting by extracting canonical git remotes, verify with `--test-threads=4`, and commit locally without release.
+
+**Phase 1 — CI/CD Egress Audit & Unblocking**:
+`.github/workflows/cisa-kev-sync.yml`: audited `allowed-endpoints`; `objects.githubusercontent.com:443` was already present; appended missing `release-assets.githubusercontent.com:443` so `gh release download` can fetch the `janitor` binary plus `.sha384` and `.sig` artifacts without StepSecurity terminating the connection.
+
+**Phase 2 — Canonical Target Attribution (Git Remote Extraction)**:
+`crates/cli/src/audit_report.rs`: added zero-dependency helpers `extract_git_remote`, `parse_git_remote_config`, `normalize_remote_url`, and `fallback_target_name`; parser reads `<dir>/.git/config`, extracts `remote "origin"` URL, normalizes `git@github.com:owner/repo.git` and `ssh://git@github.com/owner/repo.git` to `https://github.com/owner/repo`, and falls back to the directory basename when no usable remote exists; `render_report` now renders canonical target strings instead of raw local paths in both the title block and certification statement.
+`crates/cli/src/hunt.rs`: `run_submit_check` now imports `extract_git_remote` and passes the canonical target string into Bugcrowd submission generation instead of the raw scan-root basename.
+`crates/cli/src/submit_formatter.rs`: Bugcrowd markdown header now uses the canonical target string and includes an explicit `## Target` section so submissions attribute the repository cleanly without leaking `/tmp/...` execution paths.
+
+**Phase 3 — Innovation Log Hygiene**:
+`.INNOVATION_LOG.md` inspected; no active tombstone markers (`[COMPLETED]`, `[DONE]`, `[SHIPPED]`, `~~...~~`) were present. No P-tier deletion performed for this operational hotfix sprint.
+
+**Phase 4 — Verification Gate**:
+`cargo test -p cli -- --test-threads=4` → 198 passed, 0 failed, 1 ignored;
+`cargo test --workspace -- --test-threads=4` → workspace green;
+`cargo fmt --all` applied after `just audit` surfaced formatting drift;
+`just audit` → **System Clean** with documentation parity verified and audit fingerprint saved.
+
 ## 2026-05-05 — Sprint Batch 104: Deduplication Wire-Up & Bugcrowd Submission Fix
 
 **Directive**: Wire deterministic structural deduplication into audit-report and Bugcrowd submission paths; verify against `/tmp/ts-immutable-sdk` and `/tmp/mattermost-boards`; maintain innovation log hygiene; run full audit gate; commit locally without release.
