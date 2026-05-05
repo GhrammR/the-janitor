@@ -10,6 +10,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+mod audit_report;
 mod campaign_ingest;
 mod cbom;
 mod ci_telemetry;
@@ -1162,6 +1163,25 @@ enum Commands {
         submit_check: bool,
     },
 
+    /// Generate a professional Markdown security audit report for a target repository.
+    ///
+    /// Runs the full hunt pipeline (taint, IDOR, authz, solidity, FFI, credentials) and
+    /// emits a structured PDF-ready Markdown document: Executive Summary, Findings Table,
+    /// Per-Finding Technical Detail, and a SHA-384 provenance attestation statement.
+    ///
+    /// # Examples
+    /// ```text
+    /// # Audit a local clone and write audit_report.md to ./reports/
+    /// janitor audit-report ./uniswap-v3-core --output ./reports
+    /// ```
+    AuditReport {
+        /// Path to the repository to audit.
+        repo: PathBuf,
+        /// Output directory for the generated Markdown report.
+        #[arg(long, default_value = ".")]
+        output: PathBuf,
+    },
+
     /// Deploy a Labyrinth deception forest to exhaust adversarial AI agent context windows.
     ///
     /// Generates syntactically valid, semantically dead Python AST mazes seeded with canary
@@ -1696,6 +1716,9 @@ async fn main() -> anyhow::Result<()> {
                 submit: *submit,
                 submit_check: *submit_check,
             })?;
+        }
+        Commands::AuditReport { repo, output } => {
+            audit_report::cmd_audit_report(repo, output)?;
         }
         Commands::DeployLabyrinth {
             output_dir,

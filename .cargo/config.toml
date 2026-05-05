@@ -1,0 +1,10 @@
+[build]
+jobs = 2
+
+[profile.dev]
+debug = 0
+codegen-units = 1
+
+[profile.test]
+debug = 0
+codegen-units = 1

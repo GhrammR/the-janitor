@@ -2642,7 +2642,7 @@ fn is_placeholder_scan_root(scan_root: Option<&Path>, has_explicit_ingest_source
 /// Walk `dir` recursively, run all detectors on every file, and return the
 /// unified finding list.  Files > 1 MiB and unreadable files are silently
 /// skipped.
-fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding>> {
+pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding>> {
     let mut all: Vec<StructuredFinding> = Vec::new();
     let mut frontend_routes = Vec::new();
     let has_ai_assistant_config = has_ai_assistant_config(dir);
