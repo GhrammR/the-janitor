@@ -7,6 +7,7 @@
 //!    `SUBMISSION.md` alongside the hunt report.
 
 use common::slop::StructuredFinding;
+use forge::dedup::{deduplicate_findings, DeduplicatedFinding, FindingOccurrence};
 use std::path::Path;
 
 /// Scope verdict for a single finding.
@@ -210,12 +211,17 @@ pub fn write_submissions(
     output_dir: &Path,
     program_name: &str,
 ) -> anyhow::Result<usize> {
+    let in_scope_findings: Vec<StructuredFinding> = annotated
+        .iter()
+        .filter(|(_, verdict)| verdict.in_scope)
+        .map(|(finding, _)| finding.clone())
+        .collect();
+    let deduplicated = deduplicate_findings(in_scope_findings);
+
     let mut written = 0usize;
-    for (finding, verdict) in annotated {
-        if !verdict.in_scope {
-            continue;
-        }
+    for finding in &deduplicated {
         let has_repro = finding
+            .finding
             .exploit_witness
             .as_ref()
             .and_then(|w| w.repro_cmd.as_ref())
@@ -223,10 +229,10 @@ pub fn write_submissions(
         if !has_repro {
             continue;
         }
-        let safe_id = finding.id.replace([':', '/'], "_");
+        let safe_id = finding.finding.id.replace([':', '/'], "_");
         let filename = format!("SUBMISSION_{safe_id}.md");
         let dest = output_dir.join(&filename);
-        let content = format_submission_md(finding, verdict, program_name);
+        let content = format_submission_md(finding, program_name);
         std::fs::write(&dest, content.as_bytes())
             .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", dest.display()))?;
         eprintln!("[submit-check] wrote {}", dest.display());
@@ -251,75 +257,146 @@ pub fn print_scope_report(annotated: &[(StructuredFinding, ScopeVerdict)]) {
             (Some(f), None) => f.to_string(),
             _ => "unknown".to_string(),
         };
-        eprintln!("[submit-check] {label} {} @ {loc}", finding.id);
+        eprintln!(
+            "[submit-check] {label} {} @ {loc} :: {}",
+            finding.id, verdict.reason
+        );
     }
 }
 
-/// Render a `StructuredFinding` as a Bugcrowd SUBMISSION.md document.
-pub fn format_submission_md(
-    finding: &StructuredFinding,
-    scope_verdict: &ScopeVerdict,
-    program_name: &str,
-) -> String {
+/// Render a deduplicated finding class as a Bugcrowd SUBMISSION.md document.
+pub fn format_submission_md(finding: &DeduplicatedFinding, program_name: &str) -> String {
+    let primary = &finding.finding;
     let title = format!(
         "{} — {} in {}",
-        finding.severity.as_deref().unwrap_or("Finding"),
-        finding.id,
-        finding.file.as_deref().unwrap_or("target"),
+        primary.severity.as_deref().unwrap_or("Finding"),
+        primary.id,
+        primary.file.as_deref().unwrap_or("target"),
     );
-    let cvss = severity_to_cvss(finding.severity.as_deref().unwrap_or("Informational"));
-    let repro = finding
+    let severity = primary.severity.as_deref().unwrap_or("Informational");
+    let description = finding_description(primary);
+    let repro = primary
         .exploit_witness
         .as_ref()
-        .and_then(|w| w.repro_cmd.as_deref())
-        .unwrap_or("No automated reproduction command available. Manual verification required.");
-    let remediation = finding
+        .and_then(|w| {
+            w.reproduction_steps.as_ref().map(|steps| {
+                let mut rendered = String::new();
+                for (idx, step) in steps.iter().enumerate() {
+                    rendered.push_str(&format!("{}. {}\n", idx + 1, step));
+                }
+                if let Some(repro_cmd) = w.repro_cmd.as_deref() {
+                    rendered.push_str("\nDeterministic reproduction command:\n");
+                    rendered.push_str(repro_cmd);
+                }
+                rendered
+            })
+        })
+        .or_else(|| {
+            primary
+                .exploit_witness
+                .as_ref()
+                .and_then(|w| w.repro_cmd.as_ref().map(|cmd| cmd.to_string()))
+        })
+        .unwrap_or_else(|| {
+            "No automated reproduction steps available. Manual verification required.".to_string()
+        });
+    let remediation = primary
         .remediation
         .as_deref()
         .unwrap_or("No remediation advice available.");
-    let impact = severity_to_impact(
-        finding.severity.as_deref().unwrap_or("Informational"),
-        &finding.id,
-    );
-    let file_line = match (finding.file.as_deref(), finding.line) {
-        (Some(f), Some(l)) => format!("{f}:{l}"),
-        (Some(f), None) => f.to_string(),
-        _ => "unknown location".to_string(),
-    };
-    let docs_ref = finding
+    let impact = severity_to_impact(severity, &primary.id);
+    let docs_ref = primary
         .docs_url
         .as_deref()
         .map(|u| format!("- {u}\n"))
         .unwrap_or_default();
+    let occurrences = render_occurrence_list(&finding.occurrences);
+    let witness_context = render_witness_context(primary);
 
     format!(
         "# Bugcrowd Submission — {program_name}\n\n\
-**Scope Status:** {}\n\n\
 ## Title\n{title}\n\n\
-## CVSS Score\n{cvss}\n\n\
-## Finding Location\n`{file_line}`\n\n\
-## Vulnerability Class\n{}\n\n\
+## Severity\n{severity}\n\n\
+## Description\n{description}\n\n\
 ## Reproduction Steps\n```\n{repro}\n```\n\n\
+### Affected Occurrences\n{occurrences}\n\n\
+{witness_context}\
 ## Impact\n{impact}\n\n\
 ## Remediation\n{remediation}\n\n\
 ## References\n{docs_ref}\
 ---\n\
-*Generated by The Janitor {} — automated security engine*\n",
-        scope_verdict.reason,
-        finding.id,
-        env!("CARGO_PKG_VERSION"),
+*Generated by The Janitor {version} — automated security engine*\n",
+        title = title,
+        severity = severity,
+        description = description,
+        repro = repro,
+        occurrences = occurrences,
+        witness_context = witness_context,
+        impact = impact,
+        remediation = remediation,
+        docs_ref = docs_ref,
+        version = env!("CARGO_PKG_VERSION"),
     )
 }
 
-fn severity_to_cvss(severity: &str) -> &'static str {
-    match severity {
-        "KevCritical" => "CVSS 9.0–10.0 (Critical)",
-        "Critical" => "CVSS 8.5–9.9 (Critical)",
-        "High" => "CVSS 7.0–8.9 (High)",
-        "Medium" => "CVSS 4.0–6.9 (Medium)",
-        "Low" => "CVSS 0.1–3.9 (Low)",
-        _ => "CVSS — Informational (score TBD per manual triage)",
+fn finding_description(finding: &StructuredFinding) -> String {
+    let location = match (finding.file.as_deref(), finding.line) {
+        (Some(file), Some(line)) => format!("{file}:{line}"),
+        (Some(file), None) => file.to_string(),
+        _ => "unknown location".to_string(),
+    };
+    let risk = finding
+        .exploit_witness
+        .as_ref()
+        .and_then(|w| w.risk_classification.as_deref())
+        .unwrap_or("Deterministic security finding");
+    format!(
+        "`{}` was detected at `{}`. Structural deduplication collapsed all equivalent \
+         instances into this single submission. Risk classification: {}.",
+        finding.id, location, risk
+    )
+}
+
+fn render_occurrence_list(occurrences: &[FindingOccurrence]) -> String {
+    let mut rendered = String::new();
+    for occurrence in occurrences {
+        match occurrence.line {
+            Some(line) => rendered.push_str(&format!("- `{}`:{line}\n", occurrence.file)),
+            None => rendered.push_str(&format!("- `{}`\n", occurrence.file)),
+        }
     }
+    rendered
+}
+
+fn render_witness_context(finding: &StructuredFinding) -> String {
+    let Some(witness) = finding.exploit_witness.as_ref() else {
+        return String::new();
+    };
+
+    let mut sections = String::new();
+    if !witness.source_label.is_empty() || !witness.sink_label.is_empty() {
+        sections.push_str("### Witness Context\n");
+        sections.push_str(&format!(
+            "- Source: `{}` in `{}`\n- Sink: `{}` in `{}`\n",
+            witness.source_label,
+            witness.source_function,
+            witness.sink_label,
+            witness.sink_function
+        ));
+    }
+    if !witness.call_chain.is_empty() {
+        if sections.is_empty() {
+            sections.push_str("### Witness Context\n");
+        }
+        sections.push_str(&format!(
+            "- Call chain: `{}`\n",
+            witness.call_chain.join(" -> ")
+        ));
+    }
+    if !sections.is_empty() {
+        sections.push('\n');
+    }
+    sections
 }
 
 fn severity_to_impact(severity: &str, finding_id: &str) -> &'static str {
@@ -404,21 +481,33 @@ mod tests {
             "KevCritical",
             Some("cast send 0x... 'withdraw()' --value 1ether"),
         );
-        let verdict = ScopeVerdict {
-            in_scope: true,
-            reason: "[SCOPE: IN] test".to_string(),
+        let deduplicated = DeduplicatedFinding {
+            finding,
+            occurrences: vec![FindingOccurrence {
+                file: "Vault.sol".to_string(),
+                line: None,
+            }],
         };
-        let md = format_submission_md(&finding, &verdict, "test_program");
+        let md = format_submission_md(&deduplicated, "test_program");
         assert!(md.contains("# Bugcrowd Submission"), "must contain header");
         assert!(
             md.contains("security:reentrancy"),
             "must contain finding ID"
         );
         assert!(
-            md.contains("CVSS 9.0–10.0"),
-            "KevCritical must map to Critical CVSS"
+            md.contains("## Severity\nKevCritical"),
+            "severity heading must be present"
         );
         assert!(md.contains("cast send"), "must contain repro command");
+        assert!(
+            md.contains("## Description"),
+            "must contain description section"
+        );
+        assert!(md.contains("## Impact"), "must contain impact section");
+        assert!(
+            md.contains("## Remediation"),
+            "must contain remediation section"
+        );
     }
 
     #[test]
@@ -476,5 +565,43 @@ mod tests {
         assert_eq!(count, 1, "in-scope finding with repro must produce 1 file");
         let expected = dir.path().join("SUBMISSION_security_rce.md");
         assert!(expected.exists(), "SUBMISSION file must be created");
+    }
+
+    #[test]
+    fn write_submissions_deduplicates_same_vulnerability_class() {
+        let dir = tempfile::tempdir().unwrap();
+        let verdict = ScopeVerdict {
+            in_scope: true,
+            reason: "[SCOPE: IN] test".to_string(),
+        };
+        let annotated = vec![
+            (
+                make_finding(
+                    "security:rce",
+                    Some("src/a.py"),
+                    "Critical",
+                    Some("curl -X POST /exec -d 'cmd=id'"),
+                ),
+                verdict.clone(),
+            ),
+            (
+                make_finding(
+                    "security:rce",
+                    Some("src/b.py"),
+                    "Critical",
+                    Some("curl -X POST /exec -d 'cmd=id'"),
+                ),
+                verdict,
+            ),
+        ];
+        let count = write_submissions(&annotated, dir.path(), "test_program").unwrap();
+        assert_eq!(
+            count, 1,
+            "same structural finding class must produce one Bugcrowd submission"
+        );
+        let expected = dir.path().join("SUBMISSION_security_rce.md");
+        let content = std::fs::read_to_string(expected).unwrap();
+        assert!(content.contains("`src/a.py`"));
+        assert!(content.contains("`src/b.py`"));
     }
 }

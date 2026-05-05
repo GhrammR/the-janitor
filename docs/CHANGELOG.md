@@ -3,6 +3,29 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-05 — Sprint Batch 104: Deduplication Wire-Up & Bugcrowd Submission Fix
+
+**Directive**: Wire deterministic structural deduplication into audit-report and Bugcrowd submission paths; verify against `/tmp/ts-immutable-sdk` and `/tmp/mattermost-boards`; maintain innovation log hygiene; run full audit gate; commit locally without release.
+
+**Phase 1 — Audit Report Dedup Wire-Up**:
+`crates/cli/src/audit_report.rs`: imported `forge::dedup::{deduplicate_findings, DeduplicatedFinding}`; `cmd_audit_report` now ranks raw findings, then structurally deduplicates before Markdown rendering; `render_report` now consumes `DeduplicatedFinding` entries instead of raw `StructuredFinding`s; `Findings Table` and `Per-Finding Technical Detail` render one structural class per section with an `Occurrences` list (`file[:line]`) preserving all locations; summary severity counts now operate over deduplicated classes; new regression test `report_collapses_duplicate_findings_before_markdown_generation` proves duplicate findings collapse before Markdown generation.
+
+**Phase 2 — Bugcrowd Submission Formatter Upgrade (P0-REV-1 hardening)**:
+`crates/cli/src/submit_formatter.rs`: imported the dedup engine; `write_submissions` now filters to in-scope findings, runs `deduplicate_findings`, and emits exactly one `SUBMISSION_<rule>.md` per deduplicated in-scope vulnerability class with a repro witness; `format_submission_md` upgraded to Bugcrowd-required sections (`Title`, `Severity`, `Description`, `Reproduction Steps`, `Impact`, `Remediation`) sourced from `StructuredFinding` + `ExploitWitness`; affected-file occurrences are rendered explicitly; witness context (source, sink, call chain) is preserved; scope telemetry now prints the structured reason to keep `ScopeVerdict.reason` live; new regression test `write_submissions_deduplicates_same_vulnerability_class` proves same-class duplicates generate one submission file.
+
+**Phase 3 — Live Verification Results**:
+`cargo run -p cli -- audit-report /tmp/ts-immutable-sdk --output /tmp/ts-immutable-sdk-audit` → report generated with **5 deduplicated classes** (down from 60 raw findings);
+`cargo run -p cli -- audit-report /tmp/mattermost-boards --output /tmp/mattermost-boards-audit` → report generated with **4 deduplicated classes** (down from 56 raw findings).
+
+**Phase 4 — Innovation Log Hygiene**:
+`.INNOVATION_LOG.md` inspected; zero active tombstone markers (`[COMPLETED]`, `[DONE]`, `[SHIPPED]`, `~~...~~`) present. No mutation required.
+
+**Phase 5 — Verification Gate**:
+`cargo test -p cli -- --test-threads=1` → 197 passed, 0 failed, 1 ignored;
+`cargo test --workspace -- --test-threads=1` → workspace green;
+`cargo fmt --all` applied after `just audit` surfaced formatting drift;
+`just audit` → **System Clean** with audit fingerprint saved.
+
 ## 2026-05-05 — Sprint Batch 103: Monetization Trial, Continuous Assurance Daemon (P3-4), Swarm Exfil Detector (P6-9), Ledger Hydration
 
 **Directive**: Phase 1 Monetization Trial (generate audit reports for ts-immutable-sdk and mattermost-boards) + P3-4 Continuous Assurance Daemon + P6-9 Swarm Context-Window Exfil Detector + Phase 4 Ledger Hydration.

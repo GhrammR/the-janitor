@@ -7,6 +7,7 @@
 use anyhow::Context as _;
 use common::slop::StructuredFinding;
 use forge::brain::FindingRanker;
+use forge::dedup::{deduplicate_findings, DeduplicatedFinding};
 use std::path::Path;
 
 /// Entry point: scan `repo`, write `<output_dir>/audit_report.md`.
@@ -28,22 +29,23 @@ pub fn cmd_audit_report(repo: &Path, output_dir: &Path) -> anyhow::Result<()> {
 
     let component_info = format!("{} ({})", repo_name, repo.display());
     let findings = FindingRanker::rank_findings(raw_findings, Some(&component_info));
+    let deduplicated = deduplicate_findings(findings);
 
-    let report = render_report(&findings, repo_name, &repo);
+    let report = render_report(&deduplicated, repo_name, &repo);
 
     let out_path = output_dir.join("audit_report.md");
     std::fs::write(&out_path, report.as_bytes())
         .with_context(|| format!("failed to write report to {}", out_path.display()))?;
 
     eprintln!(
-        "[audit-report] report written to {}  ({} finding(s))",
+        "[audit-report] report written to {}  ({} deduplicated class(es))",
         out_path.display(),
-        findings.len()
+        deduplicated.len()
     );
     Ok(())
 }
 
-fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -> String {
+fn render_report(findings: &[DeduplicatedFinding], repo_name: &str, repo: &Path) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let now = chrono_date_utc();
 
@@ -72,7 +74,8 @@ fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -
     } else {
         out.push_str(&format!(
             "The automated scan of **{repo_name}** identified **{}** \
-             finding(s) across the following severity tiers:\n\n",
+             distinct vulnerability class(es) after deterministic structural \
+             deduplication.\n\n",
             findings.len()
         ));
         out.push_str("| Severity | Count |\n|----------|-------|\n");
@@ -101,7 +104,8 @@ fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -
     } else {
         out.push_str("| # | ID | Severity | File | CVSS |\n");
         out.push_str("|---|-----|----------|------|------|\n");
-        for (i, f) in findings.iter().enumerate() {
+        for (i, entry) in findings.iter().enumerate() {
+            let f = &entry.finding;
             let sev = f.severity.as_deref().unwrap_or("Informational");
             let file = f
                 .file
@@ -127,7 +131,8 @@ fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -
     if findings.is_empty() {
         out.push_str("_No findings to detail._\n\n");
     } else {
-        for (i, f) in findings.iter().enumerate() {
+        for (i, entry) in findings.iter().enumerate() {
+            let f = &entry.finding;
             let sev = f.severity.as_deref().unwrap_or("Informational");
             out.push_str(&format!("### Finding #{}: `{}`\n\n", i + 1, f.id));
             out.push_str(&format!("**Severity**: {}  \n", sev));
@@ -138,6 +143,18 @@ fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -
                 out.push_str(&format!("**Line**: {line}  \n"));
             }
             out.push_str(&format!("**CVSS**: {}  \n\n", severity_to_cvss(sev)));
+            out.push_str("**Occurrences**:\n\n");
+            for occurrence in &entry.occurrences {
+                match occurrence.line {
+                    Some(line) => {
+                        out.push_str(&format!("- `{}`:{line}\n", occurrence.file));
+                    }
+                    None => {
+                        out.push_str(&format!("- `{}`\n", occurrence.file));
+                    }
+                }
+            }
+            out.push('\n');
 
             // IFDS witness detail
             if let Some(ref w) = f.exploit_witness {
@@ -198,7 +215,7 @@ fn render_report(findings: &[StructuredFinding], repo_name: &str, repo: &Path) -
     out
 }
 
-fn severity_counts(findings: &[StructuredFinding]) -> Vec<(String, usize)> {
+fn severity_counts(findings: &[DeduplicatedFinding]) -> Vec<(String, usize)> {
     let order = [
         "KevCritical",
         "Critical",
@@ -209,7 +226,7 @@ fn severity_counts(findings: &[StructuredFinding]) -> Vec<(String, usize)> {
     ];
     let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     for f in findings {
-        let sev = f.severity.as_deref().unwrap_or("Informational");
+        let sev = f.finding.severity.as_deref().unwrap_or("Informational");
         *counts.entry(sev).or_insert(0) += 1;
     }
     let mut result: Vec<(String, usize)> = order
@@ -326,6 +343,7 @@ fn days_to_ymd(mut z: u64) -> (u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use forge::dedup::deduplicate_findings;
     use std::path::PathBuf;
 
     fn make_finding(id: &str, severity: &str, file: &str) -> StructuredFinding {
@@ -356,7 +374,7 @@ mod tests {
             make_finding("f2", "Critical", "b.sol"),
             make_finding("f3", "High", "c.rs"),
         ];
-        let counts = severity_counts(&findings);
+        let counts = severity_counts(&deduplicate_findings(findings));
         let crit = counts
             .iter()
             .find(|(s, _)| s == "Critical")
@@ -376,7 +394,11 @@ mod tests {
             });
             f
         }];
-        let report = render_report(&findings, "test-repo", &PathBuf::from("/tmp/test-repo"));
+        let report = render_report(
+            &deduplicate_findings(findings),
+            "test-repo",
+            &PathBuf::from("/tmp/test-repo"),
+        );
         assert!(report.contains("cast send 0xDEAD"));
         assert!(report.contains("Reproduction Command"));
     }
@@ -400,5 +422,28 @@ mod tests {
         let f = make_finding("reentrancy_check", "Critical", "vault.sol");
         let r = remediation_for(&f);
         assert!(r.contains("CEI"));
+    }
+
+    #[test]
+    fn report_collapses_duplicate_findings_before_markdown_generation() {
+        let findings = vec![
+            make_finding("security:xss", "KevCritical", "src/a.ts"),
+            make_finding("security:xss", "KevCritical", "src/b.ts"),
+        ];
+        let deduplicated = deduplicate_findings(findings);
+        let report = render_report(&deduplicated, "test-repo", &PathBuf::from("/tmp/test-repo"));
+        assert!(
+            report.contains("identified **1** distinct vulnerability class(es)"),
+            "executive summary must report deduplicated class count"
+        );
+        assert_eq!(
+            report.matches("### Finding #").count(),
+            1,
+            "technical detail must render one section per deduplicated class"
+        );
+        assert!(
+            report.contains("`src/a.ts`") && report.contains("`src/b.ts`"),
+            "all duplicate locations must survive as occurrence entries"
+        );
     }
 }
