@@ -3,6 +3,27 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 114: Revenue Frontier Hardening & The Architectural Oracle
+
+**Directive:** Upgrade the UAP response contract with the Architectural Oracle law, ship P18-1 optimizer phantom authority and P18-2 chronometric split-brain detection, hydrate the next non-Aave GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance & Oracle
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — upgraded `[NEXT RECOMMENDED ACTION]` so the next-sprint Sovereign Directive must include an **Architectural Oracle Tip** derived from a live `rg` scan of legacy infrastructure (`crates/cli/src/daemon.rs`, `crates/common/src/physarum.rs`, `action.yml`) and expressed as a concrete prune/modernize command.
+
+### Detector Frontiers
+
+* `crates/forge/src/optimizer_authority.rs` *(created)*, `crates/forge/src/chronometric_auth.rs` *(created)*, `crates/forge/src/lib.rs` *(modified)*, and `crates/forge/src/slop_hunter.rs` *(modified)* — added `security:optimizer_phantom_authority` for post-dereference null/authority guards in C/C++, added `security:clock_skew_auth_split_brain` for JWT/signed-URL flows that tolerate more than five minutes of skew without nonce/`jti` replay binding, exported both modules, wired them into `find_slop`, and added dispatch-level regressions.
+
+### Live-Fire & Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `smartcontractkit/chainlink` as a revalidated candidate, `smartcontractkit/chainlink-contracts` as a repository-not-found hydration failure, `smartcontractkit/chainlink-docs` as low-yield vendored DOM XSS, and `smartcontractkit/chainlink-testing-framework` as `no_findings`.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — routed the vendored `chainlink-docs` DOM XSS sink into the low-yield ledger because the Acceptance Oracle reported missing `schema_taint:proven` and no repository-native reflection path was proven.
+* `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — removed the stale `smartcontractkit/chainlink` bounty row so the tri-ledger funnel no longer routes the same finding into both bounty and candidate lanes.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P18-1` and `P18-2` blocks under the Absolute Eradication Law.
+
+**Verification**: `cargo test -p forge slop_hunter -- --test-threads=4` ✓ | live-fire hunts: `chainlink` revalidated existing candidate-grade evidence, `chainlink-docs` low-yield vendored DOM sinks only, `chainlink-testing-framework` no findings, `chainlink-contracts` repository not found.
+
 ## 2026-05-06 — Sprint Batch 113: Recursive Orchestration, IL6 Guard, Acceptance Oracle
 
 **Directive:** Upgrade the UAP response contract for recursive orchestration, ship P19-4 IL6 evidence compartmentation and P19-3 Bugcrowd acceptance scoring, hydrate three more GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.

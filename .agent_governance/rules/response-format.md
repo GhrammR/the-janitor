@@ -80,6 +80,12 @@ The prompt MUST:
 5. Reassert all existing UAP laws by name: Eradication, Structural Guard,
    Triage Empathy, and Tri-Ledger.
 6. Include one strategic operator tip that maximizes revenue / impact.
+7. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
+   legacy infrastructure such as `crates/cli/src/daemon.rs`,
+   `crates/common/src/physarum.rs`, and `action.yml`. The tip must name a
+   specific drift pocket, bloat seam, or forgotten feature and provide one
+   token-efficient command that modernizes or prunes it in the next sprint
+   without bloating the ledgers.
 
 The section must be operator-ready text, not analysis about the text. Do not
 emit vague "consider" language. Do not suggest manual git commands, staging,

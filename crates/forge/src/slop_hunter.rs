@@ -1023,11 +1023,13 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
         "c" | "h" => {
             let mut f = find_c_slop(eng, source);
             f.extend(crate::legacy_c_mining::find_legacy_c_mining_targets(source));
+            f.extend(crate::optimizer_authority::detect_optimizer_phantom_authority(source, "c"));
             f
         }
         "cpp" | "cxx" | "cc" | "hpp" => {
             let mut f = find_cpp_slop(eng, source);
             f.extend(crate::legacy_c_mining::find_legacy_c_mining_targets(source));
+            f.extend(crate::optimizer_authority::detect_optimizer_phantom_authority(source, "cpp"));
             f
         }
         "hcl" | "tf" => find_hcl_slop_ast(eng, source),
@@ -1052,6 +1054,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_saml_xsw_and_xxe(source));
             f.extend(find_oauth_state_omission(source));
             f.extend(find_llm_prompt_injection_sinks(source));
+            f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             // Phase 2 R&D: dangerous-call AST walk (exec/eval/pickle/os.system/__import__)
             f.extend(find_python_slop_ast(eng, parsed));
             f.extend(find_python_phantom_payload_slop(eng, parsed));
@@ -1088,6 +1091,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_js_phantom_payload_slop(eng, parsed));
             f.extend(find_js_slopsquat_imports(eng, parsed));
             f.extend(find_llm_prompt_injection_sinks(source));
+            f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             f.extend(crate::oauth_account_fusion::detect_oauth_account_fusion(
                 source,
             ));
@@ -1107,6 +1111,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_saml_xsw_and_xxe(source));
             f.extend(find_oauth_state_omission(source));
             f.extend(find_java_phantom_payload_slop(eng, parsed));
+            f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             f.extend(crate::crypto_protocol::detect_crypto_protocol_issues(
                 source,
             ));
@@ -1120,6 +1125,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_jwt_validation_bypass(source));
             f.extend(find_saml_xsw_and_xxe(source));
             f.extend(find_oauth_state_omission(source));
+            f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             f.extend(crate::crypto_protocol::detect_crypto_protocol_issues(
                 source,
             ));
@@ -13309,6 +13315,46 @@ if (!scope.context) {
                 .iter()
                 .all(|f| !f.description.contains("oauth_excessive_scope")),
             "C++ identifier scope analysis must not trigger OAuth scope detector"
+        );
+    }
+
+    #[test]
+    fn test_find_slop_dispatches_optimizer_phantom_authority() {
+        let src = br#"
+struct authz { int role; };
+int enforce(struct authz *auth) {
+    if (auth->role != 7) {
+        return -1;
+    }
+    if (auth == NULL) {
+        return -2;
+    }
+    return 0;
+}
+"#;
+        let findings = find_slop("cpp", src);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("optimizer_phantom_authority")
+                    && f.severity == Severity::Critical),
+            "post-dereference null guard must fire optimizer_phantom_authority at Critical"
+        );
+    }
+
+    #[test]
+    fn test_find_slop_dispatches_clock_skew_auth_split_brain() {
+        let src = br#"
+const payload = jwt.verify(token, key, { clockTolerance: 601, audience: "api" });
+return payload.sub;
+"#;
+        let findings = find_slop("js", src);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("clock_skew_auth_split_brain")
+                    && f.severity == Severity::High),
+            "JWT leeway above 300 seconds without nonce/jti fallback must fire chronometric split-brain"
         );
     }
 

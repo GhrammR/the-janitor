@@ -540,7 +540,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_revalidated_existing_unpinned_asset_row"
     },
     {
       "engagement": "immunefi_targets",
@@ -554,7 +556,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "clone_failed_repository_not_found"
     },
     {
       "engagement": "immunefi_targets",
@@ -568,7 +572,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_dom_xss_vendored_jquery_missing_schema_taint_proof"
     },
     {
       "engagement": "immunefi_targets",
@@ -582,7 +588,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "immunefi_targets",

@@ -28,6 +28,27 @@ trigger. Immediately either:
 2. Append a detailed actionable `P1` or `P2` proposal to `.INNOVATION_LOG.md`
    naming the solver/template required to eliminate the human intervention.
 
+## Architectural Oracle Law
+
+When writing `[NEXT RECOMMENDED ACTION]`, you MUST dynamically inspect legacy
+infrastructure with `rg` before emitting the prompt. The minimum scan set is:
+
+- `crates/cli/src/daemon.rs`
+- `crates/common/src/physarum.rs`
+- `action.yml`
+
+The resulting prompt MUST include an **Architectural Oracle Tip** that:
+
+1. Names a concrete drift pocket, bloat seam, or forgotten feature discovered
+   in that scan.
+2. Provides one precise, token-efficient command that modernizes or prunes the
+   legacy surface in the next sprint.
+3. Optimizes engine velocity without appending noise to bounty or backlog
+   ledgers.
+
+Generic "clean things up" advice is a governance violation. The tip must be
+derived from the live scan, not memory.
+
 ## Gate hierarchy (prefer higher tiers)
 
 | Tier | Mechanism | When to use |
