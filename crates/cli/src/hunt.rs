@@ -3183,6 +3183,10 @@ fn scan_buffer(
     findings.extend(forge::dataset_poisoning::detect_training_data_trojan(
         ext, source, label,
     ));
+    findings.extend(forge::ics_rules::detect_ics_hazards(ext, source, label));
+    findings.extend(forge::automotive::detect_can_bus_unvalidated_actuation(
+        ext, source, label,
+    ));
     let filename = std::path::Path::new(label)
         .file_name()
         .and_then(|n| n.to_str())

@@ -19,6 +19,7 @@ pub mod chronovisor;
 pub mod gh_workflow;
 pub mod graph;
 pub mod heuristics;
+pub mod ics;
 pub mod imports;
 pub mod induce;
 pub mod languages;

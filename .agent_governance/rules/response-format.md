@@ -186,9 +186,12 @@ logging any finding to the Bounty Ledger or including it in a hunt report.
 - **Self-XSS** (victim must trigger the payload themselves without any third-party
   attack vector): `Approval % < 10%`.
 
-For every entry with `Approval % < 10%`, either append an explicit
-**Exploitation Strategy** (how to elevate to >85%) or DELETE the entry.
-Unviable entries must NOT remain in the ledger.
+For every entry with `Approval % < 10%`, route the row to
+`tools/campaign/LOW_YIELD_LEDGER.md` instead of deleting it. Preserve the target,
+finding class, approval estimate, reason routed, and R&D follow-up so Omni-Audits
+can mine it for future AEG templates or AST suppressions.
+`tools/campaign/BOUNTY_LEDGER.md` remains reserved for findings with
+`Approval % >= 10%`.
 
 ## Structural Eradication Law (mandatory for all hunt/scan output review)
 

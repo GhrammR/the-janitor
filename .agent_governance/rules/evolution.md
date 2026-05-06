@@ -133,16 +133,18 @@ logging any finding to the Bounty Ledger.
   server-side SSRF — it is a client-side HTTP call blocked by SOP/CORS. The
   finding does NOT constitute an SSRF bounty unless a server-side execution path
   (SSR, Next.js API route, service worker with `no-cors`, or Node.js backend) can
-  be demonstrated. Set `Estimated Approval % < 10%` and append the elevation
-  path, or drop the entry entirely if no server-side path exists.
+  be demonstrated. Set `Estimated Approval % < 10%` and route the entry to
+  `tools/campaign/LOW_YIELD_LEDGER.md` with the missing server-side elevation
+  proof recorded as the R&D follow-up.
 - If a finding is **Self-XSS** (victim must paste a payload into their own browser
   console or input field with no third-party trigger), set `Estimated Approval % < 10%`.
 
-For every entry with `Approval % < 10%`, you MUST append an
-`Exploitation Strategy` column entry describing EXACTLY how to elevate the finding
-to >85% (e.g., "find an unauthenticated path to the config file", "find a
-server-side Next.js API route that calls this same SDK method"), or DELETE the
-entry entirely if no viable elevation path exists.
+For every entry with `Approval % < 10%`, you MUST route the row to
+`tools/campaign/LOW_YIELD_LEDGER.md` instead of deleting it. The low-yield row
+must preserve the target, finding class, approval estimate, reason routed, and
+R&D follow-up so Omni-Audits can mine it for future AEG templates or AST
+suppressions. `tools/campaign/BOUNTY_LEDGER.md` remains reserved for findings
+with `Approval % >= 10%`.
 
 ### Schema Taint Verification Law (Sprint Batch 95)
 
