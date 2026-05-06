@@ -76,7 +76,8 @@ pub struct HuntArgs<'a> {
     /// When `true`, cross-reference every finding against the program's
     /// `tools/campaign/targets/<program>_targets.md` scope rules, emit
     /// `[SCOPE: IN]` / `[SCOPE: OUT]` labels, and write `SUBMISSION_<id>.md`
-    /// for every in-scope finding that has a `repro_cmd`.
+    /// into `.janitor/hunt_reports/` for every in-scope finding that has a
+    /// `repro_cmd`.
     pub submit_check: bool,
 }
 
@@ -209,7 +210,7 @@ pub fn cmd_hunt(args: HuntArgs<'_>) -> anyhow::Result<()> {
         if let Some(tenant_url) = live_tenant.filter(|value| is_live_tenant_replay_origin(value)) {
             findings = apply_live_tenant_replay(findings, tenant_url);
         }
-        let output_dir = std::env::current_dir().context("resolve current output directory")?;
+        let output_dir = hunt_reports_dir()?;
         emit_browser_dom_harnesses(&mut findings, &output_dir)?;
         findings
     };
@@ -611,16 +612,24 @@ fn run_submit_check(
         .and_then(|p| p.file_name())
         .and_then(|n| n.to_str())
         .unwrap_or("unknown-program");
+    let canonical_target = scan_root
+        .map(extract_git_remote)
+        .unwrap_or_else(|| program_name.to_string());
 
     let campaign_targets_dir = std::path::PathBuf::from("tools/campaign/targets");
     let targets_path = campaign_targets_dir.join(format!("{program_name}_targets.md"));
+    let targets_path = if targets_path.exists() {
+        Some(targets_path)
+    } else {
+        find_targets_file_for_canonical_target(&campaign_targets_dir, &canonical_target)
+    };
 
-    let scope_rules = if targets_path.exists() {
-        ScopeRules::load(&targets_path)?
+    let scope_rules = if let Some(targets_path) = targets_path.as_ref() {
+        ScopeRules::load(targets_path)?
     } else {
         eprintln!(
-            "[submit-check] no targets file found at {}; using permissive scope",
-            targets_path.display()
+            "[submit-check] no targets file found for {}; using permissive scope",
+            canonical_target
         );
         ScopeRules::load_permissive()
     };
@@ -628,12 +637,7 @@ fn run_submit_check(
     let annotated = annotate_scope(findings, &scope_rules);
     print_scope_report(&annotated);
 
-    let output_dir = scan_root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let canonical_target = scan_root
-        .map(extract_git_remote)
-        .unwrap_or_else(|| program_name.to_string());
+    let output_dir = hunt_reports_dir()?;
     let written = write_submissions(&annotated, &output_dir, &canonical_target)?;
     if written > 0 {
         eprintln!(
@@ -646,6 +650,34 @@ fn run_submit_check(
         );
     }
     Ok(())
+}
+
+fn find_targets_file_for_canonical_target(
+    campaign_targets_dir: &Path,
+    canonical_target: &str,
+) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(campaign_targets_dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let content = std::fs::read_to_string(&path).ok()?;
+        if content.contains(canonical_target) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn hunt_reports_dir() -> anyhow::Result<PathBuf> {
+    let dir = std::env::current_dir()
+        .context("resolve current workspace directory")?
+        .join(".janitor")
+        .join("hunt_reports");
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("failed to create hunt reports dir {}", dir.display()))?;
+    Ok(dir)
 }
 
 /// Render an Auth0-style Markdown vulnerability report for a finding set.

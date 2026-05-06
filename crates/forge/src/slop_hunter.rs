@@ -1392,7 +1392,9 @@ fn find_jwt_validation_bypass(source: &[u8]) -> Vec<SlopFinding> {
                 && !has_none_alg
                 && !has_bad_aud
                 && !contains_any_bytes(&lower, EXPIRY_FALSE_MARKERS)
-                && contains_any_bytes(&lower, &[b"jwt.require(", b"verifier.verify("]);
+                && (contains_any_bytes(&lower, &[b"jwt.require(", b"verifier.verify("])
+                    || (call.ends_with(b"parseunverified(")
+                        && go_parseunverified_followed_by_signing_enforcement(&lower, start)));
             if (has_none_alg || has_bad_aud || has_bad_exp) && !decode_only_suppressed {
                 findings.push(SlopFinding {
                     start_byte: start,
@@ -1409,6 +1411,30 @@ fn find_jwt_validation_bypass(source: &[u8]) -> Vec<SlopFinding> {
     }
 
     Vec::new()
+}
+
+fn go_parseunverified_followed_by_signing_enforcement(lower: &[u8], start: usize) -> bool {
+    const CONTEXT_BYTES: usize = 2048;
+    const PARSE_CALL_MARKERS: &[&[u8]] = &[b"jwt.parse(", b"parsewithclaims("];
+    const ENFORCED_METHOD_MARKERS: &[&[u8]] = &[
+        b"token.method.alg() !=",
+        b"token.method.alg()!=",
+        b"token.method != ",
+        b"token.method!=",
+        b"*jwt.signingmethodrsa",
+        b"*jwt.signingmethodhmac",
+        b"*jwt.signingmethodecdsa",
+        b"*jwt.signingmethoded25519",
+        b"jwt.signingmethodrsa",
+        b"jwt.signingmethodhmac",
+        b"jwt.signingmethodecdsa",
+        b"jwt.signingmethoded25519",
+    ];
+
+    let end = lower.len().min(start.saturating_add(CONTEXT_BYTES));
+    let window = &lower[start..end];
+    contains_any_bytes(window, PARSE_CALL_MARKERS)
+        && contains_any_bytes(window, ENFORCED_METHOD_MARKERS)
 }
 
 fn find_saml_xsw_and_xxe(source: &[u8]) -> Vec<SlopFinding> {
@@ -2886,6 +2912,7 @@ fn find_js_slop(eng: &QueryEngine, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> 
     let prototype_pollution_in_context = source_contains_prototype_pollution_pattern(source);
     find_inner_html_assignments(
         tree.root_node(),
+        tree.root_node(),
         source,
         &mut findings,
         &mut Vec::new(),
@@ -3276,6 +3303,7 @@ fn walk_js_slopsquat_imports(node: Node<'_>, source: &[u8], findings: &mut Vec<S
 /// `innerHTML`.
 fn find_inner_html_assignments(
     node: Node<'_>,
+    module_root: Node<'_>,
     source: &[u8],
     findings: &mut Vec<SlopFinding>,
     config_params: &mut Vec<String>,
@@ -3299,6 +3327,7 @@ fn find_inner_html_assignments(
                                     source,
                                     config_params.as_slice(),
                                 ) || rhs_is_static_i18n_template(right, source)
+                                    || rhs_is_static_local_template_call(right, module_root, source)
                             })
                         {
                             config_params.truncate(original_param_count);
@@ -3326,6 +3355,7 @@ fn find_inner_html_assignments(
     for child in node.children(&mut cursor) {
         find_inner_html_assignments(
             child,
+            module_root,
             source,
             findings,
             config_params,
@@ -3428,6 +3458,124 @@ fn rhs_is_static_i18n_template(node: Node<'_>, source: &[u8]) -> bool {
             let mut cursor = node.walk();
             let inner = node.named_children(&mut cursor).next();
             inner.is_some_and(|child| rhs_is_static_i18n_template(child, source))
+        }
+        _ => false,
+    }
+}
+
+fn rhs_is_static_local_template_call(node: Node<'_>, module_root: Node<'_>, source: &[u8]) -> bool {
+    if node.kind() != "call_expression" {
+        return false;
+    }
+    let Some(function) = node.child_by_field_name("function") else {
+        return false;
+    };
+    if function.kind() != "identifier" {
+        return false;
+    }
+    let Some(arguments) = node.child_by_field_name("arguments") else {
+        return false;
+    };
+    if arguments.named_child_count() != 0 {
+        return false;
+    }
+    let Ok(name) = function.utf8_text(source) else {
+        return false;
+    };
+    local_function_returns_static_template(module_root, source, name)
+}
+
+fn local_function_returns_static_template(
+    module_root: Node<'_>,
+    source: &[u8],
+    target: &str,
+) -> bool {
+    let mut stack = vec![module_root];
+    while let Some(node) = stack.pop() {
+        match node.kind() {
+            "function_declaration" => {
+                let matches_target = node
+                    .child_by_field_name("name")
+                    .and_then(|name| name.utf8_text(source).ok())
+                    == Some(target);
+                if matches_target && function_like_returns_static_template(node, source) {
+                    return true;
+                }
+            }
+            "variable_declarator" => {
+                let matches_target = node
+                    .child_by_field_name("name")
+                    .and_then(|name| name.utf8_text(source).ok())
+                    == Some(target);
+                let value = node.child_by_field_name("value");
+                if matches_target
+                    && value.is_some_and(|value| {
+                        matches!(value.kind(), "arrow_function" | "function_expression")
+                            && function_like_returns_static_template(value, source)
+                    })
+                {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    false
+}
+
+fn function_like_returns_static_template(function: Node<'_>, source: &[u8]) -> bool {
+    let Some(parameters) = function.child_by_field_name("parameters") else {
+        return false;
+    };
+    if parameters.named_child_count() != 0 {
+        return false;
+    }
+    let Some(body) = function.child_by_field_name("body") else {
+        return false;
+    };
+    if body.kind() == "statement_block" {
+        let mut body_walk = body.walk();
+        let mut returns = body
+            .named_children(&mut body_walk)
+            .filter(|child| child.kind() == "return_statement");
+        let Some(return_stmt) = returns.next() else {
+            return false;
+        };
+        if returns.next().is_some() {
+            return false;
+        }
+        let mut return_walk = return_stmt.walk();
+        return return_stmt
+            .child_by_field_name("argument")
+            .or_else(|| return_stmt.named_children(&mut return_walk).next())
+            .is_some_and(|value| static_template_expression(value, source));
+    }
+    static_template_expression(body, source)
+}
+
+fn static_template_expression(node: Node<'_>, source: &[u8]) -> bool {
+    match node.kind() {
+        "string" | "string_literal" => true,
+        "template_string" => node
+            .utf8_text(source)
+            .ok()
+            .is_some_and(|text| !text.contains("${")),
+        "binary_expression" => {
+            let op = node
+                .child_by_field_name("operator")
+                .and_then(|n| n.utf8_text(source).ok())
+                .unwrap_or("");
+            op == "+"
+                && node
+                    .child_by_field_name("left")
+                    .is_some_and(|left| static_template_expression(left, source))
+                && node
+                    .child_by_field_name("right")
+                    .is_some_and(|right| static_template_expression(right, source))
         }
         _ => false,
     }
@@ -5431,6 +5579,7 @@ fn find_js_ssrf_slop(eng: &QueryEngine, parsed: &ParsedUnit<'_>) -> Vec<SlopFind
     let mut findings = Vec::new();
     find_ssrf_calls_js(
         tree.root_node(),
+        tree.root_node(),
         source,
         has_require_safe_url,
         &mut findings,
@@ -5440,6 +5589,7 @@ fn find_js_ssrf_slop(eng: &QueryEngine, parsed: &ParsedUnit<'_>) -> Vec<SlopFind
 
 fn find_ssrf_calls_js(
     node: Node<'_>,
+    module_root: Node<'_>,
     source: &[u8],
     has_require_safe_url: bool,
     findings: &mut Vec<SlopFinding>,
@@ -5475,10 +5625,13 @@ fn find_ssrf_calls_js(
                             && !arg_text.contains("https://");
                         let is_mcp_tool_dynamic_url = is_mcp_tool_context(node, source)
                             && !ssrf_arg_proves_internal_metadata(arg, source);
+                        let is_server_config_url =
+                            js_dynamic_url_originates_from_server_config(arg, module_root, source);
                         if !is_safe_route_interp
                             && !is_relative_path
                             && !is_same_origin_api_helper
                             && !is_mcp_tool_dynamic_url
+                            && !is_server_config_url
                         {
                             findings.push(SlopFinding {
                                 start_byte: node.start_byte(),
@@ -5500,8 +5653,164 @@ fn find_ssrf_calls_js(
     }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        find_ssrf_calls_js(child, source, has_require_safe_url, findings);
+        find_ssrf_calls_js(child, module_root, source, has_require_safe_url, findings);
     }
+}
+
+fn js_dynamic_url_originates_from_server_config(
+    node: Node<'_>,
+    module_root: Node<'_>,
+    source: &[u8],
+) -> bool {
+    if js_node_contains_process_env(node, source) {
+        return true;
+    }
+    let mut stack = vec![node];
+    while let Some(current) = stack.pop() {
+        match current.kind() {
+            "identifier" => {
+                if let Ok(name) = current.utf8_text(source) {
+                    if js_identifier_resolves_server_config(name, module_root, source, 0) {
+                        return true;
+                    }
+                }
+            }
+            "member_expression" => {
+                if js_member_expression_is_server_config(current, module_root, source, 0) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        let mut cursor = current.walk();
+        for child in current.named_children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    false
+}
+
+fn js_identifier_resolves_server_config(
+    name: &str,
+    module_root: Node<'_>,
+    source: &[u8],
+    depth: u8,
+) -> bool {
+    if depth > 4 {
+        return false;
+    }
+    if is_server_config_name(name) {
+        if let Some(value) = find_js_binding_value(module_root, source, name) {
+            return js_expression_is_server_config(value, module_root, source, depth + 1);
+        }
+        return true;
+    }
+    find_js_binding_value(module_root, source, name)
+        .is_some_and(|value| js_expression_is_server_config(value, module_root, source, depth + 1))
+}
+
+fn js_expression_is_server_config(
+    node: Node<'_>,
+    module_root: Node<'_>,
+    source: &[u8],
+    depth: u8,
+) -> bool {
+    if depth > 4 {
+        return false;
+    }
+    if js_node_contains_process_env(node, source) {
+        return true;
+    }
+    match node.kind() {
+        "string" | "string_literal" => true,
+        "template_string" => node
+            .utf8_text(source)
+            .ok()
+            .is_some_and(|text| !text.contains("${") || text.contains("process.env")),
+        "identifier" => node.utf8_text(source).ok().is_some_and(|name| {
+            js_identifier_resolves_server_config(name, module_root, source, depth + 1)
+        }),
+        "member_expression" => {
+            js_member_expression_is_server_config(node, module_root, source, depth + 1)
+        }
+        _ => false,
+    }
+}
+
+fn js_member_expression_is_server_config(
+    node: Node<'_>,
+    module_root: Node<'_>,
+    source: &[u8],
+    depth: u8,
+) -> bool {
+    let Some(property) = node.child_by_field_name("property") else {
+        return false;
+    };
+    let Ok(property_name) = property.utf8_text(source) else {
+        return false;
+    };
+    if property_name == "env" {
+        return node
+            .utf8_text(source)
+            .ok()
+            .is_some_and(|text| text.contains("process.env"));
+    }
+    if !is_server_config_name(property_name) {
+        return false;
+    }
+    if property_name == "authDomain" {
+        return true;
+    }
+    let object_text = node
+        .child_by_field_name("object")
+        .and_then(|object| object.utf8_text(source).ok())
+        .unwrap_or("");
+    if object_text.contains("config")
+        || object_text.contains("settings")
+        || object_text.contains("env")
+        || object_text.contains("auth")
+    {
+        return true;
+    }
+    node.child_by_field_name("object").is_some_and(|object| {
+        js_expression_is_server_config(object, module_root, source, depth + 1)
+    })
+}
+
+fn find_js_binding_value<'tree>(
+    module_root: Node<'tree>,
+    source: &[u8],
+    target: &str,
+) -> Option<Node<'tree>> {
+    let mut stack = vec![module_root];
+    while let Some(node) = stack.pop() {
+        if let Some((name, value)) = js_binding_parts(node, source) {
+            if name == target {
+                return Some(value);
+            }
+        }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            stack.push(child);
+        }
+    }
+    None
+}
+
+fn is_server_config_name(name: &str) -> bool {
+    matches!(
+        name,
+        "authDomain"
+            | "auth0Domain"
+            | "apiBaseUrl"
+            | "baseUrl"
+            | "issuer"
+            | "domain"
+            | "host"
+            | "hostname"
+            | "origin"
+            | "endpoint"
+    )
 }
 
 /// LotL API C2 detection for JS/TS: flags trusted SaaS API calls whose payload
@@ -9202,6 +9511,24 @@ span.innerHTML = get_string("sources-selected") + "<b>" + checkboxes.length + "<
     }
 
     #[test]
+    fn test_js_innerhtml_static_local_template_call_suppressed() {
+        let src = br#"
+function getEmbeddedLoginPromptOverlay() {
+    return "<section class='overlay'>Sign in</section>";
+}
+
+container.innerHTML = getEmbeddedLoginPromptOverlay();
+"#;
+        let findings = find_slop("ts", src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("dom_xss_innerHTML")),
+            "zero-argument local helper returning a constant template must suppress dom_xss_innerHTML"
+        );
+    }
+
+    #[test]
     fn test_js_innerhtml_user_data_still_fires_with_i18n_mixed() {
         // When user-controlled data is mixed with i18n strings, it must still fire.
         let src = br#"
@@ -10068,6 +10395,21 @@ server.tool("read_documents", async ({ path }) => {
                 .iter()
                 .any(|f| f.description.contains("ssrf_dynamic_url")),
             "MCP tool metadata-service fetch must remain SSRF"
+        );
+    }
+
+    #[test]
+    fn test_js_ssrf_auth_domain_env_config_suppressed() {
+        let src = br#"
+const authDomain = process.env.AUTH_DOMAIN;
+const resp = await fetch(`https://${authDomain}/oauth/token`);
+"#;
+        let findings = find_slop("ts", src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("ssrf_dynamic_url")),
+            "authDomain derived from process.env must suppress ssrf_dynamic_url"
         );
     }
 
@@ -12839,6 +13181,32 @@ mod phase7_rd_tests {
         assert!(
             findings.iter().all(|f| !f.description.contains("curl ")),
             "JWT findings are detector output only and must not introduce unrelated payload text"
+        );
+    }
+
+    #[test]
+    fn test_go_parse_unverified_with_signing_method_enforcement_suppressed() {
+        let src = br#"
+func verifyToken(raw string, keyFunc jwt.Keyfunc) (*jwt.Token, error) {
+    parser := jwt.Parser{}
+    token, _, err := parser.ParseUnverified(raw, jwt.MapClaims{})
+    if err != nil {
+        return nil, err
+    }
+    return jwt.Parse(raw, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return keyFunc(token)
+    })
+}
+"#;
+        let findings = find_slop("go", src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("jwt_validation_bypass")),
+            "ParseUnverified used for kid extraction plus explicit signing-method enforcement must not fire jwt_validation_bypass"
         );
     }
 

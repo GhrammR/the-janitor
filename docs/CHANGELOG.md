@@ -5496,6 +5496,17 @@ OkHttp and Okio returned no findings.
 
 **Verification**: `cargo test --workspace -- --test-threads=1` ✓ | `just audit` ✓
 
+## 2026-05-05 — Sprint Batch 107: Target Hydration & Eradication Mechanics
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — added a Go JWT pre-flight suppression for `ParseUnverified` flows that are followed by an explicit signed-method gate via `jwt.Parse(...)`; added a local helper-return guard so `innerHTML = getEmbeddedLoginPromptOverlay()` is suppressed when the callee has zero parameters and returns a constant string/template; added a JS/TS server-config SSRF suppression so dynamic `fetch(...)` URLs sourced from `process.env` or internal config fields like `authDomain` do not emit `security:ssrf_dynamic_url`.
+* `crates/cli/src/hunt.rs` and `crates/cli/src/submit_formatter.rs` *(modified)* — all generated hunt artifacts now route into workspace `.janitor/hunt_reports/`; submit-check now resolves campaign scope rules by canonical Git remote content when the local clone directory name does not map to the program targets file.
+* Workspace hygiene *(modified)* — moved stray root-level `janitor_poc_*.html` files and `tools/janitor-auth0-poc.html` into `.janitor/hunt_reports/`; verified no root-level generated PoCs or `SUBMISSION_*.md` artifacts remain.
+* `tools/campaign/target_ledger.json` *(modified)* — ingested a fresh Batch 2 ledger from `immunefi_targets.md`, `block_targets.md`, `fireblocks_mpc_targets.md`, `securedrop_targets.md`, and `electroneum_blockchain_targets.md`; marked the hydrated `afterpay/sdk-android`, `afterpay/sdk-ios`, and `cashapp/cash-app-pay-android-sdk` targets with hunt outcomes.
+
+**Live-fire hunt**: hydrated and scanned `afterpay/sdk-android`, `afterpay/sdk-ios`, and `cashapp/cash-app-pay-android-sdk`. `sdk-android` and `cash-app-pay-android-sdk` produced no findings. `sdk-ios` produced a single `security:unpinned_asset` candidate on a sandbox bootstrap script URL; it was not promoted into `tools/campaign/BOUNTY_LEDGER.md` because the current evidence terminates at a sandbox-only asset host and does not yet prove a production-grade exploit path or payout-viable impact.
+
+**Verification**: `cargo test -p forge slop_hunter -- --test-threads=4` ✓; `cargo test -p cli submit_formatter -- --test-threads=4` ✓; canonical PoC routing verified under `.janitor/hunt_reports/`; full workspace gates pending in the final Sprint 107 close-out.
+
 ## 2026-05-05 — Sprint Batch 106: AI Supply Chain & Steganographic Shields
 
 * `crates/forge/src/model_pinning.rs` *(created)* — added deterministic ML model revision pinning detection for Python/JS/TS hosted-model loads (`from_pretrained`, `replicate.run`, `hf_hub_download`); unpinned or non-SHA revision arguments now emit `security:unpinned_model_weights` at `KevCritical`.

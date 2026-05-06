@@ -4,11 +4,11 @@
 //! 1. Loads the program's `_targets.md` scope rules via AhoCorasick.
 //! 2. Tags every finding as `[SCOPE: IN]` or `[SCOPE: OUT]`.
 //! 3. For every in-scope finding with a populated `repro_cmd`, writes a
-//!    `SUBMISSION.md` alongside the hunt report.
+//!    `SUBMISSION.md` into `.janitor/hunt_reports/`.
 
 use common::slop::StructuredFinding;
 use forge::dedup::{deduplicate_findings, DeduplicatedFinding, FindingOccurrence};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 /// Scope verdict for a single finding.
 #[derive(Debug, Clone)]
@@ -211,6 +211,13 @@ pub fn write_submissions(
     output_dir: &Path,
     program_name: &str,
 ) -> anyhow::Result<usize> {
+    let output_dir = submission_output_dir(output_dir);
+    std::fs::create_dir_all(&output_dir).map_err(|e| {
+        anyhow::anyhow!(
+            "failed to create submission output directory {}: {e}",
+            output_dir.display()
+        )
+    })?;
     let in_scope_findings: Vec<StructuredFinding> = annotated
         .iter()
         .filter(|(_, verdict)| verdict.in_scope)
@@ -239,6 +246,18 @@ pub fn write_submissions(
         written += 1;
     }
     Ok(written)
+}
+
+fn submission_output_dir(base: &Path) -> PathBuf {
+    let mut components = base.components().rev();
+    let tail = components.next();
+    let parent = components.next();
+    if matches!(tail, Some(Component::Normal(name)) if name == "hunt_reports")
+        && matches!(parent, Some(Component::Normal(name)) if name == ".janitor")
+    {
+        return base.to_path_buf();
+    }
+    base.join(".janitor").join("hunt_reports")
 }
 
 /// Print the scope summary to stderr.
@@ -565,7 +584,11 @@ mod tests {
         let annotated = vec![(finding, verdict)];
         let count = write_submissions(&annotated, dir.path(), "test_program").unwrap();
         assert_eq!(count, 1, "in-scope finding with repro must produce 1 file");
-        let expected = dir.path().join("SUBMISSION_security_rce.md");
+        let expected = dir
+            .path()
+            .join(".janitor")
+            .join("hunt_reports")
+            .join("SUBMISSION_security_rce.md");
         assert!(expected.exists(), "SUBMISSION file must be created");
     }
 
@@ -601,7 +624,11 @@ mod tests {
             count, 1,
             "same structural finding class must produce one Bugcrowd submission"
         );
-        let expected = dir.path().join("SUBMISSION_security_rce.md");
+        let expected = dir
+            .path()
+            .join(".janitor")
+            .join("hunt_reports")
+            .join("SUBMISSION_security_rce.md");
         let content = std::fs::read_to_string(expected).unwrap();
         assert!(content.contains("`src/a.py`"));
         assert!(content.contains("`src/b.py`"));
