@@ -19,6 +19,7 @@ common = { path = "../common" }
 reaper = { path = "../reaper" }
 vault = { path = "../vault" }
 dashboard = { path = "../dashboard" }
+janitor-gov = { path = "../gov" }
 advanced_threats = { path = "../experimental/advanced_threats" }
 include_deflator = { path = "../include_deflator" }
 arc-swap.workspace = true

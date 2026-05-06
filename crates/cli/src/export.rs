@@ -29,6 +29,7 @@
 //! | 17 | `Agentic_Contribution_Pct` | `(agentic commits / total PR commits) × 100`; 100.0 when PR author is a detected agentic actor, 0.0 otherwise |
 
 use anyhow::Result;
+use janitor_gov::compartment::{enforce_flow, Clearance};
 use serde_json::Value;
 use std::io::Write as _;
 use std::path::Path;
@@ -56,6 +57,13 @@ fn csv_sanitize(s: &str) -> String {
 /// falling back to the system code page (which renders em-dashes and similar
 /// multi-byte characters as `â€"` or similar mojibake).
 const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
+
+fn enforce_siem_export_flow() -> Result<()> {
+    let src = Clearance::from_optional_env(std::env::var("JANITOR_DATA_CLEARANCE").ok())?;
+    let dst = Clearance::from_optional_env(std::env::var("JANITOR_SIEM_CLEARANCE").ok())?;
+    enforce_flow(src, dst)?;
+    Ok(())
+}
 
 /// Open `path` for writing, write the UTF-8 BOM, and return a `csv::Writer`
 /// wrapping the file.  Returns an `anyhow::Error` on any I/O failure.
@@ -279,6 +287,7 @@ pub fn cmd_export_global(gauntlet_root: &Path, out: &Path) -> Result<()> {
 }
 
 fn write_cef_lines(entries: &[crate::report::BounceLogEntry], out: &Path) -> Result<()> {
+    enforce_siem_export_flow()?;
     let mut file = std::io::BufWriter::new(std::fs::File::create(out)?);
     for entry in entries {
         writeln!(file, "{}", entry.to_cef_string())?;
@@ -288,6 +297,7 @@ fn write_cef_lines(entries: &[crate::report::BounceLogEntry], out: &Path) -> Res
 }
 
 fn write_ocsf_json(entries: &[crate::report::BounceLogEntry], out: &Path) -> Result<()> {
+    enforce_siem_export_flow()?;
     let docs: Vec<Value> = entries.iter().map(|entry| entry.to_ocsf_json()).collect();
     let file = std::fs::File::create(out)?;
     let writer = std::io::BufWriter::new(file);

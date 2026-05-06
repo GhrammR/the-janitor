@@ -29,6 +29,7 @@ use common::slop::StructuredFinding;
 use common::wisdom::{ArchivedSlopsquatCorpus, SlopsquatCorpus};
 use forge::brain::FindingRanker;
 use forge::slop_hunter::{find_slop, ParsedUnit};
+use forge::submission_assurance::score_acceptance_proof;
 use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -410,6 +411,7 @@ fn format_bugcrowd_report_with_component(
         let proof_of_concept = proof_of_concept_section(&sorted_group);
         let live_section = live_tenant_section(&sorted_group);
         let data_flow = path_proof_mermaid_section(&sorted_group);
+        let candidate_gap = candidate_ledger_gap_section(&sorted_group);
 
         reports.push(format!(
             "**Summary Title:** Multiple instances of {rule_id} in target\n\
@@ -422,6 +424,7 @@ I found the following vulnerable code paths while reviewing the target artifacts
 **Business Impact:** {business_impact}\n\
 **Data Flow Analysis:**\n\
 {upstream_validation_audit}\n\
+{candidate_gap}\
 **Vulnerability Reproduction:**\n\
 {proof_of_concept}\n\
 {live_section}\
@@ -447,6 +450,22 @@ No reproduction steps are required.\n\
     }
 
     reports.join("\n\n---\n\n")
+}
+
+fn candidate_ledger_gap_section(findings: &[&StructuredFinding]) -> String {
+    let gaps = findings
+        .iter()
+        .map(|finding| {
+            let oracle = score_acceptance_proof(finding);
+            if oracle.is_empty() {
+                "Acceptance Oracle: proof-complete.".to_string()
+            } else {
+                format!("Acceptance Oracle: {}", oracle.ledger_gap_summary())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("**Candidate Ledger Gap:** {gaps}\n")
 }
 
 /// Render an Immunefi-format vulnerability submission for a finding set.

@@ -192,6 +192,73 @@ pub struct StructuredFinding {
     pub estimated_fine_floor_usd: Option<u64>,
 }
 
+/// Returns `true` when the finding carries explicit internal-network or cloud-metadata
+/// proof required by the acceptance oracle for SSRF.
+pub fn finding_mentions_internal_metadata_proof(finding: &StructuredFinding) -> bool {
+    const NEEDLES: &[&str] = &[
+        "169.254.169.254",
+        "metadata.google.internal",
+        "100.100.100.200",
+        "127.0.0.1",
+        "localhost",
+    ];
+
+    let mut haystacks: Vec<&str> = vec![finding.id.as_str()];
+    if let Some(witness) = finding.exploit_witness.as_ref() {
+        haystacks.push(witness.source_label.as_str());
+        haystacks.push(witness.sink_label.as_str());
+        if let Some(repro) = witness.repro_cmd.as_deref() {
+            haystacks.push(repro);
+        }
+        if let Some(proof) = witness.path_proof.as_deref() {
+            haystacks.push(proof);
+        }
+        if let Some(audit) = witness.sanitizer_audit.as_deref() {
+            haystacks.push(audit);
+        }
+        if let Some(payload) = witness.payload.as_deref() {
+            haystacks.push(payload);
+        }
+        if let Some(live) = witness.live_proof.as_deref() {
+            haystacks.push(live);
+        }
+        if let Some(steps) = witness.reproduction_steps.as_ref() {
+            haystacks.extend(steps.iter().map(String::as_str));
+        }
+    }
+
+    haystacks
+        .iter()
+        .any(|haystack| NEEDLES.iter().any(|needle| haystack.contains(needle)))
+}
+
+/// Returns `true` when the finding carries the `schema_taint:proven` evidence marker
+/// required by the DOM-XSS acceptance oracle.
+pub fn finding_has_schema_taint_proof(finding: &StructuredFinding) -> bool {
+    let mut haystacks: Vec<&str> = vec![finding.id.as_str()];
+    if let Some(witness) = finding.exploit_witness.as_ref() {
+        if let Some(repro) = witness.repro_cmd.as_deref() {
+            haystacks.push(repro);
+        }
+        if let Some(proof) = witness.path_proof.as_deref() {
+            haystacks.push(proof);
+        }
+        if let Some(audit) = witness.sanitizer_audit.as_deref() {
+            haystacks.push(audit);
+        }
+        if let Some(payload) = witness.payload.as_deref() {
+            haystacks.push(payload);
+        }
+        if let Some(steps) = witness.reproduction_steps.as_ref() {
+            haystacks.extend(steps.iter().map(String::as_str));
+        }
+    }
+
+    haystacks
+        .iter()
+        .any(|haystack| haystack.contains("schema_taint:proven"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +307,33 @@ mod tests {
             !json.contains("static_source_proven"),
             "None field must be omitted from JSON to preserve schema backwards-compatibility"
         );
+    }
+
+    #[test]
+    fn metadata_proof_helper_detects_internal_ip() {
+        let finding = StructuredFinding {
+            id: "security:ssrf".to_string(),
+            exploit_witness: Some(ExploitWitness {
+                repro_cmd: Some("curl http://169.254.169.254/latest/meta-data/".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        assert!(finding_mentions_internal_metadata_proof(&finding));
+    }
+
+    #[test]
+    fn schema_taint_helper_detects_proof_marker() {
+        let finding = StructuredFinding {
+            id: "security:dom_xss_innerHTML".to_string(),
+            exploit_witness: Some(ExploitWitness {
+                path_proof: Some("schema_taint:proven".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        assert!(finding_has_schema_taint_proof(&finding));
     }
 }

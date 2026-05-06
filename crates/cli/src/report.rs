@@ -15,6 +15,7 @@
 //! Output formats: `markdown` (default) and `json`.
 
 use hmac::{Hmac, KeyInit, Mac};
+use janitor_gov::compartment::{enforce_flow, Clearance};
 use reaper::transparency_log::TransparencyLog;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -43,6 +44,23 @@ pub const CRITICAL_THREAT_AVERTED_RERUNS: f64 = 5.0;
 /// or the `--report-url` CLI flag.  This default guarantees zero unintentional
 /// egress from air-gapped or regulated environments.
 pub const DEFAULT_GOVERNOR_URL: &str = "http://127.0.0.1:8080";
+
+fn configured_source_clearance() -> anyhow::Result<Clearance> {
+    Clearance::from_optional_env(std::env::var("JANITOR_DATA_CLEARANCE").ok())
+        .map_err(anyhow::Error::from)
+}
+
+fn configured_webhook_clearance() -> anyhow::Result<Clearance> {
+    Clearance::from_optional_env(std::env::var("JANITOR_WEBHOOK_CLEARANCE").ok())
+        .map_err(anyhow::Error::from)
+}
+
+fn enforce_webhook_export_flow() -> anyhow::Result<()> {
+    let src = configured_source_clearance()?;
+    let dst = configured_webhook_clearance()?;
+    enforce_flow(src, dst)?;
+    Ok(())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InclusionProof {
@@ -228,6 +246,10 @@ pub fn fire_webhook_if_configured(entry: &BounceLogEntry, policy: &common::polic
     if !cfg.should_fire(is_critical, is_necrotic) {
         return;
     }
+    if let Err(err) = enforce_webhook_export_flow() {
+        eprintln!("{err}");
+        return;
+    }
 
     // ── Resolve secret ───────────────────────────────────────────────────
     let secret = resolve_webhook_secret(cfg);
@@ -268,6 +290,10 @@ pub fn emit_lifecycle_webhook(
 ) {
     let cfg = &policy.webhook;
     if cfg.url.is_empty() || !cfg.lifecycle_events {
+        return;
+    }
+    if let Err(err) = enforce_webhook_export_flow() {
+        eprintln!("{err}");
         return;
     }
 
@@ -328,6 +354,10 @@ pub fn emit_lifecycle_webhook(
 pub fn emit_sbom_drift_webhook(new_packages: &[String], policy: &common::policy::JanitorPolicy) {
     let cfg = &policy.webhook;
     if cfg.url.is_empty() {
+        return;
+    }
+    if let Err(err) = enforce_webhook_export_flow() {
+        eprintln!("{err}");
         return;
     }
     if !cfg.events.is_empty() && !cfg.events.iter().any(|e| e == "sbom_drift") {

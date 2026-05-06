@@ -63,21 +63,28 @@ Direct-triage backlog changes logged this session. Format:
 If none: <!-- no triage changes this session -->
 
 [NEXT RECOMMENDED ACTION]
-TWO distinct, high-priority actionable items from `.INNOVATION_LOG.md`.
-Item 1 must be the absolute highest commercial-priority frontier (highest
-TAM × severity × addressable language market share). Item 2 must be
-orthogonally related or synergistic — implementable in the same sprint to
-maximize context-window token efficiency.
+Emit exactly ONE fully formatted, copy-pasteable `Sovereign Directive` prompt
+for the operator to feed back into the agent for the next sprint.
 
-For each item state: the P0/P1/P2 ID, the file to modify, the function to
-change, the exact command to begin, and the commercial justification. No vague
-"consider" language — name the action and quantify the TAM / TEI expansion
-unlocked.
-Both items MUST be drawn directly from `.INNOVATION_LOG.md`, providing the
-file paths and brief commercial justification.
-Explicitly forbid manual operator shell guidance in this section. Do not
-suggest manual git commands, staging, signing, `/compact`, or other workflow
-rituals. The section is for implementation sequencing only.
+The prompt MUST:
+1. Begin with `codex "You are executing a Sovereign Directive:` and end with a
+   closing `"`.
+2. Name the next two highest-TAM items from `.INNOVATION_LOG.md`, with Item 1
+   as the absolute highest commercial-priority frontier (highest
+   TAM × severity × addressable language market share) and Item 2 as an
+   orthogonal or synergistic follow-on that fits the same sprint.
+3. State, inside the prompt, the exact file to modify, function to change, and
+   command to begin for each selected item.
+4. Command the next sprint to run `janitor hunt` against the next 3
+   `tools/campaign/target_ledger.json` targets.
+5. Reassert all existing UAP laws by name: Eradication, Structural Guard,
+   Triage Empathy, and Tri-Ledger.
+6. Include one strategic operator tip that maximizes revenue / impact.
+
+The section must be operator-ready text, not analysis about the text. Do not
+emit vague "consider" language. Do not suggest manual git commands, staging,
+signing, `/compact`, or other workflow rituals outside the quoted Sovereign
+Directive prompt.
 
 **Pre-flight — Absolute Eradication Law**: before writing this section,
 verify `.INNOVATION_LOG.md` contains ZERO completion markers

@@ -3,6 +3,29 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 113: Recursive Orchestration, IL6 Guard, Acceptance Oracle
+
+**Directive:** Upgrade the UAP response contract for recursive orchestration, ship P19-4 IL6 evidence compartmentation and P19-3 Bugcrowd acceptance scoring, hydrate three more GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance & Assurance
+
+* `.agent_governance/rules/response-format.md` *(modified)* — rewired `[NEXT RECOMMENDED ACTION]` to emit a single copy-pasteable Sovereign Directive prompt for the next sprint, with the next two highest-TAM `.INNOVATION_LOG.md` items, the next three `target_ledger.json` hunts, explicit UAP law enforcement, and a revenue-maximizing operator tip.
+* `crates/forge/src/submission_assurance.rs` *(created)* and `crates/forge/src/lib.rs` *(modified)* — added the Bugcrowd Acceptance Oracle: `score_acceptance_proof(candidate)` returns deterministic unmet proof clauses, currently blocking SSRF candidates missing internal metadata proof and DOM-XSS candidates missing `schema_taint:proven`.
+* `crates/common/src/slop.rs` *(modified)* — added reusable proof detectors for internal metadata reachability and schema-taint evidence plus regression coverage.
+* `crates/cli/src/hunt.rs` *(modified)* — integrated the acceptance oracle into Bugcrowd markdown via a `Candidate Ledger Gap` section so candidate routing now carries an explicit missing-proof vector.
+
+### IL6 Compartmentation
+
+* `crates/gov/src/lib.rs` and `crates/gov/src/compartment.rs` *(created)* — introduced the `Unclassified < CUI < Secret` lattice and `enforce_flow(src_clearance, dst_clearance)` hard-fail spillage guard.
+* `crates/cli/Cargo.toml`, `crates/cli/src/report.rs`, and `crates/cli/src/export.rs` *(modified)* — wired webhook and SIEM egress through the compartment guard using `JANITOR_DATA_CLEARANCE`, `JANITOR_WEBHOOK_CLEARANCE`, and `JANITOR_SIEM_CLEARANCE`; `Secret -> Unclassified` export now blocks with a data-spillage failure instead of sending evidence.
+
+### Live-Fire & Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `Uniswap/v3-periphery`, `Uniswap/v4-core`, and `aave/aave-address-book` as hunted with `no_findings`.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P19-3` and `P19-4` blocks under the Absolute Eradication Law.
+
+**Verification**: `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓ | live-fire hunts: `v3-periphery` no findings, `v4-core` no findings, `aave-address-book` no findings.
+
 ## 2026-05-05 — Sprint Batch 112: Candidate Ledger & Federal Attestation
 
 **Directive:** Close the 10%–84% approval triage gap with a tri-ledger funnel, ship P19-1 FIPS cryptographic boundary enforcement and P19-2 tamper-evident transparency chaining, hydrate three GitHub targets, delete shipped P19 backlog entries, verify with `--test-threads=4`, and commit locally without release.
