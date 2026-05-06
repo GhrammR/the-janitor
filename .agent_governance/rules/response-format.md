@@ -164,15 +164,18 @@ B. Verify the target is strictly IN SCOPE.
 C. Extract the estimated payout for the finding's severity.
 D. Route the row to exactly one ledger:
    - `tools/campaign/BOUNTY_LEDGER.md` when `Approval % >= 85` and the finding
-     carries a concrete autonomous payload. This ledger is submission-ready only.
+     carries a concrete autonomous payload. This ledger is submission-ready only
+     and MUST use the final column `Exploitation Strategy`.
    - `tools/campaign/CANDIDATE_LEDGER.md` when `Approval % >= 10 && < 85`.
-     These rows MUST record the exact `Exploitation Strategy` or mathematical
-     proof gap that prevented an 85% rating.
+     These rows MUST use the final column `R&D Follow-Up` and record the exact
+     proof gap, manual verification step, or structural engine cure that
+     prevented an 85% rating.
    - `tools/campaign/LOW_YIELD_LEDGER.md` when `Approval % < 10`.
 E. Preserve the canonical schema fields:
    `[Date]`, `[Target URL/Repo]`, `[Vulnerability Class]`, `[Severity]`,
    `[Expected Payout]`, `[Estimated Approval %]`, `[Exact Repro Command]`, and
-   `[Remediation / Exploitation Strategy]`.
+   either `[Exploitation Strategy]` for the Bounty Ledger or `[R&D Follow-Up]`
+   for the Candidate Ledger.
 
 If a finding requires a `[lattice-gap: P-XX]` annotation because the IFDS solver
 cannot trace a specific framework, protocol, or memory bound, you MUST

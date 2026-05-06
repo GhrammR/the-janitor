@@ -13,8 +13,9 @@ The audit MUST focus strictly on these four domains:
 3. Cross-Language Memory Safety
 4. AI-Agent Deception
 
-No unrelated feature work, hunts, releases, or ledger churn is permitted while
-the protocol is active.
+Max Compute sprints MAY include target hunting and specific feature
+implementation alongside the deep architectural audit, provided memory limits
+are respected. Releases remain prohibited while the protocol is active.
 
 ## Output Contract
 

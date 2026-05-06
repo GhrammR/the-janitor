@@ -125,6 +125,7 @@ pub fn propagate_authz(
 mod tests {
     use super::*;
     use crate::router_topology::build_router_topology;
+    use common::slop::ProofClass;
 
     fn topology_from(files: &[(&str, &str)]) -> RouterTopology {
         let owned: Vec<(&str, Vec<u8>)> = files
@@ -245,6 +246,27 @@ publicRouter.get('/:id', handler);
             Some("KevCritical"),
             "absence of auth guard must leave finding unchanged"
         );
+    }
+
+    #[test]
+    fn downgrade_preserves_existing_proof_class() {
+        let source = r#"
+export const teamsRouter = Router();
+teamsRouter.use(jiraContextSymmetricJwtAuthenticationMiddleware);
+teamsRouter.get('/:userId', handler);
+"#;
+        let topology = topology_from(&[("src/routes.ts", source)]);
+        let findings = vec![StructuredFinding {
+            id: "security:missing_ownership_check".to_string(),
+            file: Some("src/routes.ts".to_string()),
+            line: Some(3),
+            fingerprint: "src/routes.ts:3".to_string(),
+            severity: Some("KevCritical".to_string()),
+            proof_class: Some(ProofClass::ReachabilityProof),
+            ..Default::default()
+        }];
+        let result = propagate_authz(findings, &topology);
+        assert_eq!(result[0].proof_class, Some(ProofClass::ReachabilityProof));
     }
 
     #[test]

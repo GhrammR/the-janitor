@@ -4,7 +4,7 @@
 //! parameters reach database lookup sinks without a preceding ownership guard
 //! against the authenticated principal.
 
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding};
 use tree_sitter::Tree;
 
 use crate::authz::{self, EndpointSurface, EndpointSurfaceMatch};
@@ -137,6 +137,7 @@ pub fn find_missing_ownership_checks(
                 .to_hex()
                 .to_string(),
             severity: Some("KevCritical".to_string()),
+            proof_class: Some(ProofClass::LatticeGapProposal),
             remediation: Some(format!(
                 "Endpoint {} {} routes path parameter(s) {} into cataloged database sink `{controller}` without endpoint-surface evidence of a principal ownership predicate. Constrain the lookup by current_user.id, session.userId, or an equivalent tenant principal in the same query.",
                 endpoint.http_method,
@@ -207,6 +208,7 @@ fn scan_surfaces(
                 .to_hex()
                 .to_string(),
             severity: Some("KevCritical".to_string()),
+            proof_class: Some(ProofClass::ReachabilityProof),
             remediation: Some(format!(
                 "Endpoint {} {} routes path parameter(s) {} into a database lookup before proving ownership against the authenticated principal. Enforce a principal equality guard or include the principal identifier in the query predicate before fetching the record.",
                 surface.surface.http_method,
@@ -370,6 +372,9 @@ fn line_start_offsets(source: &[u8]) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::taint_catalog;
+    use common::taint::{TaintExportRecord, TaintKind};
+    use tempfile::tempdir;
 
     fn parse(source: &str) -> Tree {
         let mut parser = tree_sitter::Parser::new();
@@ -394,6 +399,7 @@ def show_user(user_id):
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].id, "security:missing_ownership_check");
         assert_eq!(findings[0].severity.as_deref(), Some("KevCritical"));
+        assert_eq!(findings[0].proof_class, Some(ProofClass::ReachabilityProof));
     }
 
     #[test]
@@ -411,6 +417,39 @@ def show_user(user_id):
         assert!(
             findings.is_empty(),
             "principal equality guard must suppress the IDOR finding"
+        );
+    }
+
+    #[test]
+    fn endpoint_catalog_only_finding_carries_lattice_gap_proposal() {
+        let endpoints = vec![EndpointSurface {
+            file: "api/users.py".to_string(),
+            line: Some(12),
+            http_method: "GET".to_string(),
+            route_path: "/users/<int:user_id>".to_string(),
+            controller: Some("show_user".to_string()),
+            auth_requirement: None,
+        }];
+        let temp = tempdir().expect("tempdir must exist");
+        let catalog_path = temp.path().join("taint_catalog.rkyv");
+        taint_catalog::write_catalog(
+            &catalog_path,
+            &[TaintExportRecord {
+                symbol_name: "show_user".to_string(),
+                file_path: "api/users.py".to_string(),
+                tainted_params: Vec::new(),
+                sink_kinds: vec![TaintKind::DatabaseResult],
+                propagates_to_return: false,
+            }],
+        )
+        .expect("catalog write must succeed");
+        let catalog = TaintCatalog::open(&catalog_path).expect("catalog must open");
+
+        let findings = find_missing_ownership_checks(&endpoints, &catalog);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].proof_class,
+            Some(ProofClass::LatticeGapProposal)
         );
     }
 }

@@ -1,6 +1,6 @@
 //! ICS / SCADA detector pack for hardcoded operational overrides and defaults.
 
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IcsFindingKind {
@@ -26,13 +26,15 @@ pub fn detect_ics_hazards(ext: &str, source: &[u8], file_path: &str) -> Vec<Stru
         return Vec::new();
     };
 
-    let mut has_ics_context = looks_like_ics_path(file_path) || matches!(ext, "st" | "iecst");
+    let strong_ics_carrier =
+        looks_like_ics_path(file_path) || matches!(ext, "st" | "iecst" | "scl");
+    let mut ics_context_lines = Vec::new();
     let mut candidates = Vec::new();
     for (idx, line) in text.lines().enumerate() {
         let line_no = idx as u32 + 1;
         let lower = line.to_ascii_lowercase();
         if is_ics_context_line(&lower) {
-            has_ics_context = true;
+            ics_context_lines.push(line_no);
         }
         if is_engineering_override_line(&lower) {
             candidates.push(IcsCandidate {
@@ -50,14 +52,19 @@ pub fn detect_ics_hazards(ext: &str, source: &[u8], file_path: &str) -> Vec<Stru
         }
     }
 
-    if !has_ics_context {
-        return Vec::new();
-    }
-
     candidates
         .into_iter()
+        .filter(|candidate| {
+            strong_ics_carrier || has_nearby_ics_context(candidate.line, &ics_context_lines)
+        })
         .map(|candidate| to_structured_finding(candidate, file_path))
         .collect()
+}
+
+fn has_nearby_ics_context(line: u32, ics_context_lines: &[u32]) -> bool {
+    ics_context_lines
+        .iter()
+        .any(|context_line| context_line.abs_diff(line) <= 25)
 }
 
 fn to_structured_finding(candidate: IcsCandidate, file_path: &str) -> StructuredFinding {
@@ -80,6 +87,7 @@ fn to_structured_finding(candidate: IcsCandidate, file_path: &str) -> Structured
             .to_hex()
             .to_string(),
         severity: Some("KevCritical".to_string()),
+        proof_class: Some(ProofClass::InvariantViolationProof),
         remediation: Some(remediation.to_string()),
         upstream_validation_absent: true,
         ..Default::default()
@@ -221,6 +229,10 @@ END_VAR
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].id, "security:ics_hardcoded_override");
         assert_eq!(findings[0].severity.as_deref(), Some("KevCritical"));
+        assert_eq!(
+            findings[0].proof_class,
+            Some(ProofClass::InvariantViolationProof)
+        );
     }
 
     #[test]
@@ -233,12 +245,28 @@ password := "admin"
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].id, "security:ics_default_credential");
         assert_eq!(findings[0].severity.as_deref(), Some("KevCritical"));
+        assert_eq!(
+            findings[0].proof_class,
+            Some(ProofClass::InvariantViolationProof)
+        );
     }
 
     #[test]
     fn non_ics_default_words_are_ignored() {
         let source = br#"password = "admin""#;
         let findings = detect_ics_hazards("txt", source, "docs/example.txt");
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn generic_override_listing_without_nearby_ics_context_is_ignored() {
+        let source = br#"
+--disable-ccid                    --override-session-key
+--force-ownertrust                --rfc2440
+This parser documents generic OpenPGP flags only.
+"#;
+        let findings =
+            detect_ics_hazards("py", source, "securedrop/pretty_bad_protocol/_parsers.py");
         assert!(findings.is_empty());
     }
 }

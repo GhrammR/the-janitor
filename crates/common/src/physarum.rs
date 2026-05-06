@@ -363,28 +363,14 @@ impl SystemHeart {
         };
 
         // Percentage-driven base pulse.
-        let base = if pct > 90.0 {
-            Pulse::Stop
-        } else if pct > constrict_threshold {
-            Pulse::Constrict
-        } else {
-            Pulse::Flow
-        };
+        let base = classify_pressure_pct(pct, constrict_threshold);
 
         // Velocity override: a rapid positive allocation surge escalates to
         // at least Constrict even when the SMA is within normal bounds.
         // Negative velocity (memory being freed) is intentionally ignored.
         // The velocity gate cannot produce Stop — that requires the SMA to
         // cross the 90 % hard ceiling.
-        if base == Pulse::Flow {
-            if let Some(v) = velocity {
-                if v > HIGH_VELOCITY_BYTES_PER_SEC {
-                    return Pulse::Constrict;
-                }
-            }
-        }
-
-        base
+        apply_velocity_override(base, velocity)
     }
 
     /// Sample memory pressure under active Swarm conditions and return the
@@ -457,24 +443,28 @@ impl SystemHeart {
         // so that the existing static thresholds fire at a lower real RAM%.
         let pct = effective_used / total as f64 * 100.0 * multiplier;
 
-        let base = if pct > 90.0 {
-            Pulse::Stop
-        } else if pct > 75.0 {
-            Pulse::Constrict
-        } else {
-            Pulse::Flow
-        };
-
-        if base == Pulse::Flow {
-            if let Some(v) = velocity {
-                if v > HIGH_VELOCITY_BYTES_PER_SEC {
-                    return Pulse::Constrict;
-                }
-            }
-        }
-
-        base
+        let base = classify_pressure_pct(pct, CONSTRICT_THRESHOLD_NORMAL);
+        apply_velocity_override(base, velocity)
     }
+}
+
+#[inline]
+fn classify_pressure_pct(pct: f64, constrict_threshold: f64) -> Pulse {
+    if pct > 90.0 {
+        Pulse::Stop
+    } else if pct > constrict_threshold {
+        Pulse::Constrict
+    } else {
+        Pulse::Flow
+    }
+}
+
+#[inline]
+fn apply_velocity_override(base: Pulse, velocity: Option<f64>) -> Pulse {
+    if base == Pulse::Flow && velocity.is_some_and(|value| value > HIGH_VELOCITY_BYTES_PER_SEC) {
+        return Pulse::Constrict;
+    }
+    base
 }
 
 impl Default for SystemHeart {
@@ -685,21 +675,25 @@ mod tests {
 
     #[test]
     fn test_pulse_thresholds() {
-        // Verify percentage-driven threshold logic directly.
-        let classify = |pct: f64| -> Pulse {
-            if pct > 90.0 {
-                Pulse::Stop
-            } else if pct > 75.0 {
-                Pulse::Constrict
-            } else {
-                Pulse::Flow
-            }
-        };
-        assert_eq!(classify(50.0), Pulse::Flow);
-        assert_eq!(classify(75.0), Pulse::Flow); // boundary — inclusive
-        assert_eq!(classify(75.1), Pulse::Constrict);
-        assert_eq!(classify(90.0), Pulse::Constrict); // boundary — inclusive
-        assert_eq!(classify(90.1), Pulse::Stop);
+        assert_eq!(classify_pressure_pct(50.0, 75.0), Pulse::Flow);
+        assert_eq!(classify_pressure_pct(75.0, 75.0), Pulse::Flow);
+        assert_eq!(classify_pressure_pct(75.1, 75.0), Pulse::Constrict);
+        assert_eq!(classify_pressure_pct(90.0, 75.0), Pulse::Constrict);
+        assert_eq!(classify_pressure_pct(90.1, 75.0), Pulse::Stop);
+    }
+
+    #[test]
+    fn test_velocity_override_only_escalates_flow() {
+        let burst = Some(HIGH_VELOCITY_BYTES_PER_SEC + 1.0);
+        assert_eq!(
+            apply_velocity_override(Pulse::Flow, burst),
+            Pulse::Constrict
+        );
+        assert_eq!(
+            apply_velocity_override(Pulse::Constrict, burst),
+            Pulse::Constrict
+        );
+        assert_eq!(apply_velocity_override(Pulse::Stop, burst), Pulse::Stop);
     }
 
     #[test]

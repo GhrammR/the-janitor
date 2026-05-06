@@ -3,6 +3,30 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 117: Ownership Proofs, ICS Invariant Carriage, Canonical Queue Repair & Ledger Normalization
+
+**Directive:** Upgrade Max Compute and Tri-Ledger governance, normalize the Bounty/Candidate ledgers, ship the two `P17-3A` proof-carriage cures, execute the Physarum architectural cleanup and canonical queue repair, hunt the next canonical GitHub repos, delete shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance, Ledger Schema, and Queue Repair
+
+* `.agent_governance/rules/max_compute.md` and `.agent_governance/rules/response-format.md` *(modified)* — Max Compute now explicitly allows hunts and feature work under the 8GB Law, and the Tri-Ledger schema now hard-separates submission-ready `BOUNTY_LEDGER.md` rows (`Exploitation Strategy`) from `CANDIDATE_LEDGER.md` R&D rows (`R&D Follow-Up`).
+* `tools/campaign/BOUNTY_LEDGER.md`, `tools/campaign/CANDIDATE_LEDGER.md`, and `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — purged sub-85 noise from the Bounty ledger, renamed and normalized the Candidate ledger schema, removed duplicate low-yield rows, and routed the SecureDrop journalist/admin ownership cluster to Candidate while preserving local verification-script shell sinks as Low-Yield.
+* `crates/cli/src/campaign_ingest.rs` and `tools/campaign/target_ledger.json` *(modified)* — campaign ingestion now walks only source target markdown, skips generated ledgers, canonicalizes duplicate GitHub URL variants, preserves prior hunt metadata, and records Sprint 117 outcomes for `freedomofpress/securedrop-workstation`, `smartcontractkit/chainlink-testing-framework`, and `freedomofpress/securedrop`.
+
+### Proof Carriage & Architectural Oracle
+
+* `crates/forge/src/idor.rs` and `crates/forge/src/authz_propagation.rs` *(modified)* — `security:missing_ownership_check` now emits explicit proof classes at detector construction (`ReachabilityProof` for route/body evidence and `LatticeGapProposal` for catalog-only coverage) and preserves them through authz downgrade enrichment.
+* `crates/forge/src/ics_rules.rs` *(modified)* — ICS override and default-credential findings now ship with `InvariantViolationProof`, and the detector requires either an ICS-native carrier or nearby ICS context before emission, eradicating the SecureDrop OpenPGP parser false positive.
+* `crates/common/src/physarum.rs` *(modified)* — extracted the duplicated pulse-threshold and velocity-escalation logic from `beat()` and `beat_swarm()` into shared helpers, closing the drift seam identified by the Architectural Oracle.
+
+### Hygiene
+
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P17-3A` cure blocks for `security:ics_hardcoded_override` and `security:missing_ownership_check`.
+
+**Live-fire hunt**: scanned `freedomofpress/securedrop-workstation`, `smartcontractkit/chainlink-testing-framework`, and `freedomofpress/securedrop`. The first two returned `no_findings`. `securedrop` produced one low-yield local verification-script shell sink and one candidate-grade ownership-check cluster on journalist/admin routes that still needs a live cross-user authorization witness in a production-like deployment.
+
+**Verification**: `cargo test -p forge idor -- --test-threads=4` ✓ | `cargo test -p forge ics_rules -- --test-threads=4` ✓ | `cargo test -p cli campaign_ingest -- --test-threads=4` ✓ | `cargo test -p common physarum -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-06 — Sprint Batch 116: Proof Obligations, Unified Web Evidence, & The Max Compute Protocol
 
 **Directive:** Ship P17-3 proof obligations and P18-5 DMA shadow-access detection, unify DOM XSS/SSRF/RAG evidence into one web proof artifact, add the Max Compute governance rule, hunt the next distinct GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
