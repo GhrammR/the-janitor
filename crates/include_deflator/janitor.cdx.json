@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:db9cebee-4e91-43b5-a922-9e7c0b0cf7a3",
+  "serialNumber": "urn:uuid:5356b217-a05e-4253-b936-767b2367b409",
   "metadata": {
-    "timestamp": "2026-05-04T10:13:47.127996965Z",
+    "timestamp": "2026-05-06T22:07:48.557952477Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,23 +14,23 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.1",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2",
       "name": "include_deflator",
-      "version": "10.2.0-rc.1",
+      "version": "10.2.0-rc.2",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/include_deflator@10.2.0-rc.1?download_url=file://.",
+      "purl": "pkg:cargo/include_deflator@10.2.0-rc.2?download_url=file://.",
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.1 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2 bin-target-0",
           "name": "include_deflator",
-          "version": "10.2.0-rc.1",
-          "purl": "pkg:cargo/include_deflator@10.2.0-rc.1?download_url=file://.#src/lib.rs"
+          "version": "10.2.0-rc.2",
+          "purl": "pkg:cargo/include_deflator@10.2.0-rc.2?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -1339,16 +1339,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.114",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.115",
       "author": "Alex Crichton <alex@alexcrichton.com>, Steven Fackler <sfackler@gmail.com>",
       "name": "openssl-sys",
-      "version": "0.9.114",
+      "version": "0.9.115",
       "description": "FFI bindings to OpenSSL",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "13ce1245cd07fcc4cfdb438f7507b0c7e4f3849a69fd84d52374c66d83741bb6"
+          "content": "158fe5b292746440aa6e7a7e690e55aeb72d41505e2804c23c6973ad0e9c9781"
         }
       ],
       "licenses": [
@@ -1356,7 +1356,7 @@
           "expression": "MIT"
         }
       ],
-      "purl": "pkg:cargo/openssl-sys@0.9.114",
+      "purl": "pkg:cargo/openssl-sys@0.9.115",
       "externalReferences": [
         {
           "type": "other",
@@ -2580,7 +2580,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.1",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.5",
@@ -2686,7 +2686,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#libgit2-sys@0.18.3+1.9.2",
         "registry+https://github.com/rust-lang/crates.io-index#log@0.4.29",
         "registry+https://github.com/rust-lang/crates.io-index#openssl-probe@0.1.6",
-        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.114",
+        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.115",
         "registry+https://github.com/rust-lang/crates.io-index#url@2.5.8"
       ]
     },
@@ -2807,7 +2807,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",
         "registry+https://github.com/rust-lang/crates.io-index#libssh2-sys@0.3.1",
         "registry+https://github.com/rust-lang/crates.io-index#libz-sys@1.1.28",
-        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.114",
+        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.115",
         "registry+https://github.com/rust-lang/crates.io-index#pkg-config@0.3.33"
       ]
     },
@@ -2817,7 +2817,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.61",
         "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",
         "registry+https://github.com/rust-lang/crates.io-index#libz-sys@1.1.28",
-        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.114",
+        "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.115",
         "registry+https://github.com/rust-lang/crates.io-index#pkg-config@0.3.33"
       ]
     },
@@ -2843,7 +2843,7 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#openssl-probe@0.1.6"
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.114",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#openssl-sys@0.9.115",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.61",
         "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",

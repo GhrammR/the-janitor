@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:a5289d24-36d9-4b09-b08f-67fc3985b8f7",
+  "serialNumber": "urn:uuid:696503fd-b6ea-4573-afd3-ae3686d8637c",
   "metadata": {
-    "timestamp": "2026-05-04T10:13:47.350218505Z",
+    "timestamp": "2026-05-06T22:07:48.616647360Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.1",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.2",
       "name": "shadow",
-      "version": "10.2.0-rc.1",
+      "version": "10.2.0-rc.2",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/shadow@10.2.0-rc.1?download_url=file://.",
+      "purl": "pkg:cargo/shadow@10.2.0-rc.2?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.1 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.2 bin-target-0",
           "name": "shadow",
-          "version": "10.2.0-rc.1",
-          "purl": "pkg:cargo/shadow@10.2.0-rc.1?download_url=file://.#src/lib.rs"
+          "version": "10.2.0-rc.2",
+          "purl": "pkg:cargo/shadow@10.2.0-rc.2?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -334,7 +334,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.1",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.0-rc.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18",
