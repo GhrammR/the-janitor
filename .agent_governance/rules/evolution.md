@@ -96,19 +96,31 @@ monetization surface, not an archaeological record of false positives.
 
 ## Bounty Extraction Law
 
-When executing `janitor hunt`, you must review the output for weaponized findings.
-A finding is weaponized ONLY if it possesses a concrete reproduction payload,
-`repro_cmd`, or generated HTML harness — NOT `Pending`.
+When executing `janitor hunt`, you must review the output through the
+Tri-Ledger Funnel. A finding is weaponized ONLY if it possesses a concrete
+reproduction payload, `repro_cmd`, or generated HTML harness — NOT `Pending`.
 
-For every weaponized finding, you MUST:
+For every finding, you MUST:
 A. Cross-reference the finding against its parent program's rules in
    `tools/campaign/targets/<program>_targets.md`.
 B. Verify the target is strictly IN SCOPE.
 C. Extract the estimated payout for the finding's severity.
-D. Append a structured entry to `tools/campaign/BOUNTY_LEDGER.md` detailing:
+D. Route the structured row to exactly one ledger:
+   - `tools/campaign/BOUNTY_LEDGER.md` for `Approval % >= 85` AND a concrete
+     autonomous payload (`repro_cmd` or HTML harness). These rows are ready for
+     direct submission.
+   - `tools/campaign/CANDIDATE_LEDGER.md` for `Approval % >= 10 && < 85`.
+     These rows are valid findings missing a fully autonomous payload or
+     requiring manual verification. The row MUST record the exact
+     `Exploitation Strategy` or mathematical proof gap that blocked an 85%
+     rating.
+   - `tools/campaign/LOW_YIELD_LEDGER.md` for `Approval % < 10`. These rows are
+     informational, test-only, or currently unexploitable and must preserve the
+     reason routed plus the R&D follow-up.
+E. Preserve the canonical schema fields:
    `[Date]`, `[Target URL/Repo]`, `[Vulnerability Class]`, `[Severity]`,
-   `[Expected Payout]`, `[Estimated Approval % (>85% if payload exists)]`,
-   `[Exact Repro Command]`, and `[Remediation / Exploitation Strategy]`.
+   `[Expected Payout]`, `[Estimated Approval %]`, `[Exact Repro Command]`, and
+   `[Remediation / Exploitation Strategy]`.
 
 ### Lattice-Gap Innovation Loop
 
@@ -144,7 +156,8 @@ For every entry with `Approval % < 10%`, you MUST route the row to
 must preserve the target, finding class, approval estimate, reason routed, and
 R&D follow-up so Omni-Audits can mine it for future AEG templates or AST
 suppressions. `tools/campaign/BOUNTY_LEDGER.md` remains reserved for findings
-with `Approval % >= 10%`.
+with `Approval % >= 85%`, and `tools/campaign/CANDIDATE_LEDGER.md` is reserved
+for findings in the `10%..84%` approval band.
 
 ### Schema Taint Verification Law (Sprint Batch 95)
 
@@ -207,13 +220,13 @@ finding remains unweaponized until a defensive proof can be produced.
 
 ### Dual-Ledger Mandate (Sprint Batch 96)
 
-Whenever a finding is logged to `BOUNTY_LEDGER.md` with an `Approval % < 85%`
+Whenever a finding is logged to `CANDIDATE_LEDGER.md` with an `Approval % < 85%`
 due to a **missing engine capability** (e.g., Schema Taint Verification, React
 Context loss, cross-file sanitizer propagation), you MUST perform a
 **Dual-Ledger action**:
 
-1. Document the manual `Exploitation Strategy` in the Bounty Ledger (existing
-   Bounty Extraction Law obligation).
+1. Document the manual `Exploitation Strategy` in the Candidate Ledger
+   (existing Bounty Extraction Law obligation).
 2. **Immediately** author a corresponding P-tier architectural proposal in
    `.INNOVATION_LOG.md` designed to automate that manual strategy. The proposal
    must name the missing lattice element, the Rust module to extend, the
@@ -221,9 +234,10 @@ Context loss, cross-file sanitizer propagation), you MUST perform a
    pair required to close the gap.
 
 You are **mathematically forbidden** from logging a capability gap in the bounty
-ledger without also proposing its automated cure in the innovation log. The bounty
-ledger records where the engine failed; the innovation log records how the engine
-will never fail there again. Both entries must be authored in the same session.
+or candidate ledger without also proposing its automated cure in the innovation
+log. The ledgers record where the engine failed; the innovation log records how
+the engine will never fail there again. Both entries must be authored in the
+same session.
 
 **Why this closes the Sprint Batch 95 instruction bleed**: Sprint Batch 95
 correctly applied Schema Taint Verification Law but failed to simultaneously

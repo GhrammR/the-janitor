@@ -122,18 +122,26 @@ summaries and must remain terminal-only.
 
 ## Bounty Extraction Law (mandatory for all hunt/scan output review)
 
-When reviewing `janitor hunt` output, a finding is weaponized ONLY if it possesses
-a concrete reproduction payload, `repro_cmd`, or generated HTML harness — NOT `Pending`.
+When reviewing `janitor hunt` output, route every finding through the
+Tri-Ledger Funnel. A finding is weaponized ONLY if it possesses a concrete
+reproduction payload, `repro_cmd`, or generated HTML harness — NOT `Pending`.
 
-For every weaponized finding you MUST:
+For every finding you MUST:
 A. Cross-reference the finding against its parent program's rules in
    `tools/campaign/targets/<program>_targets.md`.
 B. Verify the target is strictly IN SCOPE.
 C. Extract the estimated payout for the finding's severity.
-D. Append a structured entry to `tools/campaign/BOUNTY_LEDGER.md` with:
+D. Route the row to exactly one ledger:
+   - `tools/campaign/BOUNTY_LEDGER.md` when `Approval % >= 85` and the finding
+     carries a concrete autonomous payload. This ledger is submission-ready only.
+   - `tools/campaign/CANDIDATE_LEDGER.md` when `Approval % >= 10 && < 85`.
+     These rows MUST record the exact `Exploitation Strategy` or mathematical
+     proof gap that prevented an 85% rating.
+   - `tools/campaign/LOW_YIELD_LEDGER.md` when `Approval % < 10`.
+E. Preserve the canonical schema fields:
    `[Date]`, `[Target URL/Repo]`, `[Vulnerability Class]`, `[Severity]`,
-   `[Expected Payout]`, `[Estimated Approval % (>85% if payload exists)]`,
-   `[Exact Repro Command]`, and `[Remediation / Exploitation Strategy]`.
+   `[Expected Payout]`, `[Estimated Approval %]`, `[Exact Repro Command]`, and
+   `[Remediation / Exploitation Strategy]`.
 
 If a finding requires a `[lattice-gap: P-XX]` annotation because the IFDS solver
 cannot trace a specific framework, protocol, or memory bound, you MUST
@@ -166,9 +174,9 @@ and "100% bypass probability" language are not valid final output.
 
 Whenever a finding is logged with `Approval % < 85%` due to a **missing engine
 capability**, you MUST author BOTH: (1) a manual Exploitation Strategy in the
-Bounty Ledger AND (2) a corresponding P-tier architectural proposal in
+Candidate Ledger AND (2) a corresponding P-tier architectural proposal in
 `.INNOVATION_LOG.md` that automates that strategy. Logging a capability gap in
-the bounty ledger without a corresponding innovation log entry is a governance
+the candidate ledger without a corresponding innovation log entry is a governance
 violation. The bounty ledger records the failure; the innovation log records the
 cure. Both entries are mandatory and must be authored in the same session.
 
@@ -191,7 +199,8 @@ For every entry with `Approval % < 10%`, route the row to
 finding class, approval estimate, reason routed, and R&D follow-up so Omni-Audits
 can mine it for future AEG templates or AST suppressions.
 `tools/campaign/BOUNTY_LEDGER.md` remains reserved for findings with
-`Approval % >= 10%`.
+`Approval % >= 85%`; `tools/campaign/CANDIDATE_LEDGER.md` owns the `10%..84%`
+band.
 
 ## Structural Eradication Law (mandatory for all hunt/scan output review)
 

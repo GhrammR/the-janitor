@@ -2,6 +2,7 @@ pub mod audit;
 pub mod otlp;
 pub mod safe_delete;
 pub mod test_fingerprint;
+pub mod transparency_log;
 
 pub use safe_delete::{DeletionTarget, ReplacementTarget, SafeDeleter};
 

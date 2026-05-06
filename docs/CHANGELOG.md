@@ -3,6 +3,29 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-05 — Sprint Batch 112: Candidate Ledger & Federal Attestation
+
+**Directive:** Close the 10%–84% approval triage gap with a tri-ledger funnel, ship P19-1 FIPS cryptographic boundary enforcement and P19-2 tamper-evident transparency chaining, hydrate three GitHub targets, delete shipped P19 backlog entries, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance & Ledger Routing
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — upgraded the Bounty Extraction Law into the Tri-Ledger Funnel: `BOUNTY_LEDGER.md` for `>=85%`, `CANDIDATE_LEDGER.md` for `10%..84%`, and `LOW_YIELD_LEDGER.md` for `<10%`, with mandatory proof-gap logging for candidate rows.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(created)* — added the candidate ledger with the canonical bounty schema and backfilled the current 10%–84% backlog so intermediate-confidence findings are no longer lost between submission-ready and low-yield queues.
+
+### Cryptographic Controls
+
+* `crates/vault/src/fips_boundary.rs` *(created)* — added `CryptoBoundary::record_operation`, approved algorithm receipts, hard-fail rejection for SHA-1/MD5/BLAKE3 compliance-chain attempts, unit tests, and a co-located Kani proof harness stub.
+* `crates/vault/src/lib.rs` and `crates/vault/Cargo.toml` *(modified)* — exported the FIPS boundary module, enforced boundary receipts inside `SigningOracle::verify_token`, added SHA-384/hex dependencies, and declared `cfg(kani)` as an expected configuration.
+* `crates/reaper/src/transparency_log.rs`, `crates/reaper/src/lib.rs`, and `crates/reaper/Cargo.toml` *(modified/created)* — added an append-only SHA-384 transparency chain with monotonic sequence numbers, previous-hash binding, chain verification, and broken-chain regression coverage.
+* `crates/cli/src/report.rs` *(modified)* — every bounce-log append now syncs the primary NDJSON file and anchors the same serialized payload into `.janitor/transparency_log.ndjson`; webhook HMAC emission now passes through the boundary gate.
+
+### Live-Fire Hydration & Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `https://github.com/Uniswap/universal-router`, `https://github.com/Uniswap/v3-core`, and `https://github.com/Uniswap/v3-info` as hunted with `no_findings`.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P19-1` and `P19-2` blocks under the Absolute Eradication Law.
+
+**Verification**: `cargo test -p vault -p reaper -- --test-threads=4` ✓ | live-fire hunts: `universal-router` no findings, `v3-core` no findings, `v3-info` no findings.
+
 ## 2026-05-06 — Sprint Batch 111: Extra-High Omni-Strike & Industrial Moat
 
 **Directive:** Repair GitHub Pages and CISA KEV sync permissions, refresh dependencies, establish the Low-Yield Ledger, ship OT/ICS and automotive detector packs, hydrate three targets, and append FedRAMP High / IL6 enterprise audit frontiers without cutting a release.

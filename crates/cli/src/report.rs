@@ -15,10 +15,12 @@
 //! Output formats: `markdown` (default) and `json`.
 
 use hmac::{Hmac, KeyInit, Mac};
+use reaper::transparency_log::TransparencyLog;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use vault::fips_boundary::{CryptoAlgorithm, CryptoBoundary, SecurityPurpose};
 
 // ---------------------------------------------------------------------------
 // ROI Constants — Workslop Triage Tax
@@ -124,6 +126,15 @@ fn resolve_webhook_secret(cfg: &common::policy::WebhookConfig) -> String {
 
 fn sign_webhook_payload(secret: &str, payload: &str) -> String {
     if secret.is_empty() {
+        return String::new();
+    }
+    if CryptoBoundary::record_operation(
+        "cli::report::sign_webhook_payload",
+        CryptoAlgorithm::HmacSha256,
+        SecurityPurpose::TransportIntegrity,
+    )
+    .is_err()
+    {
         return String::new();
     }
 
@@ -1082,6 +1093,14 @@ fn append_log_line<T: Serialize>(janitor_dir: &Path, event: &T) {
             // write(2) returned successfully.
             if let Err(e) = f.sync_all() {
                 eprintln!("janitor: sync_all on {} failed: {e}", log_path.display());
+                return;
+            }
+            let transparency_path = janitor_dir.join("transparency_log.ndjson");
+            if let Err(e) = TransparencyLog::append_leaf(&transparency_path, line.as_bytes()) {
+                eprintln!(
+                    "janitor: transparency append to {} failed: {e}",
+                    transparency_path.display()
+                );
             }
         }
         Err(e) => {

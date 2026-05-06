@@ -4673,6 +4673,7 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "flate2",
+ "hex",
  "memmap2",
  "serde",
  "serde_json",
@@ -4680,6 +4681,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "ureq",
+ "vault",
 ]
 
 [[package]]
@@ -6469,6 +6471,8 @@ version = "10.2.0-rc.1"
 dependencies = [
  "base64",
  "ed25519-dalek",
+ "hex",
+ "sha2 0.11.0",
  "thiserror 2.0.18",
 ]
 

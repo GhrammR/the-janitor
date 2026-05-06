@@ -11,6 +11,8 @@
 //!    [`SigningOracle::verify_token`] before any destructive operation.
 //!    An `Err` return is a hard gate — the operation must not proceed.
 
+pub mod fips_boundary;
+
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use std::sync::OnceLock;
 
@@ -97,6 +99,13 @@ impl SigningOracle {
     /// A token is obtained by purchasing a license at thejanitor.app.
     pub fn verify_token(token: &str) -> Result<(), VaultError> {
         use base64::Engine;
+
+        let _receipt = fips_boundary::CryptoBoundary::record_operation(
+            "vault::SigningOracle::verify_token",
+            fips_boundary::CryptoAlgorithm::Ed25519,
+            fips_boundary::SecurityPurpose::TokenVerification,
+        )
+        .map_err(|_| VaultError::InvalidSignature)?;
 
         // 1. Base64-decode the token.
         let decoded = base64::engine::general_purpose::STANDARD
