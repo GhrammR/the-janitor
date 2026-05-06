@@ -3136,6 +3136,12 @@ fn scan_buffer(
             structured
         })
         .collect::<Vec<_>>();
+    findings.extend(forge::model_pinning::detect_unpinned_model_revisions(
+        ext, source, label,
+    ));
+    findings.extend(forge::stego_binary::detect_embedded_executable_blob(
+        source, label,
+    ));
     let filename = std::path::Path::new(label)
         .file_name()
         .and_then(|n| n.to_str())

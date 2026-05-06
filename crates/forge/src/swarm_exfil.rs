@@ -55,7 +55,6 @@ const EXFIL_PATTERNS: &[&[u8]] = &[
     // appear in committed source outside of LLM framework test fixtures)
     b"FINAL ANSWER:",
     b"Action Input:",
-    b"Observation:",
     // Prompt-injection escalation vectors (injected into source to hijack
     // downstream LLM assistants reading the codebase via RAG)
     b"Ignore all previous instructions",

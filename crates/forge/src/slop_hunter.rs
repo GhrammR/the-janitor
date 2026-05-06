@@ -1040,7 +1040,6 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_jwt_validation_bypass(source));
             f.extend(find_saml_xsw_and_xxe(source));
             f.extend(find_oauth_state_omission(source));
-            f.extend(find_unpinned_ml_model_weights(source));
             f.extend(find_llm_prompt_injection_sinks(source));
             // Phase 2 R&D: dangerous-call AST walk (exec/eval/pickle/os.system/__import__)
             f.extend(find_python_slop_ast(eng, parsed));
@@ -2735,67 +2734,6 @@ fn find_python_slop(source: &[u8]) -> Vec<SlopFinding> {
             }]
         })
         .unwrap_or_default()
-}
-
-fn find_unpinned_ml_model_weights(source: &[u8]) -> Vec<SlopFinding> {
-    let lower = ascii_lower(source);
-    let mut findings = Vec::new();
-    for needle in [b".from_pretrained(".as_slice(), b"pipeline(".as_slice()] {
-        let mut cursor = 0;
-        while cursor < lower.len() {
-            let Some(relative) = lower[cursor..]
-                .windows(needle.len())
-                .position(|window| window == needle)
-            else {
-                break;
-            };
-            let start = cursor + relative;
-            let open = start + needle.len() - 1;
-            let Some(end) = find_matching_paren(source, open) else {
-                cursor = start + needle.len();
-                continue;
-            };
-            let call = &source[start..end.min(source.len())];
-            if !call_has_pinned_huggingface_revision(call) {
-                findings.push(SlopFinding {
-                    start_byte: start,
-                    end_byte: end.min(source.len()),
-                    description: "security:unpinned_ml_model_weights — HuggingFace model load \
-                        uses `from_pretrained` or `pipeline` without a `revision` pinned to a \
-                        40-character Git commit SHA; unpinned model weights can be silently \
-                        replaced with BadNets or poisoned checkpoints at runtime"
-                        .to_string(),
-                    domain: DOMAIN_FIRST_PARTY,
-                    severity: Severity::KevCritical,
-                });
-            }
-            cursor = end.max(start + needle.len());
-        }
-    }
-    findings
-}
-
-fn call_has_pinned_huggingface_revision(call: &[u8]) -> bool {
-    let Ok(call_text) = std::str::from_utf8(call) else {
-        return false;
-    };
-    let Some(revision_idx) = call_text.find("revision") else {
-        return false;
-    };
-    let after_revision = &call_text[revision_idx + "revision".len()..];
-    let Some(eq_idx) = after_revision.find('=') else {
-        return false;
-    };
-    let value = after_revision[eq_idx + 1..].trim_start();
-    let Some(quote) = value.chars().next().filter(|ch| *ch == '"' || *ch == '\'') else {
-        return false;
-    };
-    let value = &value[quote.len_utf8()..];
-    let Some(end_quote) = value.find(quote) else {
-        return false;
-    };
-    let revision = &value[..end_quote];
-    revision.len() == 40 && revision.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Detect LLM API call sinks where untrusted data may flow to a prompt.
@@ -8685,40 +8623,6 @@ fn main() {
                 .contains("supply_chain:untrusted_ide_extension")
                 && f.severity == Severity::High),
             "latest-tag VS Code recommendations must be blocked"
-        );
-    }
-
-    #[test]
-    fn python_from_pretrained_without_revision_triggers_ml_model_provenance() {
-        let src = br#"
-from transformers import AutoModel
-model = AutoModel.from_pretrained("org/critical-model")
-"#;
-        let findings = find_slop("py", src);
-        assert!(
-            findings.iter().any(
-                |f| f.description.contains("security:unpinned_ml_model_weights")
-                    && f.severity == Severity::KevCritical
-            ),
-            "HuggingFace from_pretrained without a 40-char revision SHA must be blocked"
-        );
-    }
-
-    #[test]
-    fn python_from_pretrained_with_sha_revision_is_allowed() {
-        let src = br#"
-from transformers import AutoModel
-model = AutoModel.from_pretrained(
-    "org/critical-model",
-    revision="0123456789abcdef0123456789abcdef01234567",
-)
-"#;
-        let findings = find_slop("py", src);
-        assert!(
-            findings
-                .iter()
-                .all(|f| !f.description.contains("security:unpinned_ml_model_weights")),
-            "40-char Git SHA revision pin must suppress ML model provenance finding"
         );
     }
 

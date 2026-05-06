@@ -5496,6 +5496,17 @@ OkHttp and Okio returned no findings.
 
 **Verification**: `cargo test --workspace -- --test-threads=1` ✓ | `just audit` ✓
 
+## 2026-05-05 — Sprint Batch 106: AI Supply Chain & Steganographic Shields
+
+* `crates/forge/src/model_pinning.rs` *(created)* — added deterministic ML model revision pinning detection for Python/JS/TS hosted-model loads (`from_pretrained`, `replicate.run`, `hf_hub_download`); unpinned or non-SHA revision arguments now emit `security:unpinned_model_weights` at `KevCritical`.
+* `crates/forge/src/stego_binary.rs` *(created)* — added bounded long-literal decoding for base64 and hex blobs with PE/ELF/Mach-O magic recognition; embedded executable carriers now emit `security:embedded_executable_blob` at `KevCritical`.
+* `crates/forge/src/lib.rs`, `crates/cli/src/hunt.rs`, and `crates/forge/src/slop_hunter.rs` *(modified)* — exported the new detectors, wired them into hunt scans, and removed the older Python-only ML pinning path so the new module is the single authority.
+* `crates/forge/src/swarm_exfil.rs` *(modified)* — deleted the broad `Observation:` marker after live-fire Chainlink scanning proved it generated cosmetic false positives against benign telemetry strings.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the completed `P6-8` and `P6-11` frontier blocks from the active queue.
+* `tools/campaign/target_ledger.json` and `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — recorded the only remaining unhunted GitHub engagement (`smartcontractkit/chainlink`) as a partial hydration because `smartcontractkit/chainlink-contracts` is no longer cloneable, and logged the verified `jwt_validation_bypass` and `unpinned_asset` hunt outputs.
+
+**Verification**: `cargo run -p cli -- audit-report /tmp/ts-immutable-sdk --output .janitor/audit_reports/` confirmed canonical target `https://github.com/immutable/ts-immutable-sdk`; `cargo run -p cli -- audit-report /tmp/mattermost-boards --output .janitor/audit_reports/` confirmed canonical target `https://github.com/mattermost/mattermost-plugin-boards`; `cargo run -p cli -- hunt /tmp/chainlink --format bugcrowd --submit-check` generated deduplicated submissions for Chainlink; `cargo test --workspace -- --test-threads=4` ✓; `just audit` ✓.
+
 ## 2026-05-03 — Sprint Batch 98: Defensive WAF Constraints, Bayesian Taint, and MEV Risk Synthesis
 
 * `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — added the Delivery Guarantee Law as a defensive witness rule: web ExploitWitness rendering assumes WAF presence, applies Z3 negative constraints for common signatures, and forbids bypass guarantees or live exploit command synthesis.

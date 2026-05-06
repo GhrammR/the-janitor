@@ -44525,7 +44525,8 @@
     "language_tags": ["Solidity", "Go"],
     "matched_attack_keywords": ["reentrancy", "delegatecall", "oracle_manipulation", "signature_replay"],
     "priority_score": 90,
-    "hunted": false,
+    "hunted": true,
+    "hunt_result": "partial_chainlink_scanned_chainlink_contracts_missing_repo",
     "platform": "immunefi",
     "max_payout_usd": 100000
   }
