@@ -3,8 +3,8 @@
 //! When `--submit-check` is passed to `janitor hunt`, this module:
 //! 1. Loads the program's `_targets.md` scope rules via AhoCorasick.
 //! 2. Tags every finding as `[SCOPE: IN]` or `[SCOPE: OUT]`.
-//! 3. For every in-scope finding with a populated `repro_cmd`, writes a
-//!    `SUBMISSION.md` into `.janitor/hunt_reports/`.
+//! 3. For every in-scope, submission-grade finding with a concrete exploit
+//!    strategy, writes a `SUBMISSION.md` into `.janitor/hunt_reports/`.
 
 use common::slop::StructuredFinding;
 use forge::dedup::{deduplicate_findings, DeduplicatedFinding, FindingOccurrence};
@@ -203,7 +203,8 @@ pub fn annotate_scope(
         .collect()
 }
 
-/// Write `SUBMISSION_<rule_id>.md` for every in-scope finding that has a `repro_cmd`.
+/// Write `SUBMISSION_<rule_id>.md` for every in-scope finding that survives the
+/// artifact-emission threat-model gate.
 ///
 /// Returns the number of files written.
 pub fn write_submissions(
@@ -227,13 +228,7 @@ pub fn write_submissions(
 
     let mut written = 0usize;
     for finding in &deduplicated {
-        let has_repro = finding
-            .finding
-            .exploit_witness
-            .as_ref()
-            .and_then(|w| w.repro_cmd.as_ref())
-            .is_some();
-        if !has_repro {
+        if !forge::exploitability::artifact_emission_allowed(&finding.finding, true) {
             continue;
         }
         let safe_id = finding.finding.id.replace([':', '/'], "_");
@@ -464,6 +459,7 @@ mod tests {
             exploit_witness: repro.map(|cmd| {
                 let mut w = common::slop::ExploitWitness::default();
                 w.repro_cmd = Some(cmd.to_string());
+                w.reproduction_steps = Some(vec!["Execute the deterministic repro.".to_string()]);
                 w
             }),
             ..Default::default()
@@ -565,6 +561,31 @@ mod tests {
         assert_eq!(
             count, 0,
             "findings without repro_cmd must not produce SUBMISSION.md"
+        );
+    }
+
+    #[test]
+    fn write_submissions_skips_low_evidence_repro_without_strategy() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut finding = make_finding(
+            "security:sqli",
+            Some("api.py"),
+            "High",
+            Some("curl -X POST"),
+        );
+        finding.exploit_witness = Some(common::slop::ExploitWitness {
+            repro_cmd: Some("curl -X POST".to_string()),
+            ..Default::default()
+        });
+        let verdict = ScopeVerdict {
+            in_scope: true,
+            reason: "[SCOPE: IN] test".to_string(),
+        };
+        let annotated = vec![(finding, verdict)];
+        let count = write_submissions(&annotated, dir.path(), "test").unwrap();
+        assert_eq!(
+            count, 0,
+            "repro without exploitation strategy must not produce SUBMISSION.md"
         );
     }
 

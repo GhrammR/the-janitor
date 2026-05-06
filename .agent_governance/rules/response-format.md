@@ -208,6 +208,14 @@ Required action on a Commercial False Positive:
 The exception: `security:credential_leak` in any directory is always billable — a
 secret in a repo is a secret in a repo.
 
+## Ledger Synchronization Law
+
+Whenever a structural AST guard suppresses a vulnerability class that already
+exists in `tools/campaign/BOUNTY_LEDGER.md`, you MUST proactively open the
+ledger and physically DELETE the disproven rows in the same session. A false
+positive may not survive as historical noise once the engine has mathematically
+eradicated it.
+
 ## Anti-Recency-Bias Law (mandatory for `[NEXT RECOMMENDED ACTION]`)
 
 You MUST scan the **entire** `.INNOVATION_LOG.md` — P0, P1, and P2 — before

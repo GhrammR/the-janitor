@@ -5496,6 +5496,38 @@ OkHttp and Okio returned no findings.
 
 **Verification**: `cargo test --workspace -- --test-threads=1` ✓ | `just audit` ✓
 
+## 2026-05-05 — Sprint Batch 108: Workspace Sanitization \& Agentic Reversal
+
+**Directive:** Workspace Sanitization \& Agentic Reversal — purge legacy root clones, suppress low-grade artifact emission, synchronize the bounty ledger after structural false-positive eradication, and ship P6-6 plus P6-12.
+
+### Workspace Hygiene \& Artifact Gating
+
+* `crates/forge/src/exploitability.rs` *(modified)* — added the shared `artifact\_emission\_allowed` gate used by hunt artifact writers; `Informational` / `Low`, out-of-scope, static-source-proven, placeholder-based, and low-evidence findings no longer emit persisted submission or harness artifacts.
+* `crates/cli/src/submit_formatter.rs` *(modified)* — `SUBMISSION_*.md` generation now obeys the shared threat-model gate; added regression coverage proving low-evidence repros are skipped before disk emission.
+* `crates/cli/src/hunt.rs` *(modified)* — BrowserDOM harness emission now obeys the same gate; added regression coverage proving HTML harnesses are not written for low-evidence findings.
+* Repo root *(sanitized)* — deleted the untracked legacy clone directories `auth0-spa-js`, `codex`, `janitor-test-gauntlet`, `mattermost-plugin-mscalendar`, `mattermost-plugin-msteams`, `node-newrelic`, `octopus-cli`, `okta-auth-js`, `pipelinewise`, `securedrop-workstation`, and `transferwise-tasks`.
+
+### Governance \& Ledger Synchronization
+
+* `.agent_governance/rules/evolution.md` *(modified)* — added the **Ledger Synchronization Law** requiring proactive deletion of disproven bounty-ledger rows whenever a structural AST guard suppresses a previously logged vulnerability class.
+* `.agent_governance/rules/response-format.md` *(modified)* — mirrored the **Ledger Synchronization Law** in the terminal-output governance contract.
+* `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — physically deleted the disproven rows for `auth0/auth0.js` DOM XSS, `immutable/ts-immutable-sdk` DOM XSS and SSRF, and `smartcontractkit/chainlink` JWT validation bypass.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P6-6` and `P6-12` frontier blocks.
+
+### AI Supply-Chain Detectors
+
+* `crates/forge/src/llm_decompile.rs` *(created)* — shipped deterministic tool/prompt surface decompilation and emits `security:agent_intent_misalignment` when a restrictive system prompt contradicts shell/file-write/exfiltration-capable tool definitions.
+* `crates/forge/src/dataset_poisoning.rs` *(created)* — shipped a streaming `.jsonl` / `.csv` detector for repeated hidden trigger suffixes and emits `security:training_data_trojan` at `KevCritical`.
+* `crates/forge/src/lib.rs` *(modified)* — exported the new `llm_decompile` and `dataset_poisoning` modules.
+* `crates/forge/src/slop_hunter.rs` *(modified)* — added an `it/` shell-helper false-positive guard so integration-test curl-pipe helpers are eradicated from live-fire output.
+
+### Live-Fire Hydration
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `cashapp/cash-app-pay-ios-sdk` as hunted clean, `cashapp/hermit` as hunted with a placeholder-grade unpinned-asset candidate not logged, and `cashapp/misk` as hunted with a `protobuf_any` candidate not promoted to the bounty ledger.
+* `.janitor/hunt_reports/` *(runtime artifacts)* — stale `SUBMISSION_security_unpinned_asset.md` was deleted after the tighter placeholder gate invalidated it; the `protobuf_any` submission artifact remained as a non-ledger candidate.
+
+**Verification**: `cargo test -p forge llm_decompile -- --test-threads=4` ✓ | `cargo test -p forge dataset_poisoning -- --test-threads=4` ✓ | `cargo test -p forge slop_hunter -- --test-threads=4` ✓ | `cargo test -p cli submit_formatter -- --test-threads=4` ✓ | `cargo test -p cli browser_dom_harness -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-05 — Sprint Batch 107: Target Hydration & Eradication Mechanics
 
 * `crates/forge/src/slop_hunter.rs` *(modified)* — added a Go JWT pre-flight suppression for `ParseUnverified` flows that are followed by an explicit signed-method gate via `jwt.Parse(...)`; added a local helper-return guard so `innerHTML = getEmbeddedLoginPromptOverlay()` is suppressed when the callee has zero parameters and returns a constant string/template; added a JS/TS server-config SSRF suppression so dynamic `fetch(...)` URLs sourced from `process.env` or internal config fields like `authDomain` do not emit `security:ssrf_dynamic_url`.

@@ -243,6 +243,17 @@ pub fn is_hunt_false_positive_path(label: &str, description: &str) -> bool {
                 | "security:os_command_injection"
         );
     }
+    if (path.starts_with("it/") || path.contains("/it/"))
+        && matches!(
+            rule.as_str(),
+            "security:curl_pipe_execution"
+                | "security:command_injection"
+                | "security:os_command_injection"
+                | "security:subprocess_shell_injection"
+        )
+    {
+        return true;
+    }
     if path.starts_with("cmake/") && rule == "security:cmake_execute_process_injection" {
         return true;
     }
@@ -12205,6 +12216,17 @@ mod phase5_rd_tests {
                 "security:unsafe_deserialization — Java ObjectInputStream.readObject()",
             ),
             "sample deserialization fixtures are out-of-scope for generic hunts"
+        );
+    }
+
+    #[test]
+    fn integration_shell_helpers_are_exempt() {
+        assert!(
+            is_hunt_false_positive_path(
+                "it/common.sh",
+                "security:curl_pipe_execution — curl <url> | bash",
+            ),
+            "integration-test shell helpers must not emit generic curl-pipe findings"
         );
     }
 

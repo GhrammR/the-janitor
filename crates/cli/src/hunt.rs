@@ -76,8 +76,8 @@ pub struct HuntArgs<'a> {
     /// When `true`, cross-reference every finding against the program's
     /// `tools/campaign/targets/<program>_targets.md` scope rules, emit
     /// `[SCOPE: IN]` / `[SCOPE: OUT]` labels, and write `SUBMISSION_<id>.md`
-    /// into `.janitor/hunt_reports/` for every in-scope finding that has a
-    /// `repro_cmd`.
+    /// into `.janitor/hunt_reports/` for every in-scope finding that survives
+    /// the artifact-emission threat-model gate.
     pub submit_check: bool,
 }
 
@@ -1141,6 +1141,9 @@ fn emit_browser_dom_harnesses(
 ) -> anyhow::Result<()> {
     let mut emitted = BTreeMap::<String, usize>::new();
     for finding in findings {
+        if !forge::exploitability::artifact_emission_allowed(finding, true) {
+            continue;
+        }
         let Some(witness) = finding.exploit_witness.as_mut() else {
             continue;
         };
@@ -3174,6 +3177,12 @@ fn scan_buffer(
     findings.extend(forge::stego_binary::detect_embedded_executable_blob(
         source, label,
     ));
+    findings.extend(forge::llm_decompile::detect_agent_intent_misalignment(
+        ext, source, label,
+    ));
+    findings.extend(forge::dataset_poisoning::detect_training_data_trojan(
+        ext, source, label,
+    ));
     let filename = std::path::Path::new(label)
         .file_name()
         .and_then(|n| n.to_str())
@@ -4841,6 +4850,7 @@ class Handler {
                     "cat > janitor-auth0-dom-xss-poc.html <<'HTML'\n<!doctype html>\n<title>Harness</title>\n<script>console.log('ready')</script>\nHTML\npython3 -m http.server 8765"
                         .to_string(),
                 ),
+                reproduction_steps: Some(vec!["Serve the harness.".to_string()]),
                 live_proof: Some("Live tenant context injected.".to_string()),
                 ..Default::default()
             }),
@@ -4863,6 +4873,36 @@ class Handler {
                 .and_then(|w| w.live_proof.as_deref())
                 .is_some_and(|proof| proof.contains("BrowserDOM harness written to")),
             "live proof must mention the emitted harness path"
+        );
+    }
+
+    #[test]
+    fn browser_dom_harness_is_skipped_without_exploitation_strategy() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut findings = vec![StructuredFinding {
+            id: "security:dom_xss_innerHTML".to_string(),
+            file: Some("src/auth0-widget.js".to_string()),
+            line: Some(44),
+            fingerprint: "domxss-low-evidence".to_string(),
+            severity: Some("High".to_string()),
+            exploit_witness: Some(common::slop::ExploitWitness {
+                repro_cmd: Some(
+                    "cat > janitor-auth0-dom-xss-poc.html <<'HTML'\n<!doctype html>\n<title>Harness</title>\n<script>console.log('ready')</script>\nHTML\npython3 -m http.server 8765"
+                        .to_string(),
+                ),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }];
+
+        emit_browser_dom_harnesses(&mut findings, temp.path()).unwrap();
+
+        let emitted = temp
+            .path()
+            .join("janitor_poc_security_dom_xss_innerhtml.html");
+        assert!(
+            !emitted.exists(),
+            "low-evidence BrowserDOM harness must not be written"
         );
     }
 

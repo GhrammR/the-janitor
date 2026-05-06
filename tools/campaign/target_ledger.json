@@ -138,7 +138,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -152,7 +154,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -166,7 +170,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_unpinned_asset_placeholder_not_logged"
     },
     {
       "engagement": "block_targets",
@@ -180,7 +186,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_unpinned_asset_placeholder_not_logged"
     },
     {
       "engagement": "block_targets",
@@ -194,7 +202,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_protobuf_any_not_logged"
     },
     {
       "engagement": "block_targets",
@@ -208,7 +218,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_protobuf_any_not_logged"
     },
     {
       "engagement": "block_targets",

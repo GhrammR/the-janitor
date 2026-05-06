@@ -86,6 +86,14 @@ the finding is absent from the output before closing.
 The sole exception: `security:credential_leak` is always billable regardless of
 path — a secret in a repo is a secret in a repo.
 
+## Ledger Synchronization Law
+
+Whenever a structural AST guard is implemented that suppresses a previously
+recorded vulnerability class, you MUST proactively open
+`tools/campaign/BOUNTY_LEDGER.md` and physically DELETE the obsolete rows
+corresponding to the now-disproven findings. The ledger is an active
+monetization surface, not an archaeological record of false positives.
+
 ## Bounty Extraction Law
 
 When executing `janitor hunt`, you must review the output for weaponized findings.
