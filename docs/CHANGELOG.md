@@ -5496,6 +5496,27 @@ OkHttp and Okio returned no findings.
 
 **Verification**: `cargo test --workspace -- --test-threads=1` ✓ | `just audit` ✓
 
+## 2026-05-05 — Sprint Batch 109: Triage Triage & Submission Automation
+
+**Directive:** Triage sub-85% Mattermost findings into submission-grade evidence, bundle Bugcrowd artifacts into a single copy-pasteable package, and eradicate the obsolete `P3-4` marketplace residue from the innovation log.
+
+### Triage Proxy Protocol
+
+* `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — appended triager-facing `Triage Defense` sections for the two `mattermost/mattermost-plugin-boards` entries below the 85% approval threshold.
+* `mattermost/mattermost-plugin-boards` stored XSS row *(elevated with concrete evidence)* — documented the exact attacker-controlled parameter chain from editor `text` into `mutator.changeBlockTitle(...)`, `octoClient.patchBlock(boardId, blockId, {title: newTitle})`, and the persisted `PATCH /api/v2/boards/{boardId}/blocks/{blockId}` API field before re-render through `Utils.htmlFromMarkdown(...)` and `dangerouslySetInnerHTML`.
+* `mattermost/mattermost-plugin-boards` DOM XSS row *(constrained)* — recorded that current HEAD does not statically prove a reachable call into the generic `htmlToElement` helper, and attached a deterministic Node interrogation script that patches `board.description` through the same Boards API family and tells the operator exactly how to confirm or falsify runtime reflection.
+
+### Submission Packaging
+
+* `crates/cli/src/submit_formatter.rs` *(modified)* — added `generate_bugcrowd_submission_package(...)`; submit-check output now bundles the canonical submission markdown, the exact `repro_cmd` as a fenced attachment block, and any HTML PoC extracted from a heredoc into a single copy-pasteable package.
+* `crates/cli/src/submit_formatter.rs` *(tests)* — added regression coverage proving the package preserves the raw reproduction command and embeds HTML PoC bodies when the witness carries a browser-delivery harness.
+
+### Innovation Log Hygiene
+
+* `.INNOVATION_LOG.md` *(modified)* — deleted the remaining `P3-4` marketplace residue by removing the obsolete marketplace framing from the decentralized rule-mesh frontier; no completed tombstones remain in the active queue.
+
+**Verification**: `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-05 — Sprint Batch 108: Workspace Sanitization \& Agentic Reversal
 
 **Directive:** Workspace Sanitization \& Agentic Reversal — purge legacy root clones, suppress low-grade artifact emission, synchronize the bounty ledger after structural false-positive eradication, and ship P6-6 plus P6-12.

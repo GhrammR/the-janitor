@@ -234,7 +234,7 @@ pub fn write_submissions(
         let safe_id = finding.finding.id.replace([':', '/'], "_");
         let filename = format!("SUBMISSION_{safe_id}.md");
         let dest = output_dir.join(&filename);
-        let content = format_submission_md(finding, program_name);
+        let content = generate_bugcrowd_submission_package(finding, program_name);
         std::fs::write(&dest, content.as_bytes())
             .map_err(|e| anyhow::anyhow!("failed to write {}: {e}", dest.display()))?;
         eprintln!("[submit-check] wrote {}", dest.display());
@@ -355,6 +355,43 @@ pub fn format_submission_md(finding: &DeduplicatedFinding, canonical_target: &st
     )
 }
 
+/// Render a single copy-pasteable Bugcrowd package for one deduplicated finding.
+///
+/// The package contains the submission markdown body, the exact reproduction
+/// command as a text attachment block, and any embedded HTML proof-of-concept
+/// extracted from the witness command heredoc.
+pub fn generate_bugcrowd_submission_package(
+    finding: &DeduplicatedFinding,
+    canonical_target: &str,
+) -> String {
+    let primary = &finding.finding;
+    let mut package = format_submission_md(finding, canonical_target);
+
+    if let Some(repro_cmd) = primary
+        .exploit_witness
+        .as_ref()
+        .and_then(|witness| witness.repro_cmd.as_deref())
+    {
+        package.push_str("\n## Attached Reproduction Command\n```text\n");
+        package.push_str(repro_cmd);
+        if !repro_cmd.ends_with('\n') {
+            package.push('\n');
+        }
+        package.push_str("```\n");
+
+        if let Some(html_poc) = extract_html_poc(repro_cmd) {
+            package.push_str("\n## Attached HTML PoC\n```html\n");
+            package.push_str(html_poc);
+            if !html_poc.ends_with('\n') {
+                package.push('\n');
+            }
+            package.push_str("```\n");
+        }
+    }
+
+    package
+}
+
 fn finding_description(finding: &StructuredFinding) -> String {
     let location = match (finding.file.as_deref(), finding.line) {
         (Some(file), Some(line)) => format!("{file}:{line}"),
@@ -413,6 +450,13 @@ fn render_witness_context(finding: &StructuredFinding) -> String {
         sections.push('\n');
     }
     sections
+}
+
+fn extract_html_poc(repro_cmd: &str) -> Option<&str> {
+    let start = repro_cmd.find("<<'HTML'\n")? + "<<'HTML'\n".len();
+    let tail = &repro_cmd[start..];
+    let end = tail.find("\nHTML")?;
+    Some(&tail[..end])
 }
 
 fn severity_to_impact(severity: &str, finding_id: &str) -> &'static str {
@@ -524,6 +568,64 @@ mod tests {
         assert!(
             md.contains("## Remediation"),
             "must contain remediation section"
+        );
+    }
+
+    #[test]
+    fn submission_package_includes_repro_attachment() {
+        let finding = make_finding(
+            "security:ssrf_dynamic_url",
+            Some("server.ts"),
+            "High",
+            Some("curl -i https://target.example/internal"),
+        );
+        let deduplicated = DeduplicatedFinding {
+            finding,
+            occurrences: vec![FindingOccurrence {
+                file: "server.ts".to_string(),
+                line: Some(88),
+            }],
+        };
+        let package = generate_bugcrowd_submission_package(&deduplicated, "github.com/acme/app");
+        assert!(
+            package.contains("## Attached Reproduction Command"),
+            "package must include a reproduction attachment block"
+        );
+        assert!(
+            package.contains("curl -i https://target.example/internal"),
+            "package must preserve the exact repro command"
+        );
+    }
+
+    #[test]
+    fn submission_package_embeds_html_poc_attachment() {
+        let finding = make_finding(
+            "security:dom_xss",
+            Some("app.js"),
+            "High",
+            Some(
+                "cat > poc.html <<'HTML'\n<!doctype html>\n<script>alert(1)</script>\nHTML\npython3 -m http.server 8765",
+            ),
+        );
+        let deduplicated = DeduplicatedFinding {
+            finding,
+            occurrences: vec![FindingOccurrence {
+                file: "app.js".to_string(),
+                line: Some(21),
+            }],
+        };
+        let package = generate_bugcrowd_submission_package(&deduplicated, "github.com/acme/web");
+        assert!(
+            package.contains("## Attached HTML PoC"),
+            "package must include the extracted HTML artifact"
+        );
+        assert!(
+            package.contains("<!doctype html>"),
+            "package must preserve the html body"
+        );
+        assert!(
+            package.contains("<script>alert(1)</script>"),
+            "package must preserve the PoC script content"
         );
     }
 
