@@ -3221,6 +3221,16 @@ fn scan_buffer(
     findings.extend(forge::agentic_tool_audit::find_bare_metal_agentic_loops(
         ext, source, label,
     ));
+    findings.extend(
+        forge::noninterference::prove_prompt_tool_non_interference(source)
+            .into_iter()
+            .map(|mut finding| {
+                if finding.file.is_none() {
+                    finding.file = Some(label.to_string());
+                }
+                finding
+            }),
+    );
     if filename == "build.rs" {
         findings.extend(forge::rust_build_worm::find_cargo_build_worm_slop(
             label, source,

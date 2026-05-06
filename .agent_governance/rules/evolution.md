@@ -49,6 +49,46 @@ The resulting prompt MUST include an **Architectural Oracle Tip** that:
 Generic "clean things up" advice is a governance violation. The tip must be
 derived from the live scan, not memory.
 
+## Autonomous Modulator Law
+
+Final directive summaries now have two distinct intelligence channels:
+
+1. `[NEXT RECOMMENDED ACTION]` is reserved for the *next agent* and must remain
+   a copy-pasteable Sovereign Directive prompt.
+2. `[OPERATOR INTELLIGENCE]` is reserved for the *human operator* and must NOT
+   be framed as an agent prompt.
+
+The `[OPERATOR INTELLIGENCE]` section MUST include an **Entropy Modulator Tip**
+derived from the last 3 sprint entries in `docs/CHANGELOG.md`.
+
+Entropy Modulator requirements:
+
+- If the last 3 sprints concentrated on Web/AI surfaces, the tip must analyze
+  Systems/CLI/Build infrastructure.
+- If the last 3 sprints concentrated on Systems/CLI/Build infrastructure, the
+  tip must analyze Web/AI surfaces.
+- The tip must identify one concrete refactor, token-efficiency improvement, or
+  procedural bottleneck the human should address.
+- The tip must be concise, operational, and explicitly human-directed.
+
+Generic motivation, trend commentary, or restating the agent prompt is a
+governance violation.
+
+## Distinct-Target Hydration Law
+
+When selecting the next 3 GitHub hunt targets from
+`tools/campaign/target_ledger.json`, you MUST enforce organization/project
+diversity.
+
+Hard rules:
+
+1. The 3 selected targets must come from 3 distinct organizations or projects.
+2. Do NOT select multiple repository variants from the same family in the same
+   sprint (for example `org/repo`, `org/repo-docs`, and `org/repo-client`).
+3. If the next raw ledger entries violate this law, skip forward until 3
+   distinct organizations/projects are found, then record the actual hydrated
+   targets in the ledger outcome notes.
+
 ## Gate hierarchy (prefer higher tiers)
 
 | Tier | Mechanism | When to use |

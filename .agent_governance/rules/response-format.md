@@ -76,7 +76,9 @@ The prompt MUST:
 3. State, inside the prompt, the exact file to modify, function to change, and
    command to begin for each selected item.
 4. Command the next sprint to run `janitor hunt` against the next 3
-   `tools/campaign/target_ledger.json` targets.
+   `tools/campaign/target_ledger.json` targets, with all three selected from
+   distinct organizations or projects rather than three variants of the same
+   repository family.
 5. Reassert all existing UAP laws by name: Eradication, Structural Guard,
    Triage Empathy, and Tri-Ledger.
 6. Include one strategic operator tip that maximizes revenue / impact.
@@ -108,6 +110,20 @@ and explicitly answer:
 1. What did we just build?
 2. Why does the CISO care?
 3. How does this make money or crush competitors?
+
+[OPERATOR INTELLIGENCE]
+A human-directed operator brief that is NOT fed back into the next agent.
+It must contain one **Entropy Modulator Tip** derived from the last 3 sprint
+entries in `docs/CHANGELOG.md`.
+
+Entropy Modulator protocol:
+1. Inspect the last 3 completed sprints in `docs/CHANGELOG.md`.
+2. Classify whether those sprints concentrated on Web/AI surfaces or on
+   Systems/CLI/Build infrastructure.
+3. Deliberately pivot the tip to the opposite surface area.
+4. Name one specific refactor, token-optimization, or procedural bottleneck the
+   human operator should address next.
+5. Keep it concise, direct, and addressed to the human, not the next agent.
 ```
 
 ## Enforcement
@@ -132,6 +148,8 @@ commands, release commands, or operator housekeeping steps.
   Rust, zero-copy, low-memory AST/IFDS operations.
 - The `[SOVEREIGN TRANSLATION]` section is mandatory for final directive
 summaries and must remain terminal-only.
+- The `[OPERATOR INTELLIGENCE]` section is mandatory for final directive
+summaries and must be addressed directly to the human operator.
 
 ## Bounty Extraction Law (mandatory for all hunt/scan output review)
 

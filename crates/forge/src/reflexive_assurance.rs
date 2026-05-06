@@ -23,6 +23,8 @@
 #[allow(unexpected_cfgs)]
 #[cfg(kani)]
 mod kani_proofs {
+    use crate::embedding_trust::trust_prioritization_missing;
+    use crate::noninterference::declassification_gate_missing;
     use crate::slop_hunter::Severity;
 
     /// Prove that `Severity::points()` never panics and always returns a value
@@ -62,6 +64,43 @@ mod kani_proofs {
         let pts = Severity::KevCritical.points();
         kani::assert(pts == 150, "KevCritical must score exactly 150 points");
     }
+
+    /// Prove the embedding-trust gate is a pure monotonic conjunction:
+    /// it fires iff query + untrusted input are present and the trust guard is absent.
+    #[kani::proof]
+    fn embedding_trust_gate_is_conjunctive() {
+        let has_query: bool = kani::any();
+        let has_untrusted_input: bool = kani::any();
+        let has_guard: bool = kani::any();
+        let fired = trust_prioritization_missing(has_query, has_untrusted_input, has_guard);
+        kani::assert(fired == (has_query && has_untrusted_input && !has_guard));
+    }
+
+    /// Prove the non-interference gate never fires when a declassification
+    /// boundary is visible or the privileged tool does not occur after extraction.
+    #[kani::proof]
+    fn prompt_tool_interference_requires_missing_gate_and_order() {
+        let has_prompt: bool = kani::any();
+        let has_extraction: bool = kani::any();
+        let has_privileged_tool: bool = kani::any();
+        let has_gate: bool = kani::any();
+        let tool_after_extraction: bool = kani::any();
+        let fired = declassification_gate_missing(
+            has_prompt,
+            has_extraction,
+            has_privileged_tool,
+            has_gate,
+            tool_after_extraction,
+        );
+        kani::assert(
+            fired
+                == (has_prompt
+                    && has_extraction
+                    && has_privileged_tool
+                    && tool_after_extraction
+                    && !has_gate),
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +109,8 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
+    use crate::embedding_trust::trust_prioritization_missing;
+    use crate::noninterference::declassification_gate_missing;
     use crate::slop_hunter::Severity;
 
     #[test]
@@ -106,5 +147,20 @@ mod tests {
         // Same cast as build_otlp_payload — must not panic.
         let ts_ns: u128 = ts_ms as u128 * 1_000_000u128;
         assert!(ts_ns <= u128::MAX, "u64::MAX * 1_000_000 must fit in u128");
+    }
+
+    #[test]
+    fn embedding_trust_gate_requires_missing_guard() {
+        assert!(trust_prioritization_missing(true, true, false));
+        assert!(!trust_prioritization_missing(true, true, true));
+    }
+
+    #[test]
+    fn noninterference_gate_requires_order_and_missing_declassification() {
+        assert!(declassification_gate_missing(true, true, true, false, true));
+        assert!(!declassification_gate_missing(true, true, true, true, true));
+        assert!(!declassification_gate_missing(
+            true, true, true, false, false
+        ));
     }
 }

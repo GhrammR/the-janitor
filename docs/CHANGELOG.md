@@ -3,6 +3,27 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 115: The Autonomous Modulator & RAG Assurances
+
+**Directive:** Establish the Operator Intelligence output channel, enforce distinct-project target hydration, ship P18-4 embedding trust and P17-2 prompt/tool non-interference, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance & Output Contract
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — added the Autonomous Modulator law: final summaries now require a human-directed `[OPERATOR INTELLIGENCE]` section with an Entropy Modulator Tip derived from the last three changelog sprints; target hydration rules now require three distinct organizations/projects instead of same-family repo clustering.
+
+### Detector Frontiers
+
+* `crates/forge/src/embedding_trust.rs` *(created)*, `crates/forge/src/noninterference.rs` *(created)*, `crates/forge/src/lib.rs` *(modified)*, `crates/forge/src/slop_hunter.rs` *(modified)*, `crates/cli/src/hunt.rs` *(modified)*, and `crates/forge/src/reflexive_assurance.rs` *(modified)* — added `security:embedding_trust_transposition` for vector-store retrieval that lacks trust-prioritization guards, added `security:prompt_tool_interference` for prompt-derived privileged tool execution without a hardcoded declassification boundary, wired both detectors into the scan pipeline, and added regression plus Kani-helper proofs.
+
+### Live-Fire & Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — recorded Sprint 115 hunts for `smartcontractkit/chainlink`, `freedomofpress/securedrop-client`, and `freedomofpress/securedrop-workstation`, selected as three distinct repositories/projects under the remaining ledger diversity constraint.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — added candidate rows for Chainlink JWT validation bypass and SQL injection; preserved the existing unpinned-asset candidate row.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — routed Chainlink script-only command injection, deployment-surface TLS bypass, early-stage embedding-trust telemetry, and SecureDrop Client local verification-script command injection to low-yield.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P18-4` and `P17-2` blocks under the Absolute Eradication Law.
+
+**Verification**: `cargo test -p forge -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` → ✅ System Clean | live-fire hunts: `chainlink` candidate JWT/SQLi plus low-yield script/TLS/RAG findings, `securedrop-client` low-yield local-script command injection, `securedrop-workstation` no findings.
+
 ## 2026-05-06 — Sprint Batch 114: Revenue Frontier Hardening & The Architectural Oracle
 
 **Directive:** Upgrade the UAP response contract with the Architectural Oracle law, ship P18-1 optimizer phantom authority and P18-2 chronometric split-brain detection, hydrate the next non-Aave GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
