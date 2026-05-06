@@ -3,6 +3,27 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 116: Proof Obligations, Unified Web Evidence, & The Max Compute Protocol
+
+**Directive:** Ship P17-3 proof obligations and P18-5 DMA shadow-access detection, unify DOM XSS/SSRF/RAG evidence into one web proof artifact, add the Max Compute governance rule, hunt the next distinct GitHub targets, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Proof Discipline & Web Evidence
+
+* `crates/common/src/slop.rs` *(modified)*, `crates/forge/src/exploitability.rs` *(modified)*, `crates/forge/src/proof_obligation.rs` *(created)*, `crates/forge/src/noninterference.rs` *(modified)*, `crates/cli/src/hunt.rs` *(modified)*, and `crates/forge/src/reflexive_assurance.rs` *(modified)* — added explicit `ProofClass` carriage for critical findings, added unified `WebProofArtifact` binding external taint source to web sink across DOM XSS / SSRF / RAG lanes, upgraded exploit-witness attachment to auto-carry reachability proofs, and inserted a proof-obligation gate that suppresses unproved critical findings while emitting idempotent innovation-log cures.
+
+### DMA & Governance
+
+* `crates/forge/src/dma_revocation.rs` *(created)* and `crates/forge/src/lib.rs` *(modified)* — added `security:dma_revocation_shadow_access` for revocation paths that fail to dominate outstanding DMA mappings or descriptor submissions, plus deterministic tests and Kani-helper predicates.
+* `.agent_governance/rules/max_compute.md` *(created)* — defined the GPT-5.5 Max Compute Protocol for `[ACTIVATE MAX COMPUTE]`, constraining that mode to cryptographic invariants, formal verification translation, cross-language memory safety, and AI-agent deception blueprints.
+
+### Live-Fire & Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — recorded Sprint 116 hunts for `smartcontractkit/chainlink-testing-framework`, `freedomofpress/securedrop`, and `freedomofpress/securedrop-client`, while collapsing duplicate SecureDrop URL variants into canonical hunt coverage.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — routed SecureDrop and SecureDrop Client verification-script shell sinks to low-yield under Threat Model Awareness.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P17-3` and `P18-5` blocks under the Absolute Eradication Law.
+
+**Verification**: `cargo test --workspace -- --test-threads=4` ✓ | `just audit` → ✅ System Clean | live-fire hunts: `chainlink-testing-framework` no findings, `securedrop` low-yield local verification-script command injection, `securedrop-client` low-yield local verification-script command injection.
+
 ## 2026-05-06 — Sprint Batch 115: The Autonomous Modulator & RAG Assurances
 
 **Directive:** Establish the Operator Intelligence output channel, enforce distinct-project target hydration, ship P18-4 embedding trust and P17-2 prompt/tool non-interference, delete the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.

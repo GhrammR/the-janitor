@@ -233,6 +233,8 @@ mod tests {
             remediation: Some("Remove the vulnerable call.".to_string()),
             docs_url: Some("https://thejanitor.app/findings/test".to_string()),
             exploit_witness: None,
+            proof_class: None,
+            web_proof_artifact: None,
             upstream_validation_absent: false,
             regulatory_regimes: None,
             estimated_fine_floor_usd: None,

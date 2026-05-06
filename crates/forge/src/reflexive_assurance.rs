@@ -23,8 +23,10 @@
 #[allow(unexpected_cfgs)]
 #[cfg(kani)]
 mod kani_proofs {
+    use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
     use crate::noninterference::declassification_gate_missing;
+    use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
     /// Prove that `Severity::points()` never panics and always returns a value
@@ -101,6 +103,42 @@ mod kani_proofs {
                     && !has_gate),
         );
     }
+
+    /// Prove critical findings are suppressed iff they require proof and no
+    /// proof class has been attached.
+    #[kani::proof]
+    fn proof_obligation_gate_is_exact() {
+        let requires_proof: bool = kani::any();
+        let has_proof_class: bool = kani::any();
+        let fired = proof_obligation_missing(requires_proof, has_proof_class);
+        kani::assert(fired == (requires_proof && !has_proof_class));
+    }
+
+    /// Prove the DMA revocation detector fires only when revoke occurs after
+    /// DMA activity and no unmap/fence dominates that revoke path.
+    #[kani::proof]
+    fn dma_revocation_gate_requires_missing_unmap_dominance() {
+        let has_map: bool = kani::any();
+        let has_submit: bool = kani::any();
+        let has_revoke: bool = kani::any();
+        let unmap_after_revoke: bool = kani::any();
+        let revoke_after_activity: bool = kani::any();
+        let fired = dma_shadow_access_missing_revocation_dominance(
+            has_map,
+            has_submit,
+            has_revoke,
+            unmap_after_revoke,
+            revoke_after_activity,
+        );
+        kani::assert(
+            fired
+                == (has_map
+                    && has_submit
+                    && has_revoke
+                    && revoke_after_activity
+                    && !unmap_after_revoke),
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,8 +147,10 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
+    use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
     use crate::noninterference::declassification_gate_missing;
+    use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
     #[test]
@@ -161,6 +201,22 @@ mod tests {
         assert!(!declassification_gate_missing(true, true, true, true, true));
         assert!(!declassification_gate_missing(
             true, true, true, false, false
+        ));
+    }
+
+    #[test]
+    fn proof_obligation_gate_requires_missing_class() {
+        assert!(proof_obligation_missing(true, false));
+        assert!(!proof_obligation_missing(true, true));
+    }
+
+    #[test]
+    fn dma_revocation_gate_requires_missing_unmap_dominance() {
+        assert!(dma_shadow_access_missing_revocation_dominance(
+            true, true, true, false, true
+        ));
+        assert!(!dma_shadow_access_missing_revocation_dominance(
+            true, true, true, true, true
         ));
     }
 }

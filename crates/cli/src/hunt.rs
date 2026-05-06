@@ -25,7 +25,7 @@
 //! `jq` dependency required).
 
 use anyhow::Context as _;
-use common::slop::StructuredFinding;
+use common::slop::{ExploitWitness, StructuredFinding};
 use common::wisdom::{ArchivedSlopsquatCorpus, SlopsquatCorpus};
 use forge::brain::FindingRanker;
 use forge::slop_hunter::{find_slop, ParsedUnit};
@@ -457,10 +457,36 @@ fn candidate_ledger_gap_section(findings: &[&StructuredFinding]) -> String {
         .iter()
         .map(|finding| {
             let oracle = score_acceptance_proof(finding);
+            let web_artifact = finding
+                .web_proof_artifact
+                .as_ref()
+                .map(|artifact| {
+                    let path = artifact.ifds_trace.join(" -> ");
+                    match artifact.evidence_marker.as_deref() {
+                        Some(marker) => format!(
+                            "WebProofArtifact: {} -> {} via [{}] marker=`{}`.",
+                            artifact.source_label, artifact.sink_label, path, marker
+                        ),
+                        None => format!(
+                            "WebProofArtifact: {} -> {} via [{}].",
+                            artifact.source_label, artifact.sink_label, path
+                        ),
+                    }
+                })
+                .unwrap_or_default();
             if oracle.is_empty() {
-                "Acceptance Oracle: proof-complete.".to_string()
-            } else {
+                if web_artifact.is_empty() {
+                    "Acceptance Oracle: proof-complete.".to_string()
+                } else {
+                    format!("{web_artifact} Acceptance Oracle: proof-complete.")
+                }
+            } else if web_artifact.is_empty() {
                 format!("Acceptance Oracle: {}", oracle.ledger_gap_summary())
+            } else {
+                format!(
+                    "{web_artifact} Acceptance Oracle: {}",
+                    oracle.ledger_gap_summary()
+                )
             }
         })
         .collect::<Vec<_>>()
@@ -2795,7 +2821,8 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
         ));
     }
 
-    Ok(dedup_findings(all))
+    let deduped = dedup_findings(all);
+    Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
 }
 
 fn has_ai_assistant_config(root: &Path) -> bool {
@@ -3064,6 +3091,9 @@ fn scan_buffer(
             if rule_id == "security:dom_xss_innerHTML" || rule_id.contains("prototype_pollution") {
                 let mut witness =
                     forge::exploitability::browser_sink_witness(label, &rule_id, line);
+                if finding.description.contains("schema_taint:proven") {
+                    witness.path_proof = Some("schema_taint:proven".to_string());
+                }
                 if let Some(route) =
                     forge::authz::match_frontend_route_for_file(frontend_routes, label)
                 {
@@ -3186,6 +3216,23 @@ fn scan_buffer(
                     label, &rule_id, line, model_api,
                 );
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:embedding_trust_transposition" {
+                let witness = ExploitWitness {
+                    source_function: label.to_string(),
+                    source_label: "rag_chunk:scraped_text".to_string(),
+                    sink_function: label.to_string(),
+                    sink_label: "sink:llm.invoke".to_string(),
+                    call_chain: vec![
+                        format!("{label}:{line}"),
+                        "vector_query".to_string(),
+                        "llm.invoke".to_string(),
+                    ],
+                    path_proof: Some(
+                        "ifds:web_proof_artifact rag_chunk:scraped_text -> llm.invoke".to_string(),
+                    ),
+                    ..Default::default()
+                };
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
             }
             structured
         })
@@ -3223,6 +3270,16 @@ fn scan_buffer(
     ));
     findings.extend(
         forge::noninterference::prove_prompt_tool_non_interference(source)
+            .into_iter()
+            .map(|mut finding| {
+                if finding.file.is_none() {
+                    finding.file = Some(label.to_string());
+                }
+                finding
+            }),
+    );
+    findings.extend(
+        forge::dma_revocation::detect_dma_revocation_shadow_access(source)
             .into_iter()
             .map(|mut finding| {
                 if finding.file.is_none() {

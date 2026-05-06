@@ -38,6 +38,45 @@ pub struct HarnessArtifact {
     pub run_command: String,
 }
 
+/// Exclusive proof class required for critical findings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProofClass {
+    #[default]
+    ReachabilityProof,
+    InvariantViolationProof,
+    LatticeGapProposal,
+}
+
+/// Unified web proof object binding an external taint source to a web sink.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebProofArtifact {
+    /// Human-readable external taint source, e.g. `url_param:url` or `rag_chunk:scraped_text`.
+    pub source_label: String,
+    /// Human-readable execution sink, e.g. `sink:innerHTML`, `sink:fetch`, `sink:llm.invoke`.
+    pub sink_label: String,
+    /// Deterministic IFDS hop list proving the source-to-sink path.
+    pub ifds_trace: Vec<String>,
+    /// Optional compact evidence marker, e.g. `schema_taint:proven` or
+    /// `internal_metadata:169.254.169.254`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_marker: Option<String>,
+    /// Exact proof class carried by this artifact.
+    pub proof_class: ProofClass,
+}
+
+impl WebProofArtifact {
+    /// Returns `true` when the artifact carries the requested compact evidence marker.
+    pub fn has_marker(&self, marker: &str) -> bool {
+        self.evidence_marker
+            .as_deref()
+            .is_some_and(|value| value.contains(marker))
+            || self.ifds_trace.iter().any(|hop| hop.contains(marker))
+            || self.source_label.contains(marker)
+            || self.sink_label.contains(marker)
+    }
+}
+
 /// Deterministic exploitability proof for a confirmed source-to-sink chain.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExploitWitness {
@@ -169,6 +208,14 @@ pub struct StructuredFinding {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exploit_witness: Option<ExploitWitness>,
 
+    /// Mandatory proof class for `KevCritical` / `Critical` findings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_class: Option<ProofClass>,
+
+    /// Unified web proof artifact for DOM XSS, SSRF, and RAG trust findings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_proof_artifact: Option<WebProofArtifact>,
+
     /// True when the engine proved that at least one reachable source-to-sink
     /// path bypasses all registered sanitizers or validators.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -227,6 +274,14 @@ pub fn finding_mentions_internal_metadata_proof(finding: &StructuredFinding) -> 
         }
     }
 
+    if finding
+        .web_proof_artifact
+        .as_ref()
+        .is_some_and(|artifact| artifact.has_marker("169.254.169.254"))
+    {
+        return true;
+    }
+
     haystacks
         .iter()
         .any(|haystack| NEEDLES.iter().any(|needle| haystack.contains(needle)))
@@ -254,9 +309,22 @@ pub fn finding_has_schema_taint_proof(finding: &StructuredFinding) -> bool {
         }
     }
 
+    if finding
+        .web_proof_artifact
+        .as_ref()
+        .is_some_and(|artifact| artifact.has_marker("schema_taint:proven"))
+    {
+        return true;
+    }
+
     haystacks
         .iter()
         .any(|haystack| haystack.contains("schema_taint:proven"))
+}
+
+/// Returns `true` when the finding carries one of the required proof classes.
+pub fn finding_has_required_proof_class(finding: &StructuredFinding) -> bool {
+    finding.proof_class.is_some()
 }
 
 #[cfg(test)]
@@ -335,5 +403,26 @@ mod tests {
         };
 
         assert!(finding_has_schema_taint_proof(&finding));
+    }
+
+    #[test]
+    fn web_proof_artifact_serializes_and_proves_marker() {
+        let finding = StructuredFinding {
+            id: "security:ssrf_dynamic_url".to_string(),
+            proof_class: Some(ProofClass::ReachabilityProof),
+            web_proof_artifact: Some(WebProofArtifact {
+                source_label: "url_param:url".to_string(),
+                sink_label: "sink:fetch".to_string(),
+                ifds_trace: vec!["handler:url".to_string(), "client:get".to_string()],
+                evidence_marker: Some("internal_metadata:169.254.169.254".to_string()),
+                proof_class: ProofClass::ReachabilityProof,
+            }),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&finding).expect("serialization must not fail");
+        assert!(json.contains("web_proof_artifact"));
+        assert!(finding_mentions_internal_metadata_proof(&finding));
+        assert!(finding_has_required_proof_class(&finding));
     }
 }

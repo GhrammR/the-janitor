@@ -1,6 +1,6 @@
 //! Prompt/tool non-interference detector.
 
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding};
 
 const PROMPT_SOURCES: &[&[u8]] = &[
     b"messages[".as_slice(),
@@ -76,6 +76,7 @@ pub fn prove_prompt_tool_non_interference(trace: &[u8]) -> Vec<StructuredFinding
             format!("security:prompt_tool_interference:{extract_offset}:{tool_offset}").as_bytes(),
         ),
         severity: Some("KevCritical".to_string()),
+        proof_class: Some(ProofClass::InvariantViolationProof),
         remediation: Some(
             "Insert a hardcoded declassification gate before privileged tools: route model output through a static mapping or regex allowlist rather than directly into ShellExec or CloudMutate surfaces."
                 .to_string(),
