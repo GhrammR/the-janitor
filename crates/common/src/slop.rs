@@ -66,6 +66,32 @@ pub struct WebProofArtifact {
 }
 
 impl WebProofArtifact {
+    /// Build a web proof artifact from an exploit witness while preserving the
+    /// witness call chain as the IFDS hop list.
+    pub fn from_witness(
+        witness: &ExploitWitness,
+        proof_class: ProofClass,
+        evidence_marker: Option<String>,
+    ) -> Self {
+        let ifds_trace = if witness.call_chain.is_empty() {
+            witness
+                .path_proof
+                .as_deref()
+                .map(parse_ifds_trace)
+                .unwrap_or_default()
+        } else {
+            witness.call_chain.clone()
+        };
+
+        Self {
+            source_label: witness.source_label.clone(),
+            sink_label: witness.sink_label.clone(),
+            ifds_trace,
+            evidence_marker,
+            proof_class,
+        }
+    }
+
     /// Returns `true` when the artifact carries the requested compact evidence marker.
     pub fn has_marker(&self, marker: &str) -> bool {
         self.evidence_marker
@@ -75,6 +101,64 @@ impl WebProofArtifact {
             || self.source_label.contains(marker)
             || self.sink_label.contains(marker)
     }
+
+    /// Return the source-bound IFDS trace with the external source and execution
+    /// sink pinned at the edges even when detector output supplied only middle hops.
+    pub fn bound_ifds_trace(&self) -> Vec<String> {
+        let mut trace = Vec::with_capacity(self.ifds_trace.len() + 2);
+        if !self.source_label.is_empty() {
+            trace.push(self.source_label.clone());
+        }
+        for hop in &self.ifds_trace {
+            if hop.trim().is_empty() {
+                continue;
+            }
+            if trace.last().is_some_and(|last| last == hop) {
+                continue;
+            }
+            trace.push(hop.clone());
+        }
+        if !self.sink_label.is_empty() && trace.last().is_none_or(|last| last != &self.sink_label) {
+            trace.push(self.sink_label.clone());
+        }
+        trace
+    }
+
+    /// Render the canonical IFDS source-to-sink binding.
+    pub fn ifds_trace_output(&self) -> String {
+        self.bound_ifds_trace().join(" -> ")
+    }
+
+    /// Render compact Bugcrowd-ready markdown for DOM XSS, SSRF, and RAG evidence.
+    pub fn to_markdown(&self) -> String {
+        let mut rendered = format!(
+            "WebProofArtifact: `{}` -> `{}` | IFDS: `{}` | proof=`{:?}`",
+            self.source_label,
+            self.sink_label,
+            self.ifds_trace_output(),
+            self.proof_class
+        );
+        if let Some(marker) = self
+            .evidence_marker
+            .as_deref()
+            .filter(|marker| !marker.trim().is_empty())
+        {
+            rendered.push_str(" | marker=`");
+            rendered.push_str(marker);
+            rendered.push('`');
+        }
+        rendered
+    }
+}
+
+fn parse_ifds_trace(proof: &str) -> Vec<String> {
+    proof
+        .replace("ifds:web_proof_artifact", "")
+        .split("->")
+        .map(str::trim)
+        .filter(|hop| !hop.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// Deterministic exploitability proof for a confirmed source-to-sink chain.
@@ -424,5 +508,44 @@ mod tests {
         assert!(json.contains("web_proof_artifact"));
         assert!(finding_mentions_internal_metadata_proof(&finding));
         assert!(finding_has_required_proof_class(&finding));
+    }
+
+    #[test]
+    fn web_proof_artifact_generates_unified_markdown() {
+        let witness = ExploitWitness {
+            source_label: "url_param:url".to_string(),
+            sink_label: "sink:http_client".to_string(),
+            call_chain: vec![
+                "route:/fetch".to_string(),
+                "service.fetch_remote".to_string(),
+                "reqwest::get".to_string(),
+            ],
+            ..Default::default()
+        };
+        let artifact = WebProofArtifact::from_witness(
+            &witness,
+            ProofClass::ReachabilityProof,
+            Some("internal_metadata:169.254.169.254".to_string()),
+        );
+
+        let markdown = artifact.to_markdown();
+        assert!(
+            markdown.contains("url_param:url"),
+            "source label must be rendered"
+        );
+        assert!(
+            markdown.contains("sink:http_client"),
+            "sink label must be rendered"
+        );
+        assert!(
+            markdown.contains(
+                "url_param:url -> route:/fetch -> service.fetch_remote -> reqwest::get -> sink:http_client"
+            ),
+            "IFDS trace must bind source directly to sink"
+        );
+        assert!(
+            markdown.contains("internal_metadata:169.254.169.254"),
+            "compact evidence marker must be rendered"
+        );
     }
 }

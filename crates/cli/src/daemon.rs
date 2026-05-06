@@ -47,7 +47,7 @@ pub mod unix {
     use tokio::net::{UnixListener, UnixStream};
     use tokio::sync::Semaphore;
 
-    use common::physarum::{Pulse, SystemHeart};
+    use common::physarum::{global_pulse, start_background_heart, Pulse};
     use common::registry::{MappedRegistry, SymbolRegistry};
     use forge::pr_collider::LshIndex;
     use forge::slop_filter::{PRBouncer, PatchBouncer};
@@ -218,10 +218,6 @@ pub mod unix {
         /// `bounce_log.ndjson` so that `janitor report` can aggregate
         /// daemon-served bounce activity alongside CLI invocations.
         pub janitor_dir: std::path::PathBuf,
-        /// Physarum Protocol — OS memory pressure monitor.
-        ///
-        /// Sampled before each new connection is handed off to a task.
-        pub heart: SystemHeart,
         /// Concurrency gate for [`Pulse::Flow`] mode — [`FLOW_CONCURRENCY`] permits.
         pub flow_semaphore: Arc<Semaphore>,
         /// Concurrency gate for [`Pulse::Constrict`] mode — [`CONSTRICT_CONCURRENCY`] permits.
@@ -244,6 +240,11 @@ pub mod unix {
         pub fn emit_siem_event(&self, finding_detail: &str) {
             emit_siem_event_inner(&self.janitor_dir, &self.siem_webhook_url, finding_detail);
         }
+    }
+
+    #[inline]
+    fn daemon_pressure_pulse() -> Pulse {
+        global_pulse()
     }
 
     /// Write one SIEM event to the ndjson sink.  Free function so tests can call
@@ -312,6 +313,7 @@ pub mod unix {
     /// # Errors
     /// Returns `Err` if the registry cannot be loaded or the socket cannot be bound.
     pub async fn serve(socket_path: &Path, registry_path: &Path) -> Result<()> {
+        start_background_heart();
         let janitor_dir = registry_path
             .parent()
             .unwrap_or(std::path::Path::new("."))
@@ -324,7 +326,6 @@ pub mod unix {
             registry: HotRegistry::open(registry_path)?,
             lsh_index: LshIndex::new(),
             janitor_dir,
-            heart: SystemHeart::new(),
             flow_semaphore: Arc::new(Semaphore::new(FLOW_CONCURRENCY)),
             constrict_semaphore: Arc::new(Semaphore::new(CONSTRICT_CONCURRENCY)),
             siem_webhook_url,
@@ -355,7 +356,7 @@ pub mod unix {
                                 // connection open and retry every 500 ms until
                                 // the system digests current load.  The client
                                 // socket stays alive; the task simply parks.
-                                while let Pulse::Stop = s.heart.beat() {
+                                while let Pulse::Stop = daemon_pressure_pulse() {
                                     eprintln!(
                                         "janitor daemon: memory pressure STOP — \
                                          holding request (500 ms)"
@@ -366,7 +367,7 @@ pub mod unix {
                                 // current pressure before entering the handler.
                                 // `acquire_owned` takes `Arc<Self>` by value —
                                 // clone the Arc cheaply to pass ownership.
-                                let _permit = match s.heart.beat() {
+                                let _permit = match daemon_pressure_pulse() {
                                     Pulse::Constrict => Arc::clone(&s.constrict_semaphore)
                                         .acquire_owned()
                                         .await
@@ -709,6 +710,16 @@ pub mod unix {
             assert!(json.contains("ScanReport"));
             assert!(json.contains("findings_count"));
             assert!(json.contains("siem_events_emitted"));
+        }
+
+        #[test]
+        fn daemon_pressure_uses_global_pulse_read_path() {
+            start_background_heart();
+            let pulse = daemon_pressure_pulse();
+            assert!(
+                matches!(pulse, Pulse::Flow | Pulse::Constrict | Pulse::Stop),
+                "daemon admission must read a valid Melanin Layer pulse"
+            );
         }
     }
 }

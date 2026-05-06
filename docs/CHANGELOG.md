@@ -3,6 +3,30 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 118: Unified WebProofArtifact, Lock-Free Daemon Pulse, Block Hydration & RC.2
+
+**Directive:** Consolidate web evidence for DOM XSS, SSRF, and RAG findings into `WebProofArtifact`, move daemon backpressure to the lock-free Melanin Layer pulse, hydrate three Block open-source targets, add the nuclei-template frontier, bump the workspace to `10.2.0-rc.2`, verify, commit, and execute the release pipeline.
+
+### Unified Web Evidence
+
+* `crates/common/src/slop.rs` *(modified)* — expanded `WebProofArtifact` with witness construction, source-bound IFDS trace output, and compact Bugcrowd-ready markdown that pins external taint source, intermediate hops, sink, proof class, and optional marker in one artifact.
+* `crates/cli/src/hunt.rs` *(modified)* — DOM XSS, SSRF, and RAG trust findings now attach `WebProofArtifact` at scan time; Bugcrowd reports prefer the unified artifact for data-flow graphs, reproduction fallback, and candidate gap rendering without redundant proof-complete prose.
+* `crates/cli/src/submit_formatter.rs` *(modified)* — submission packages now render the same artifact in witness context, preserving a single source of truth for web evidence.
+
+### Lock-Free Daemon Pulse
+
+* `crates/cli/src/daemon.rs` *(modified)* — daemon startup now activates the Melanin Layer background heart, removes `SystemHeart` from `DaemonState`, and gates request admission/concurrency through `global_pulse()` reads instead of request-path mutex polling.
+
+### Target Hydration & Release Hygiene
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `afterpay/sdk-android`, `cashapp/cash-app-pay-ios-sdk`, and `square/okhttp` as hunted with `no_findings`; no Tri-Ledger rows were created because all three Bugcrowd reports emitted `no_findings`.
+* `.INNOVATION_LOG.md` *(modified)* — added the open WebProofArtifact-to-`nuclei` template synthesis frontier with missing lattice element, Rust module target, deterministic proof strategy, and fixture pair.
+* `Cargo.toml`, `Cargo.lock`, `README.md`, and `docs/index.md` *(modified)* — bumped/synced workspace and documentation version strings to `10.2.0-rc.2`.
+
+**Live-fire hunt**: cloned and scanned `afterpay/sdk-android`, `cashapp/cash-app-pay-ios-sdk`, and `square/okhttp` with `cargo run -p cli -- hunt <target> --format bugcrowd`; all three returned `no_findings`.
+
+**Verification**: `cargo test -p common web_proof -- --test-threads=4` ✓ | `cargo test -p cli web_proof -- --test-threads=4` ✓ | `cargo test -p cli daemon_pressure -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓ after `just sync-versions` repaired doc parity.
+
 ## 2026-05-06 — Sprint Batch 117: Ownership Proofs, ICS Invariant Carriage, Canonical Queue Repair & Ledger Normalization
 
 **Directive:** Upgrade Max Compute and Tri-Ledger governance, normalize the Bounty/Candidate ledgers, ship the two `P17-3A` proof-carriage cures, execute the Physarum architectural cleanup and canonical queue repair, hunt the next canonical GitHub repos, delete shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.

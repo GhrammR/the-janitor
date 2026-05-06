@@ -422,11 +422,18 @@ fn render_occurrence_list(occurrences: &[FindingOccurrence]) -> String {
 }
 
 fn render_witness_context(finding: &StructuredFinding) -> String {
+    let mut sections = String::new();
+    if let Some(artifact) = finding.web_proof_artifact.as_ref() {
+        sections.push_str("### Web Proof Artifact\n");
+        sections.push_str("- ");
+        sections.push_str(&artifact.to_markdown());
+        sections.push_str("\n\n");
+    }
+
     let Some(witness) = finding.exploit_witness.as_ref() else {
-        return String::new();
+        return sections;
     };
 
-    let mut sections = String::new();
     if !witness.source_label.is_empty() || !witness.sink_label.is_empty() {
         sections.push_str("### Witness Context\n");
         sections.push_str(&format!(
@@ -594,6 +601,40 @@ mod tests {
         assert!(
             package.contains("curl -i https://target.example/internal"),
             "package must preserve the exact repro command"
+        );
+    }
+
+    #[test]
+    fn submission_md_renders_web_proof_artifact() {
+        let mut finding = make_finding(
+            "security:ssrf_dynamic_url",
+            Some("server.ts"),
+            "High",
+            Some("curl -i http://169.254.169.254/latest/meta-data/"),
+        );
+        finding.web_proof_artifact = Some(common::slop::WebProofArtifact {
+            source_label: "url_param:url".to_string(),
+            sink_label: "sink:http_client".to_string(),
+            ifds_trace: vec!["handler".to_string(), "fetch_remote".to_string()],
+            evidence_marker: Some("internal_metadata:169.254.169.254".to_string()),
+            proof_class: common::slop::ProofClass::ReachabilityProof,
+        });
+        let deduplicated = DeduplicatedFinding {
+            finding,
+            occurrences: vec![FindingOccurrence {
+                file: "server.ts".to_string(),
+                line: Some(88),
+            }],
+        };
+
+        let md = format_submission_md(&deduplicated, "github.com/acme/app");
+        assert!(
+            md.contains("### Web Proof Artifact"),
+            "submission markdown must include unified web proof context"
+        );
+        assert!(
+            md.contains("url_param:url -> handler -> fetch_remote -> sink:http_client"),
+            "submission markdown must render the bound IFDS trace"
         );
     }
 
