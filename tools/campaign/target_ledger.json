@@ -28,7 +28,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 36
+      "priority_score": 36,
+      "hunted": true,
+      "hunt_result": "candidate_ssrf_and_native_memory_findings_not_logged"
     },
     {
       "engagement": "block_targets",
@@ -234,7 +236,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -248,7 +252,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -262,7 +268,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -276,7 +284,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -318,7 +328,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_ssrf_and_native_memory_findings_not_logged"
     },
     {
       "engagement": "electroneum_blockchain_targets",
@@ -332,7 +344,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_ssrf_and_native_memory_findings_not_logged"
     },
     {
       "engagement": "electroneum_blockchain_targets",

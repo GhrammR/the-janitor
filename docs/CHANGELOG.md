@@ -5496,6 +5496,29 @@ OkHttp and Okio returned no findings.
 
 **Verification**: `cargo test --workspace -- --test-threads=1` ✓ | `just audit` ✓
 
+## 2026-05-05 — Sprint Batch 110: Chronovisor \& Deep Target Hydration
+
+**Directive:** Ship `P7-1` historical commit archaeology under the 8GB Law, hydrate the next in-scope GitHub campaign targets, and explicitly defer `P5-1` in the active innovation queue because zero-knowledge circuit compilation is not safe on current operator hardware.
+
+### Chronovisor Historical Analysis
+
+* `crates/anatomist/Cargo.toml` and `crates/anatomist/src/lib.rs` *(modified)* — wired `git2` into `anatomist` and exported the new `chronovisor` module.
+* `crates/anatomist/src/chronovisor.rs` *(created)* — shipped `Chronovisor::first_introduction`, a zero-checkout historical replay engine that walks the git object graph in chronological order, loads target blobs directly from commit trees, and re-runs the detector family for the seeded `StructuredFinding` until the first introducing commit is identified.
+* `crates/anatomist/src/chronovisor.rs` *(tests)* — added deterministic mock-repository coverage proving historical detection of `security:unsafe_string_function` and proving clean history returns `None`.
+* `crates/cli/src/main.rs` *(modified)* — added `janitor chronovisor <TARGET> <FINDING_ID>`; the command scans `HEAD` for the requested finding ID, invokes Chronovisor, and emits the origin commit SHA plus raw commit timestamp metadata.
+
+### Campaign Hydration
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked the next in-scope distinct GitHub targets as hydrated: `electroneum/electroneum` yielded only low-confidence SSRF/native-memory candidates not logged, while `square/okhttp` and `square/okio` scanned clean.
+* Live-fire hunt batch *(runtime only)* — executed `cargo run -p cli -- hunt /tmp/electroneum --format bugcrowd --submit-check`, `cargo run -p cli -- hunt /tmp/okhttp --format bugcrowd --submit-check`, and `cargo run -p cli -- hunt /tmp/okio --format bugcrowd --submit-check`.
+* Audit-report mandate *(checked, not triggered)* — no hydrated target produced a weaponized finding above the direct-submission threshold, so no automatic `audit-report` artifact was generated in this batch.
+
+### Innovation Log Hygiene
+
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P7-1` block and added an explicit Phase 5 operator-constraint note that `P5-1` is deferred indefinitely in the current 8GB environment because Halo2/Plonky3 compilation risks deterministic OOM.
+
+**Verification**: `cargo test -p anatomist chronovisor -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-05 — Sprint Batch 109: Triage Triage & Submission Automation
 
 **Directive:** Triage sub-85% Mattermost findings into submission-grade evidence, bundle Bugcrowd artifacts into a single copy-pasteable package, and eradicate the obsolete `P3-4` marketplace residue from the innovation log.

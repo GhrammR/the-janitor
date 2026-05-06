@@ -113,6 +113,7 @@ dependencies = [
  "common",
  "dunce",
  "forge",
+ "git2",
  "memmap2",
  "petgraph 0.8.3",
  "rkyv",

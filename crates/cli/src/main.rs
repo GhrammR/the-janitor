@@ -102,6 +102,33 @@ fn build_ureq_agent(policy: &common::policy::JanitorPolicy) -> anyhow::Result<ur
         .new_agent())
 }
 
+fn cmd_chronovisor(target: &Path, finding_id: &str) -> anyhow::Result<()> {
+    let findings = hunt::scan_directory(target).with_context(|| {
+        format!(
+            "scan target {} for Chronovisor seed finding",
+            target.display()
+        )
+    })?;
+    let finding = findings
+        .into_iter()
+        .find(|finding| finding.id == finding_id)
+        .with_context(|| format!("finding `{finding_id}` was not detected at HEAD"))?;
+
+    let chronovisor = anatomist::chronovisor::Chronovisor::open(target)?;
+    let Some(origin) = chronovisor.first_introduction(&finding)? else {
+        anyhow::bail!(
+            "finding `{}` is present at HEAD but no historical origin commit was identified",
+            finding.id
+        );
+    };
+
+    println!("finding_id={}", finding.id);
+    println!("origin_commit={}", origin.commit_sha);
+    println!("timestamp_unix={}", origin.timestamp_unix);
+    println!("offset_minutes={}", origin.offset_minutes);
+    Ok(())
+}
+
 #[derive(Debug, serde::Serialize)]
 struct VerifySuppressionsRequest<'a> {
     suppression_ids: Vec<&'a str>,
@@ -1182,6 +1209,18 @@ enum Commands {
         output: PathBuf,
     },
 
+    /// Identify the first historical commit where a finding appears.
+    ///
+    /// Scans `TARGET` at `HEAD`, selects the first finding whose `id` matches
+    /// `FINDING_ID`, then replays that detector across git history to emit the
+    /// origin commit and commit timestamp.
+    Chronovisor {
+        /// Path to the repository root to analyze.
+        target: PathBuf,
+        /// Structured finding ID, e.g. `security:unsafe_string_function`.
+        finding_id: String,
+    },
+
     /// Deploy a Labyrinth deception forest to exhaust adversarial AI agent context windows.
     ///
     /// Generates syntactically valid, semantically dead Python AST mazes seeded with canary
@@ -1719,6 +1758,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::AuditReport { repo, output } => {
             audit_report::cmd_audit_report(repo, output)?;
+        }
+        Commands::Chronovisor { target, finding_id } => {
+            cmd_chronovisor(target, finding_id)?;
         }
         Commands::DeployLabyrinth {
             output_dir,
