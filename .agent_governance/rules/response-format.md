@@ -232,12 +232,12 @@ alphabetic, or section-only identifiers are governance-invalid.
 
 ### Ledger Hydration Law (Sprint Batch 119)
 
-When performing an Omni-Audit or Max Compute Sprint, you MUST read the
-`R&D Follow-Up` columns in `tools/campaign/CANDIDATE_LEDGER.md` and
-`tools/campaign/LOW_YIELD_LEDGER.md`. Any R&D task that implies a missing
-architectural capability MUST be elevated into a formal strict P-tier item in
-`.INNOVATION_LOG.md`, and that item MUST append explicit instructions to
-re-hunt the affected targets once the feature is built.
+During EVERY sprint, you MUST read the `R&D Follow-Up` columns in
+`tools/campaign/CANDIDATE_LEDGER.md` and `tools/campaign/LOW_YIELD_LEDGER.md`.
+If an R&D task is listed but does not already have a corresponding strict
+P-tier entry in `.INNOVATION_LOG.md`, you MUST elevate it into a formal
+strict P-tier item immediately, and that item MUST append explicit instructions
+to re-hunt the affected targets once the feature is built.
 
 ### Threat Model Awareness (mandatory threat model pre-filter)
 

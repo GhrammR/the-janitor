@@ -101,8 +101,8 @@ toml = "1.0"
 semver = "1.0"
 
 # HTTP client (sync, used for remote audit attestation)
-ureq = { version = "3", features = ["json", "rustls"] }
-rustls = "0.23"
+ureq = { version = "3", default-features = false, features = ["json", "rustls"] }
+rustls = { version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
 rustls-pemfile = "2"
 
 # Post-quantum cryptography — ML-DSA-65 (FIPS 204) for BYOK local attestation

@@ -25,8 +25,12 @@ Candidate (RC) or Major Version.
 
 ## Ledger Hydration Law
 
-When reviewing low-yield or candidate ledgers, all `R&D Follow-Up` tasks MUST
-be elevated into strict P-tier entries in `.INNOVATION_LOG.md`.
+When reviewing low-yield or candidate ledgers, you MUST read the
+`R&D Follow-Up` columns in `tools/campaign/CANDIDATE_LEDGER.md` and
+`tools/campaign/LOW_YIELD_LEDGER.md` during EVERY sprint. If an R&D task is
+listed but does not already have a corresponding strict P-tier entry in
+`.INNOVATION_LOG.md`, you MUST elevate it into a formal P-tier entry in the log
+immediately.
 
 ## Autonomous Ideation Law
 

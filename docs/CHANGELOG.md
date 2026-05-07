@@ -3,6 +3,29 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-07 — Sprint Batch 123: Code Red (CI/CD Restoration & Ledger Sync)
+
+**Directive:** Restore the pipeline by removing the `aws-lc-sys` OOM path from Rustls, force GitHub Pages to deploy only the static facade without Jekyll interference, tighten Ledger Hydration governance to run every sprint, retroactively hydrate any missing R&D tasks, verify with `--test-threads=4`, and commit locally without release.
+
+### CI/CD Restoration — Rustls Provider Fix
+
+* `Cargo.toml` *(modified)* — switched workspace `ureq` to `default-features = false` and pinned workspace `rustls` to an explicit non-default feature set: `logging`, `ring`, `std`, and `tls12`. This removes Rustls default `aws_lc_rs` activation and prevents `aws-lc-sys` C/assembly compilation on GitHub runners.
+* `crates/gov/Cargo.toml` *(modified)* — replaced `axum-server`’s `tls-rustls` feature with `tls-rustls-no-provider` and pinned `tokio-rustls` to `default-features = false` plus `logging`, `ring`, and `tls12`, eliminating the second `aws_lc_rs` ingress path.
+* `Cargo.lock` *(modified)* — resolver updated to the ring-only Rustls provider graph; `cargo tree -e features -i aws-lc-rs` now reports no matching package.
+
+### CI/CD Restoration — GitHub Pages Static Artifact Fix
+
+* `.github/workflows/deploy_docs.yml` *(modified)* — removed the extra Pages configuration step and reduced the workflow to checkout, static `_site` preparation, `upload-pages-artifact`, and `deploy-pages`; the artifact step now copies only `index.html` and creates `_site/.nojekyll`, preventing Jekyll takeover and branch-root upload bloat.
+
+### Governance and Retroactive Ledger Sync
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — upgraded the Ledger Hydration Law from Omni-Audit-only behavior to an EVERY-sprint mandate: every sprint must read Candidate and Low-Yield `R&D Follow-Up` columns and immediately elevate any missing task into `.INNOVATION_LOG.md`.
+* `.INNOVATION_LOG.md` *(modified)* — added `P2-17 — Config-Backed SSRF Demotion and Trusted URL Classification` to close the backlog drift around false-positive SSRF on `authDomain`-style config hosts and other operator-managed service URLs that are not attacker-controlled destinations.
+
+**Retroactive hydration result:** current Candidate and Low-Yield rows already mapped cleanly onto `P2-5` through `P2-16`; the only missing formal backlog item was the config-backed SSRF suppression lane, now logged as `P2-17`.
+
+**Verification**: `cargo tree -e features -i aws-lc-rs` → no matches ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-07 — Sprint Batch 122: Cash-Flow Priority, ML Model Lineage, and Cache Refactor
 
 **Directive:** Add the Cash-Flow Priority Override to UAP governance, deduplicate Physarum cache refresh logic, ship `P14-4` model-lineage backdoor detection, ship `P14-1` multimodal RAG poisoning detection, hunt the next three GitHub targets with `--submit-check`, purge the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
