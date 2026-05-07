@@ -105,11 +105,34 @@ def main() -> int:
     document = json.loads(path.read_text(encoding="utf-8"))
     targets = document.get("targets", [])
 
+    repo_hunt_state: dict[str, str] = {}
+    hunted_repos: set[str] = set()
+    for entry in targets:
+        repos = ordered_unique(
+            [repo for repo in (canonical_repo_from_url(url) for url in entry.get("urls", [])) if repo]
+        )
+        if not entry.get("hunted", False):
+            continue
+        for repo in repos:
+            hunted_repos.add(repo)
+            if entry.get("hunt_result") and repo not in repo_hunt_state:
+                repo_hunt_state[repo] = entry["hunt_result"]
+
     deduped: list[dict] = []
     index: dict[tuple[str, str], int] = {}
     for entry in targets:
         normalized = dict(entry)
         normalized["urls"] = [canonical_github_url(url) for url in entry.get("urls", [])]
+        repos = ordered_unique(
+            [repo for repo in (canonical_repo_from_url(url) for url in normalized.get("urls", [])) if repo]
+        )
+        if repos and all(repo in hunted_repos for repo in repos):
+            normalized["hunted"] = True
+            if not normalized.get("hunt_result"):
+                for repo in repos:
+                    if repo in repo_hunt_state:
+                        normalized["hunt_result"] = repo_hunt_state[repo]
+                        break
         key = entry_key(normalized)
         existing = index.get(key)
         if existing is None:

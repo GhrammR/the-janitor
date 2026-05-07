@@ -339,7 +339,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 34
+      "priority_score": 34,
+      "hunted": true,
+      "hunt_result": "smartchain_low_yield_ssrf_logged"
     },
     {
       "engagement": "aiven_targets",
@@ -555,7 +557,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_sandbox_bootstrap_asset_logged"
     },
     {
       "engagement": "block_targets",
@@ -702,7 +706,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "smartchain_low_yield_ssrf_logged"
     },
     {
       "engagement": "electroneum_targets",
