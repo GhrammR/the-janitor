@@ -3,6 +3,24 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-07 — Sprint Batch 121: Pipeline Exorcism & Ledger Normalization
+
+**Directive:** Repair the failing GitHub Pages deployment path, collapse duplicated CI bootstrap state in `action.yml`, deterministically normalize GitHub target URLs in the campaign ledger, hydrate all ledger `R&D Follow-Up` tasks into strict P-tier backlog items, verify with `--test-threads=4`, commit locally, and push `main` without release.
+
+### GitHub Pages and CI Pipeline Repair
+
+* `.github/workflows/deploy_docs.yml` *(modified)* — replaced the old MkDocs `gh-deploy` flow with a native GitHub Pages artifact workflow; added a static `_site` preparation step that copies only `index.html` and `.nojekyll`, then uploads `_site` through `actions/upload-pages-artifact` before `actions/deploy-pages`. This prevents the Pages pipeline from attempting to upload `.git` history or `target/`.
+* `action.yml` *(modified)* — exported `BOOTSTRAP_TAG`, `BOOTSTRAP_DIR`, `CURRENT_DIR`, and `JANITOR_BIN` exactly once into `$GITHUB_ENV`; cache restore now keys off `env.BOOTSTRAP_TAG`, and downstream verification steps consume the shared env instead of repeating bootstrap-path assembly logic.
+
+### Ledger Normalization and Hydration
+
+* `tools/campaign/dedupe_target_ledger.py` *(created)* — added a deterministic normalizer that canonicalizes GitHub URLs to `https://github.com/<owner>/<repo>`, preserves non-GitHub URLs verbatim, merges duplicate metadata when a canonical single-repo collision exists, and never downgrades a hunted target back to unhunted.
+* `tools/campaign/target_ledger.json` *(modified)* — ran the normalizer once; GitHub URL variants now collapse to canonical repo roots, duplicate GitHub URL forms inside entries were normalized, and the ledger retained all prior hunt state.
+* `.agent_governance/rules/evolution.md` *(modified)* — codified the Ledger Hydration Law so every `R&D Follow-Up` task from Candidate or Low-Yield ledgers must be elevated into `.INNOVATION_LOG.md`.
+* `.INNOVATION_LOG.md` *(modified)* — added `P2-5` through `P2-16` to close the concrete proof gaps mined from `tools/campaign/CANDIDATE_LEDGER.md` and `tools/campaign/LOW_YIELD_LEDGER.md`, including witness finality, width-flow proofs, FFI reachability, provider endpoint elevation, asset mutability, ingress proof packs, script/CI demotion, RAG answer-sink proof, vendored suppression, native ownership proofs, and program-aware impact gating.
+
+**Verification**: `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-06 — Sprint Batch 120: Adversarial CVP Governance & Vector Store Proofs
 
 **Directive:** Implement P14-2 vector-store topology poisoning proofs, ship P14-3 cross-modal prompt steganography detection, add the CVP Red Team governance rule, re-hydrate the mandated GitHub targets, verify with `--test-threads=4`, and commit locally without release.

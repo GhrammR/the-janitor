@@ -23,6 +23,11 @@ You are mathematically forbidden from updating `README.md`, `docs/index.md`, or
 files MUST only be updated during a sprint that explicitly cuts a Release
 Candidate (RC) or Major Version.
 
+## Ledger Hydration Law
+
+When reviewing low-yield or candidate ledgers, all `R&D Follow-Up` tasks MUST
+be elevated into strict P-tier entries in `.INNOVATION_LOG.md`.
+
 ## Autonomous Ideation Law
 
 When reviewing `janitor hunt` output, any report text showing `Unknown / Source

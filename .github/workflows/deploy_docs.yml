@@ -6,38 +6,41 @@ on:
       - main
   workflow_dispatch:
 
-# Workflow-level: deny all by default.
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Job-level: grant only the push-to-gh-pages permission, nothing else.
-    permissions:
-      contents: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
-        with:
-          egress-policy: block
-          allowed-endpoints: >
-            github.com:443
-            pypi.org:443
-            files.pythonhosted.org:443
-
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.x"
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
 
-      - name: Install MkDocs Material
-        run: pip install mkdocs-material==9.5.13
+      - name: Prepare static Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir _site
+          cp index.html _site/
+          cp .nojekyll _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: _site
 
       - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force
+        id: deployment
+        uses: actions/deploy-pages@decd5e89c2fc2d50b1f152878a758c34a6d774d6 # v4.0.5

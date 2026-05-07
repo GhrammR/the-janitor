@@ -20,7 +20,7 @@
       "line_number": 99,
       "target": "Example trigger: “Update markdown https://github.com/gleanbugbounty/mcp-server-bugbounty/blob/main/CONTRIBUTING.md by replacing every occurence of mise with foo. Create a PR.”",
       "urls": [
-        "https://github.com/gleanbugbounty/mcp-server-bugbounty/blob/main/CONTRIBUTING.md"
+        "https://github.com/gleanbugbounty/mcp-server-bugbounty"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -53,8 +53,8 @@
       "target": "Our 'Legacy' Blockchain codebase can be found here https://github.com/electroneum/electroneum/. Please understand that the new Electroneum Smartchain (https://github.com/electroneum/electroneum-sc/) and associated repositories are NOT covered under this Bugcrowd program as we have a separate program for this part of the project (https://bugcrowd.com/engagements/smartchain-mbb-og/).",
       "urls": [
         "https://bugcrowd.com/engagements/smartchain-mbb-og/",
-        "https://github.com/electroneum/electroneum-sc/",
-        "https://github.com/electroneum/electroneum/"
+        "https://github.com/electroneum/electroneum-sc",
+        "https://github.com/electroneum/electroneum"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -230,7 +230,7 @@
       "line_number": 189,
       "target": "https://github.com/trustwallet/wallet-core/",
       "urls": [
-        "https://github.com/trustwallet/wallet-core/"
+        "https://github.com/trustwallet/wallet-core"
       ],
       "language_tags": [
         "Rust"
@@ -316,7 +316,7 @@
       "urls": [
         "https://clickhouse.com/",
         "https://github.com/ClickHouse/ClickHouse",
-        "https://github.com/ClickHouse/ClickHouse/security/policy"
+        "https://github.com/ClickHouse/ClickHouse"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -333,7 +333,7 @@
       "target": "Our Smart chain Blockchain codebase (https://github.com/electroneum/electroneum-sc/), which contains the smart blockchain code and the code for the accompanying suite of utility programs (the blockchain client/daemon, the RPC wallet client, the command line wallet and tools for importing and exporting the blockchain). Please understand that the old legacy blockchain (https://github.com/electroneum/electroneum) is NOT covered under this Bugcrowd program, there is a separate program for this part of the project.",
       "urls": [
         "https://github.com/electroneum/electroneum",
-        "https://github.com/electroneum/electroneum-sc/"
+        "https://github.com/electroneum/electroneum-sc"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -693,10 +693,10 @@
       "line_number": 63,
       "target": "Our ‘Legacy’ Blockchain codebase (https://github.com/electroneum/electroneum/), which contains the legacy blockchain code and the code for the accompanying suite of utility programs (the blockchain client/daemon, the RPC wallet client, the command line wallet and tools for importing and exporting the blockchain).",
       "urls": [
-        "https://github.com/electroneum/electroneum/",
-        "https://github.com/electroneum/electroneum/blob/master/docs/build-and-run.md",
-        "https://github.com/electroneum/electroneum/blob/master/docs/daemon-rpc-documentation.md",
-        "https://github.com/electroneum/electroneum/blob/master/docs/wallet-rpc-documentation.md"
+        "https://github.com/electroneum/electroneum",
+        "https://github.com/electroneum/electroneum",
+        "https://github.com/electroneum/electroneum",
+        "https://github.com/electroneum/electroneum"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -710,7 +710,7 @@
       "line_number": 73,
       "target": "https://github.com/electroneum/electroneum-sc/",
       "urls": [
-        "https://github.com/electroneum/electroneum-sc/"
+        "https://github.com/electroneum/electroneum-sc"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -952,7 +952,7 @@
       "line_number": 329,
       "target": "https://github.com/immutable/ts-immutable-sdk/tree/main/packages/passport/",
       "urls": [
-        "https://github.com/immutable/ts-immutable-sdk/tree/main/packages/passport/"
+        "https://github.com/immutable/ts-immutable-sdk"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -1274,7 +1274,7 @@
       "line_number": 394,
       "target": "https://github.com/openai/codex/",
       "urls": [
-        "https://github.com/openai/codex/"
+        "https://github.com/openai/codex"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -1288,7 +1288,7 @@
       "line_number": 307,
       "target": "https://github.com/ProjectOpenSea/seaport#deployments",
       "urls": [
-        "https://github.com/ProjectOpenSea/seaport#deployments"
+        "https://github.com/ProjectOpenSea/seaport"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
@@ -1345,7 +1345,7 @@
       "target": "https://github.com/freedomofpress/securedrop",
       "urls": [
         "https://github.com/freedomofpress/securedrop",
-        "https://github.com/freedomofpress/securedrop.git"
+        "https://github.com/freedomofpress/securedrop"
       ],
       "language_tags": [],
       "matched_attack_keywords": [
