@@ -3,6 +3,32 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 120: Adversarial CVP Governance & Vector Store Proofs
+
+**Directive:** Implement P14-2 vector-store topology poisoning proofs, ship P14-3 cross-modal prompt steganography detection, add the CVP Red Team governance rule, re-hydrate the mandated GitHub targets, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance Upgrade
+
+* `.agent_governance/rules/evolution.md`, `.agent_governance/rules/response-format.md`, and `.agent_governance/rules/cvp_red_team.md` *(modified/created)* — added the Release Parity Law for RC/Major-version-only documentation updates, required `[NEXT RECOMMENDED ACTION]` prompts to use `### Phase X:` headers, and defined the Claude-only CVP Red Team persona for one mathematically grounded zero-day proposal plus mandatory ledger/innovation-log follow-through when activated.
+
+### P14-2 — Vector Store Topology Poisoning Proofs
+
+* `crates/forge/src/vector_topology.rs` *(created)* — added deterministic detection for vector-query result flows (`chromadb`, `pinecone`, `weaviate`, `milvus`, `qdrant`, generic similarity search patterns) that feed an LLM sink without a similarity or semantic-threshold validation gate; emits `security:vector_store_poisoning` at High.
+* `crates/forge/src/lib.rs`, `crates/forge/src/slop_hunter.rs`, and `crates/cli/src/hunt.rs` *(modified)* — exported the new detector, wired it into the primary scan path, and attached a `WebProofArtifact` plus `ExploitWitness` that traces vector retrieval into the downstream LLM sink.
+
+### P14-3 — Cross-Modal Prompt Steganography Guard
+
+* `crates/forge/src/invisible_payload.rs` *(modified)* — extended carrier detection across `.png`/`.jpg`/`.pdf`/audio facts and OCR or vision-model sinks such as `pytesseract`, `ocr(...)`, and `gpt-4-vision-preview`; now emits `security:cross_modal_prompt_injection` when metadata sanitization is absent.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P14-2` and `P14-3` frontier blocks under the Absolute Eradication Law after implementation landed.
+
+### Live-Fire Hunt and Ledger Routing
+
+* `tools/campaign/target_ledger.json` and `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — marked `immutable/wallet-contracts` as no-findings; recorded the ClickHouse re-hunt as low-yield because the shell-risk evidence terminates in CI teardown code outside the in-scope `clickhouse-server` runtime; recorded the Afterpay re-hunt as low-yield because the only concrete drift was a sandbox bootstrap asset URL without a production exploit chain.
+
+**Live-fire hunt**: cloned and scanned `immutable/wallet-contracts`, `ClickHouse/ClickHouse`, and `afterpay/sdk-ios` with Bugcrowd formatting. Immutable produced no findings. ClickHouse emitted multiple signals, but the strongest command-execution path terminated in CI infrastructure rather than the server component required by the program. Afterpay produced a single sandbox bootstrap `security:unpinned_asset` signal with no demonstrated production asset substitution or customer impact.
+
+**Verification**: `cargo fmt --all` ✓ | `cargo test -p forge vector_topology -- --test-threads=4` ✓ | `cargo test -p forge invisible_payload -- --test-threads=4` ✓ | `cargo test -p cli vector_store_poisoning -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-06 — Sprint Batch 119: Nuclei Synthesis, Ledger Hydration, UAP Governance, and CI Cache Repair
 
 **Directive:** Tighten operator response governance, ship `WebProofArtifact` to Nuclei synthesis, attach safe Nuclei YAML to Bugcrowd submissions, repair GitHub Pages/Jekyll drift, harden CI build-cache behavior, hydrate the next three GitHub targets, clean the innovation log, verify with `--test-threads=4`, and commit locally without release.

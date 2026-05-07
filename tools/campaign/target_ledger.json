@@ -256,7 +256,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 35
+      "priority_score": 35,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "indeed_targets",
@@ -322,7 +324,7 @@
       ],
       "priority_score": 34,
       "hunted": true,
-      "hunt_result": "smartchain_low_yield_ssrf_logged"
+      "hunt_result": "rehunt_low_yield_ci_shell_logged"
     },
     {
       "engagement": "electroneum_targets",
@@ -367,7 +369,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_sandbox_bootstrap_asset_logged"
     },
     {
       "engagement": "atlassian_apps_targets",

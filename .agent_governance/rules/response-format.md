@@ -74,6 +74,10 @@ the fence early:
 codex "You are executing a Sovereign Directive: ..."
 ````
 
+The generated `[NEXT RECOMMENDED ACTION]` prompt MUST strictly use
+`### Phase X:` headers to delineate the implementation steps, making the prompt
+directly trackable for the operator.
+
 The prompt MUST:
 1. Begin with `codex "You are executing a Sovereign Directive:` and end with a
    closing `"`.

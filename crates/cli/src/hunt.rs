@@ -3286,6 +3286,30 @@ fn scan_buffer(
                     Some("rag_trust:unprioritized_retrieval".to_string()),
                 );
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:vector_store_poisoning" {
+                let witness = ExploitWitness {
+                    source_function: label.to_string(),
+                    source_label: "rag_chunk:vector_retrieval".to_string(),
+                    sink_function: label.to_string(),
+                    sink_label: "sink:llm.invoke".to_string(),
+                    call_chain: vec![
+                        format!("{label}:{line}"),
+                        "vector_query".to_string(),
+                        "retrieval_result".to_string(),
+                        "llm.invoke".to_string(),
+                    ],
+                    path_proof: Some(
+                        "ifds:web_proof_artifact rag_chunk:vector_retrieval -> llm.invoke"
+                            .to_string(),
+                    ),
+                    ..Default::default()
+                };
+                attach_web_proof_artifact(
+                    &mut structured,
+                    &witness,
+                    Some("vector_topology:missing_similarity_gate".to_string()),
+                );
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
             }
             structured
         })
@@ -4010,6 +4034,32 @@ def main(user_id):
             !report.contains("Acceptance Oracle: proof-complete"),
             "candidate gap section must not emit redundant proof-complete prose when an artifact exists"
         );
+    }
+
+    #[test]
+    fn scan_buffer_attaches_web_proof_artifact_for_vector_store_poisoning() {
+        let source = br#"
+async function answer(req) {
+  const results = await pinecone.query({ vector: embed(req.body.prompt), topK: 6 });
+  return openai.chat.completions.create({
+    messages: [{ role: "user", content: results.matches[0].metadata.page_content }]
+  });
+}
+"#;
+
+        let findings = scan_buffer("ts", source, "src/rag.ts", &[], false);
+        let finding = findings
+            .iter()
+            .find(|finding| finding.id == "security:vector_store_poisoning")
+            .expect("vector store poisoning finding must be emitted");
+
+        let artifact = finding
+            .web_proof_artifact
+            .as_ref()
+            .expect("vector store poisoning finding must carry a web proof artifact");
+        assert_eq!(artifact.source_label, "rag_chunk:vector_retrieval");
+        assert_eq!(artifact.sink_label, "sink:llm.invoke");
+        assert!(artifact.has_marker("vector_topology:missing_similarity_gate"));
     }
 
     #[test]

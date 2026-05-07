@@ -16,6 +16,13 @@ Follow `.agent_governance/rules/8gb-law.md`: pure Rust, zero-copy,
 low-memory AST/IFDS first. Never recommend P2-4 Tier 3, JVM subprocesses, or
 local massive ML inference as `[NEXT RECOMMENDED ACTION]`.
 
+## Release Parity Law
+
+You are mathematically forbidden from updating `README.md`, `docs/index.md`, or
+`docs/architecture.md` during feature sprints to conserve context tokens. These
+files MUST only be updated during a sprint that explicitly cuts a Release
+Candidate (RC) or Major Version.
+
 ## Autonomous Ideation Law
 
 When reviewing `janitor hunt` output, any report text showing `Unknown / Source

@@ -4,6 +4,37 @@ const ZWSP: &[u8] = &[0xE2, 0x80, 0x8B];
 const ZWNJ: &[u8] = &[0xE2, 0x80, 0x8C];
 const ZWJ: &[u8] = &[0xE2, 0x80, 0x8D];
 const BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
+const MEDIA_SOURCE_MARKERS: &[&[u8]] = &[
+    b".png",
+    b".jpg",
+    b".jpeg",
+    b".webp",
+    b".gif",
+    b".pdf",
+    b"image/png",
+    b"image/jpeg",
+    b"application/pdf",
+    b"audio/wav",
+    b"audio/mpeg",
+];
+const OCR_VISION_SINK_MARKERS: &[&[u8]] = &[
+    b"pytesseract",
+    b"image_to_string",
+    b"gpt-4-vision-preview",
+    b"responses.create",
+    b"visionmodel",
+    b"vision_model",
+    b"ocr(",
+    b"ocr_image",
+];
+const METADATA_SANITIZER_MARKERS: &[&[u8]] = &[
+    b"strip_exif",
+    b"sanitize_metadata",
+    b"remove_metadata",
+    b"clear_metadata",
+    b"exiftool -all=",
+    b"metadata_sanitizer",
+];
 
 /// Scan source text for invisible CamoLeak payload carriers.
 pub fn scan_invisible_payloads(source: &[u8], ai_assistant_context: bool) -> Vec<SlopFinding> {
@@ -29,6 +60,15 @@ pub fn scan_invisible_payloads(source: &[u8], ai_assistant_context: bool) -> Vec
             description: "security:camoleak_prompt_injection — Markdown/HTML comment contains \
                           AI hijacking instructions"
                 .to_string(),
+            start_byte: start,
+            end_byte: end,
+            domain: crate::metadata::DOMAIN_FIRST_PARTY,
+            severity,
+        });
+    }
+    if let Some((start, end)) = find_cross_modal_prompt_injection(source) {
+        findings.push(SlopFinding {
+            description: "security:cross_modal_prompt_injection — image/audio/pdf carrier facts flow into an OCR or vision-model parser without an explicit metadata sanitization step; hidden prompt content can survive into LLM context.".to_string(),
             start_byte: start,
             end_byte: end,
             domain: crate::metadata::DOMAIN_FIRST_PARTY,
@@ -124,6 +164,41 @@ fn contains_prompt_hijack(body: &[u8]) -> bool {
         || lower.contains("exfiltrate")
 }
 
+fn find_cross_modal_prompt_injection(source: &[u8]) -> Option<(usize, usize)> {
+    let lower = ascii_lower(source);
+    let start = first_offset(&lower, MEDIA_SOURCE_MARKERS)?;
+    if !contains_any(&lower, OCR_VISION_SINK_MARKERS) {
+        return None;
+    }
+    if contains_any(&lower, METADATA_SANITIZER_MARKERS) {
+        return None;
+    }
+    Some((start, source.len().min(start.saturating_add(64))))
+}
+
+fn ascii_lower(source: &[u8]) -> Vec<u8> {
+    source.iter().map(u8::to_ascii_lowercase).collect()
+}
+
+fn contains_any(haystack: &[u8], needles: &[&[u8]]) -> bool {
+    needles.iter().any(|needle| {
+        haystack
+            .windows(needle.len())
+            .any(|window| window == *needle)
+    })
+}
+
+fn first_offset(haystack: &[u8], needles: &[&[u8]]) -> Option<usize> {
+    needles
+        .iter()
+        .filter_map(|needle| {
+            haystack
+                .windows(needle.len())
+                .position(|window| window == *needle)
+        })
+        .min()
+}
+
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
@@ -162,5 +237,33 @@ mod tests {
                 .contains("security:camoleak_prompt_injection")
                 && finding.severity == Severity::KevCritical
         }));
+    }
+
+    #[test]
+    fn png_into_ocr_without_metadata_sanitizer_triggers_cross_modal_prompt_injection() {
+        let source = br#"
+def parse_upload(upload):
+    if upload.content_type == "image/png":
+        text = pytesseract.image_to_string(upload.path)
+        return client.responses.create(model="gpt-4-vision-preview", input=text)
+"#;
+        let findings = scan_invisible_payloads(source, true);
+        assert!(findings.iter().any(|finding| {
+            finding
+                .description
+                .contains("security:cross_modal_prompt_injection")
+        }));
+    }
+
+    #[test]
+    fn metadata_sanitizer_suppresses_cross_modal_prompt_injection() {
+        let source = br#"
+def parse_upload(upload):
+    if upload.content_type == "application/pdf":
+        clean = sanitize_metadata(upload.path)
+        text = pytesseract.image_to_string(clean)
+        return client.responses.create(model="gpt-4-vision-preview", input=text)
+"#;
+        assert!(scan_invisible_payloads(source, true).is_empty());
     }
 }
