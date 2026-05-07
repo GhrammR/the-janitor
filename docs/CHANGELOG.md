@@ -5886,6 +5886,20 @@ OkHttp and Okio returned no findings.
 * `tools/campaign/target_ledger.json` *(modified)* — marked `cashapp/cash-app-pay-ios-sdk` as hunted clean, `cashapp/hermit` as hunted with a placeholder-grade unpinned-asset candidate not logged, and `cashapp/misk` as hunted with a `protobuf_any` candidate not promoted to the bounty ledger.
 * `.janitor/hunt_reports/` *(runtime artifacts)* — stale `SUBMISSION_security_unpinned_asset.md` was deleted after the tighter placeholder gate invalidated it; the `protobuf_any` submission artifact remained as a non-ledger candidate.
 
+## 2026-05-07 — Sprint Batch 124: Git Sync Law, Supported Ingress Proofs, and Mutable Asset Finality
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — added the Git Sync Law requiring `git push origin main` after every successful sprint commit unless the operator explicitly forbids it.
+* `crates/common/src/slop.rs` *(modified)* — added `StructuredFinding::auth_requirement` so supported-ingress metadata survives as first-class machine-readable output instead of living only inside witnesses.
+* `crates/forge/src/authz.rs` *(modified)* — exported file-oriented controller-surface extraction with handler-span metadata so hunt-time proof binding can resolve real ingress routes and authorization boundaries without duplicating tree-sitter logic in `cli`.
+* `crates/forge/src/model_pinning.rs` *(modified)* — hardened the mutable-asset proof lane with production-vs-sandbox path and call-site classification; non-production model loads are now demoted before they become findings.
+* `crates/cli/src/hunt.rs` *(modified)* — threaded controller surfaces into `scan_buffer`, bound JWT/SQLi/ownership findings to supported ingress metadata, normalized middleware-style auth labels, and demoted sandbox/example unpinned-asset findings before ledger routing.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P2-9` and `P2-10` blocks from the active queue.
+* `tools/campaign/target_ledger.json` *(modified)* — marked `square/okio`, `bullish-exchange/api-docs`, and `fireblocks/mpc-lib` as hunted with `no_findings`.
+
+**Live-fire hunt**: cloned and scanned `square/okio`, `bullish-exchange/api-docs`, and `fireblocks/mpc-lib`. All three targets returned `no_findings`, so no Candidate or Low-Yield rows were opened this session.
+
+**Verification**: `cargo test -p forge authz -- --test-threads=4` ✓ | `cargo test -p forge model_pinning -- --test-threads=4` ✓ | `cargo test -p cli hunt -- --test-threads=4` ✓
+
 **Verification**: `cargo test -p forge llm_decompile -- --test-threads=4` ✓ | `cargo test -p forge dataset_poisoning -- --test-threads=4` ✓ | `cargo test -p forge slop_hunter -- --test-threads=4` ✓ | `cargo test -p cli submit_formatter -- --test-threads=4` ✓ | `cargo test -p cli browser_dom_harness -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
 
 ## 2026-05-05 — Sprint Batch 107: Target Hydration & Eradication Mechanics

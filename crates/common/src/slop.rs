@@ -292,6 +292,12 @@ pub struct StructuredFinding {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exploit_witness: Option<ExploitWitness>,
 
+    /// Supported ingress metadata naming the public or authenticated boundary
+    /// that reaches this finding, e.g. `public_api GET /health` or
+    /// `authenticated_endpoint auth=ADMIN POST /api/v1/users`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_requirement: Option<String>,
+
     /// Mandatory proof class for `KevCritical` / `Critical` findings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proof_class: Option<ProofClass>,

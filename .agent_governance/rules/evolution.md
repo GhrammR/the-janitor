@@ -32,6 +32,12 @@ listed but does not already have a corresponding strict P-tier entry in
 `.INNOVATION_LOG.md`, you MUST elevate it into a formal P-tier entry in the log
 immediately.
 
+## Git Sync Law
+
+You must execute `git push origin main` after every successful local commit in a
+sprint, UNLESS explicitly instructed otherwise by the operator. The local and
+remote state must remain synchronized to trigger CI/CD pipelines.
+
 ## Autonomous Ideation Law
 
 When reviewing `janitor hunt` output, any report text showing `Unknown / Source

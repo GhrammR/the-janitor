@@ -653,7 +653,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "block_targets",
@@ -681,7 +683,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "chime_targets",
@@ -744,7 +748,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "immunefi_targets",

@@ -21,8 +21,10 @@ pub struct EndpointSurface {
     pub line: Option<u32>,
 }
 
+/// Internal controller match with handler-span metadata used to bind findings
+/// to supported ingress surfaces.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct EndpointSurfaceMatch {
+pub struct EndpointSurfaceMatch {
     pub surface: EndpointSurface,
     pub handler_name: Option<String>,
     pub start_line: u32,
@@ -45,6 +47,40 @@ pub fn extract_controller_surface(tree: &Tree, lang: &str, source: &[u8]) -> Vec
         .into_iter()
         .map(|entry| entry.surface)
         .collect()
+}
+
+/// Parse source text and extract endpoint surfaces for a supported controller file.
+pub fn extract_controller_surface_for_file(
+    lang: &str,
+    source: &[u8],
+    file: String,
+) -> Vec<EndpointSurface> {
+    extract_controller_surface_matches_for_file(lang, source, file)
+        .into_iter()
+        .map(|entry| entry.surface)
+        .collect()
+}
+
+/// Parse source text and retain handler span metadata for supported controller files.
+pub fn extract_controller_surface_matches_for_file(
+    lang: &str,
+    source: &[u8],
+    file: String,
+) -> Vec<EndpointSurfaceMatch> {
+    let language = match lang {
+        "java" => tree_sitter_java::LANGUAGE.into(),
+        "py" => tree_sitter_python::LANGUAGE.into(),
+        "js" | "jsx" | "ts" | "tsx" => tree_sitter_javascript::LANGUAGE.into(),
+        _ => return Vec::new(),
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return Vec::new();
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return Vec::new();
+    };
+    extract_controller_surface_with_file(&tree, lang, source, file)
 }
 
 pub(crate) fn extract_controller_surface_with_file(
@@ -121,7 +157,7 @@ pub fn match_frontend_route_for_file<'a>(
     })
 }
 
-pub(crate) fn match_surface_for_witness<'a>(
+pub fn match_surface_for_witness<'a>(
     surfaces: &'a [EndpointSurfaceMatch],
     source_function: &str,
     line: Option<u32>,

@@ -24,7 +24,7 @@ pub fn detect_unpinned_model_revisions(
     source: &[u8],
     file_path: &str,
 ) -> Vec<StructuredFinding> {
-    if !matches!(ext, "py" | "ts" | "tsx" | "js" | "jsx") {
+    if !matches!(ext, "py" | "ts" | "tsx" | "js" | "jsx") || is_non_production_path(file_path) {
         return Vec::new();
     }
 
@@ -36,7 +36,7 @@ pub fn detect_unpinned_model_revisions(
             continue;
         };
         let call = &source[mat.start()..end];
-        if has_pinned_revision(call) {
+        if has_pinned_revision(call) || is_non_production_call(call) {
             continue;
         }
         findings.push(StructuredFinding {
@@ -142,6 +142,49 @@ fn ascii_lower(source: &[u8]) -> Vec<u8> {
     source.iter().map(|b| b.to_ascii_lowercase()).collect()
 }
 
+fn is_non_production_path(file_path: &str) -> bool {
+    let lower = file_path.to_ascii_lowercase();
+    [
+        "/test",
+        "/tests",
+        "/spec",
+        "/fixture",
+        "/fixtures",
+        "/mock",
+        "/mocks",
+        "/example",
+        "/examples",
+        "/sample",
+        "/samples",
+        "/demo",
+        "/demos",
+        "/sandbox",
+        "/staging",
+        "/docs/",
+        "/storybook",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn is_non_production_call(call: &[u8]) -> bool {
+    let lower = String::from_utf8_lossy(call).to_ascii_lowercase();
+    [
+        "sandbox",
+        "staging",
+        "example",
+        "demo",
+        "sample",
+        "mock",
+        "test/",
+        "test-",
+        "localhost",
+        "127.0.0.1",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,6 +210,16 @@ const model = AutoModel.from_pretrained("meta-llama/Llama-3-70b", {
 });
 "#;
         let findings = detect_unpinned_model_revisions("ts", source, "model.ts");
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn sandbox_model_load_is_demoted() {
+        let source = br#"
+from transformers import AutoModel
+model = AutoModel.from_pretrained("acme/sandbox-redteam-model")
+"#;
+        let findings = detect_unpinned_model_revisions("py", source, "examples/model.py");
         assert!(findings.is_empty());
     }
 }

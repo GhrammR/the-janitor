@@ -239,6 +239,12 @@ P-tier entry in `.INNOVATION_LOG.md`, you MUST elevate it into a formal
 strict P-tier item immediately, and that item MUST append explicit instructions
 to re-hunt the affected targets once the feature is built.
 
+### Git Sync Law (Sprint Batch 124)
+
+You must execute `git push origin main` after every successful local commit in a
+sprint, UNLESS explicitly instructed otherwise by the operator. The local and
+remote state must remain synchronized to trigger CI/CD pipelines.
+
 ### Threat Model Awareness (mandatory threat model pre-filter)
 
 You MUST evaluate the **Taint Source Origin** and **Actor Privilege Level** BEFORE

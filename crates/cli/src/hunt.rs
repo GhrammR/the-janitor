@@ -2265,7 +2265,7 @@ fn resolve_python_module_path(root: &Path, module: &str) -> Option<PathBuf> {
 fn scan_python_priority_file(path: &Path, label: &str) -> anyhow::Result<Vec<StructuredFinding>> {
     let source =
         std::fs::read(path).with_context(|| format!("read python file {}", path.display()))?;
-    Ok(scan_buffer("py", &source, label, &[], false))
+    Ok(scan_buffer("py", &source, label, &[], &[], false))
 }
 
 // ---------------------------------------------------------------------------
@@ -2741,6 +2741,7 @@ fn is_placeholder_scan_root(scan_root: Option<&Path>, has_explicit_ingest_source
 /// skipped.
 pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding>> {
     let mut all: Vec<StructuredFinding> = Vec::new();
+    let mut controller_surfaces = Vec::new();
     let mut frontend_routes = Vec::new();
     let has_ai_assistant_config = has_ai_assistant_config(dir);
     let gadget_manifests = collect_gadget_manifest_blobs(dir);
@@ -2781,6 +2782,11 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
             .unwrap_or(file_path)
             .to_string_lossy()
             .to_string();
+        controller_surfaces.extend(forge::authz::extract_controller_surface_matches_for_file(
+            ext,
+            &source,
+            rel_path.clone(),
+        ));
         frontend_routes.extend(forge::authz::extract_frontend_routes_from_source(
             ext, &source, rel_path,
         ));
@@ -2823,6 +2829,7 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
             ext,
             &source,
             &rel_path,
+            &controller_surfaces,
             &frontend_routes,
             has_ai_assistant_config,
         ));
@@ -3072,6 +3079,7 @@ fn scan_buffer(
     ext: &str,
     source: &[u8],
     label: &str,
+    controller_surfaces: &[forge::authz::EndpointSurfaceMatch],
     frontend_routes: &[forge::authz::FrontendRoute],
     has_ai_assistant_config: bool,
 ) -> Vec<StructuredFinding> {
@@ -3103,6 +3111,7 @@ fn scan_buffer(
         .into_iter()
         .filter(|f| {
             !forge::slop_hunter::is_hunt_false_positive_path(label, &f.description)
+                && !should_demote_unpinned_asset(label, &f.description, source)
                 && (!is_issue_template
                     || (!f.description.contains("unpinned_asset")
                         && !f.description.contains("oauth_excessive_scope")))
@@ -3130,6 +3139,8 @@ fn scan_buffer(
                 upstream_validation_absent,
                 ..Default::default()
             };
+            let ingress_surface =
+                ingress_surface_for_finding(&rule_id, label, line, controller_surfaces);
             if rule_id == "security:dom_xss_innerHTML" || rule_id.contains("prototype_pollution") {
                 let mut witness =
                     forge::exploitability::browser_sink_witness(label, &rule_id, line);
@@ -3146,14 +3157,16 @@ fn scan_buffer(
                 attach_web_proof_artifact(&mut structured, &witness, evidence_marker);
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
             } else if rule_id == "security:jwt_validation_bypass" {
-                let witness =
+                let mut witness =
                     forge::exploitability::protocol_bypass_witness(label, &rule_id, line, None);
+                apply_ingress_surface(&mut structured, &mut witness, ingress_surface.as_ref());
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
             } else if rule_id == "security:ssrf_dynamic_url" {
                 let method = extract_go_http_method(&finding.description);
                 let parameter = extract_go_url_parameter(&finding.description);
-                let witness =
+                let mut witness =
                     forge::exploitability::ssrf_witness(label, &rule_id, line, method, parameter);
+                apply_ingress_surface(&mut structured, &mut witness, ingress_surface.as_ref());
                 let evidence_marker = ssrf_evidence_marker(&finding.description)
                     .or_else(|| witness.repro_cmd.as_deref().and_then(ssrf_evidence_marker));
                 attach_web_proof_artifact(&mut structured, &witness, evidence_marker);
@@ -3311,6 +3324,19 @@ fn scan_buffer(
                 );
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
             }
+            if matches!(
+                rule_id.as_str(),
+                "security:missing_ownership_check" | "security:missing_authz_check"
+            ) || rule_id == "security:jwt_validation_bypass"
+                || rule_id.contains("sqli")
+            {
+                if let Some(mut witness) = structured.exploit_witness.take() {
+                    apply_ingress_surface(&mut structured, &mut witness, ingress_surface.as_ref());
+                    structured.exploit_witness = Some(witness);
+                } else if let Some(surface) = ingress_surface.as_ref() {
+                    structured.auth_requirement = Some(format_supported_ingress(surface));
+                }
+            }
             structured
         })
         .collect::<Vec<_>>();
@@ -3419,6 +3445,102 @@ fn scan_buffer(
     }
 
     findings
+}
+
+fn ingress_surface_for_finding(
+    rule_id: &str,
+    file: &str,
+    line: u32,
+    controller_surfaces: &[forge::authz::EndpointSurfaceMatch],
+) -> Option<forge::authz::EndpointSurface> {
+    if !(matches!(
+        rule_id,
+        "security:missing_ownership_check"
+            | "security:missing_authz_check"
+            | "security:jwt_validation_bypass"
+    ) || rule_id.contains("sqli"))
+    {
+        return None;
+    }
+
+    let file_matches = controller_surfaces
+        .iter()
+        .filter(|surface| surface.surface.file == file)
+        .cloned()
+        .collect::<Vec<_>>();
+    forge::authz::match_surface_for_witness(&file_matches, file, Some(line))
+        .map(|entry| entry.surface.clone())
+}
+
+fn apply_ingress_surface(
+    structured: &mut StructuredFinding,
+    witness: &mut ExploitWitness,
+    surface: Option<&forge::authz::EndpointSurface>,
+) {
+    let Some(surface) = surface else {
+        return;
+    };
+
+    witness.route_path = Some(surface.route_path.clone());
+    witness.http_method = Some(surface.http_method.clone());
+    witness.auth_requirement = Some(format_supported_ingress(surface));
+    structured.auth_requirement = witness.auth_requirement.clone();
+}
+
+fn format_supported_ingress(surface: &forge::authz::EndpointSurface) -> String {
+    let boundary = surface
+        .auth_requirement
+        .as_deref()
+        .map(compact_auth_requirement)
+        .map(|auth| format!("authenticated_endpoint auth={auth}"))
+        .unwrap_or_else(|| "public_api".to_string());
+    format!("{boundary} {} {}", surface.http_method, surface.route_path)
+}
+
+fn compact_auth_requirement(auth: &str) -> String {
+    let trimmed = auth.trim();
+    if let Some(start) = trimmed.find('"') {
+        if let Some(end) = trimmed[start + 1..].find('"') {
+            return trimmed[start + 1..start + 1 + end].to_string();
+        }
+    }
+    if let Some(start) = trimmed.find('\'') {
+        if let Some(end) = trimmed[start + 1..].find('\'') {
+            return trimmed[start + 1..start + 1 + end].to_string();
+        }
+    }
+    trimmed
+        .trim_start_matches("ROLE_")
+        .trim_start_matches("role:")
+        .to_string()
+}
+
+fn should_demote_unpinned_asset(label: &str, description: &str, source: &[u8]) -> bool {
+    if !description.contains("unpinned_asset") {
+        return false;
+    }
+
+    let lower = format!(
+        "{label}\n{description}\n{}",
+        String::from_utf8_lossy(source)
+    )
+    .to_ascii_lowercase();
+    [
+        "sandbox",
+        "staging",
+        "example",
+        "examples",
+        "demo",
+        "sample",
+        "mock",
+        "test/",
+        "test-",
+        "localhost",
+        "127.0.0.1",
+        "sdk-example-server",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 fn is_compiled_artifact_extension(ext: &str) -> bool {
@@ -4047,7 +4169,7 @@ async function answer(req) {
 }
 "#;
 
-        let findings = scan_buffer("ts", source, "src/rag.ts", &[], false);
+        let findings = scan_buffer("ts", source, "src/rag.ts", &[], &[], false);
         let finding = findings
             .iter()
             .find(|finding| finding.id == "security:vector_store_poisoning")
@@ -4060,6 +4182,69 @@ async function answer(req) {
         assert_eq!(artifact.source_label, "rag_chunk:vector_retrieval");
         assert_eq!(artifact.sink_label, "sink:llm.invoke");
         assert!(artifact.has_marker("vector_topology:missing_similarity_gate"));
+    }
+
+    #[test]
+    fn scan_buffer_attaches_supported_ingress_metadata_to_jwt_findings() {
+        let source = br#"
+const express = require("express");
+const router = express.Router();
+router.get("/api/tokens", ensureRole("ADMIN"), (req, res) => {
+  jwt.decode(req.headers.authorization, { complete: true });
+  res.json({ ok: true });
+});
+"#;
+        let controller_surfaces = forge::authz::extract_controller_surface_matches_for_file(
+            "js",
+            source,
+            "src/routes.js".to_string(),
+        );
+        let findings = scan_buffer(
+            "js",
+            source,
+            "src/routes.js",
+            &controller_surfaces,
+            &[],
+            false,
+        );
+        let finding = findings
+            .iter()
+            .find(|finding| finding.id == "security:jwt_validation_bypass")
+            .expect("jwt validation bypass finding must be emitted");
+        assert_eq!(
+            finding.auth_requirement.as_deref(),
+            Some("authenticated_endpoint auth=ADMIN GET /api/tokens")
+        );
+        let witness = finding
+            .exploit_witness
+            .as_ref()
+            .expect("jwt finding must carry an exploit witness");
+        assert_eq!(witness.route_path.as_deref(), Some("/api/tokens"));
+        assert_eq!(witness.http_method.as_deref(), Some("GET"));
+    }
+
+    #[test]
+    fn scan_buffer_demotes_sandbox_unpinned_assets() {
+        let source = br#"
+enum Environment {
+  case sandbox
+}
+let bootstrap = "https://afterpay.github.io/sdk-example-server/widget-bootstrap.js"
+"#;
+        let findings = scan_buffer(
+            "swift",
+            source,
+            "Sources/Afterpay/Model/Environment.swift",
+            &[],
+            &[],
+            false,
+        );
+        assert!(
+            findings
+                .iter()
+                .all(|finding| !finding.id.contains("unpinned_asset")),
+            "sandbox bootstrap assets must be demoted before ledger routing"
+        );
     }
 
     #[test]
