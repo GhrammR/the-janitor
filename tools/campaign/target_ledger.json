@@ -27,7 +27,9 @@
         "GitHub",
         "MCP"
       ],
-      "priority_score": 52
+      "priority_score": 52,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "indeed_targets",
@@ -401,7 +403,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "atlassian_apps_targets",
@@ -415,7 +419,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_unpinned_asset_logged"
     },
     {
       "engagement": "atlassian_apps_targets",

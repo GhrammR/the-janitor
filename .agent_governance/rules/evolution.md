@@ -318,6 +318,13 @@ author a P-tier proposal to automate the schema traversal. The Dual-Ledger
 Mandate makes that pairing structurally mandatory — a governance circuit breaker,
 not a soft reminder.
 
+### Cash-Flow Priority Override
+
+If a `P-tier` item in `.INNOVATION_LOG.md` was explicitly generated to solve a
+proof gap for a finding currently sitting in `tools/campaign/CANDIDATE_LEDGER.md`,
+it automatically outranks broader architectural features. The fastest path to a
+validated Bugcrowd submission is the absolute priority.
+
 ### Exploitation-Strategy-Gap Autonomous Logging Law (Sprint Batch 88)
 
 When a Bounty Ledger row requires a **manual** `Exploitation Strategy`

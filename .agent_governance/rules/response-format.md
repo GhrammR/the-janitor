@@ -307,6 +307,13 @@ that has been completed is already deleted from the log, not tagged — so the
 selection universe at any moment is exactly the set of open P-entries
 present in the file.
 
+## Cash-Flow Priority Override
+
+If a `P-tier` item in `.INNOVATION_LOG.md` was explicitly generated to solve a
+proof gap for a finding currently sitting in `tools/campaign/CANDIDATE_LEDGER.md`,
+it automatically outranks broader architectural features. The fastest path to a
+validated Bugcrowd submission is the absolute priority.
+
 ## Absolute Eradication Pre-Flight (reminder)
 
 Before emitting `[NEXT RECOMMENDED ACTION]`, perform the check defined in

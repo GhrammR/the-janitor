@@ -75,6 +75,8 @@ use crate::embedding_trust::detect_embedding_trust_transposition;
 use crate::fold::fold_string_concat;
 use crate::intent_divergence::find_rust_intent_divergence;
 use crate::metadata::{DOMAIN_ALL, DOMAIN_FIRST_PARTY};
+use crate::model_lineage::detect_model_weight_backdoor;
+use crate::multimodal_poison::detect_multimodal_rag_poisoning;
 use crate::rag_source_registry::find_rag_context_poisoning;
 use crate::vector_topology::detect_vector_store_poisoning;
 
@@ -1049,6 +1051,8 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_rag_context_poisoning(source));
             f.extend(detect_embedding_trust_transposition(source));
             f.extend(detect_vector_store_poisoning(source));
+            f.extend(detect_model_weight_backdoor(source));
+            f.extend(detect_multimodal_rag_poisoning(source));
             // CISA KEV gates — AST-based (Python grammar); share parse tree via ParsedUnit
             f.extend(find_python_sqli_slop(eng, parsed));
             f.extend(find_python_ssrf_slop(eng, parsed));
@@ -1078,6 +1082,8 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_rag_context_poisoning(source));
             f.extend(detect_embedding_trust_transposition(source));
             f.extend(detect_vector_store_poisoning(source));
+            f.extend(detect_model_weight_backdoor(source));
+            f.extend(detect_multimodal_rag_poisoning(source));
             // CISA KEV gates — AST-based (JS grammar); share parse tree via ParsedUnit
             f.extend(find_js_sqli_slop(eng, parsed));
             f.extend(find_js_ssrf_slop(eng, parsed));
@@ -1128,6 +1134,8 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             let mut f = find_go_ssrf_slop(source);
             f.extend(detect_embedding_trust_transposition(source));
             f.extend(detect_vector_store_poisoning(source));
+            f.extend(detect_model_weight_backdoor(source));
+            f.extend(detect_multimodal_rag_poisoning(source));
             // Phase 4 R&D: exec.Command shell injection + TLS bypass AST walk
             f.extend(find_go_slop(eng, parsed));
             f.extend(find_jwt_validation_bypass(source));

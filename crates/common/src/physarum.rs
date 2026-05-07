@@ -317,21 +317,7 @@ impl SystemHeart {
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
 
-        // Throttled refresh — call sysinfo only when the window has elapsed.
-        // The SMA ring buffer is updated only on actual refreshes so every
-        // sample in the history represents a distinct OS observation.
-        if now.duration_since(g.last_refresh) >= REFRESH_THROTTLE {
-            g.sys.refresh_memory();
-            g.cached_total = g.sys.total_memory();
-            g.cached_used = g.sys.used_memory();
-            g.last_refresh = now;
-            // Copy before the push to avoid a simultaneous mut/imm borrow of `g`.
-            let snapshot_used = g.cached_used;
-            g.history.push(Sample {
-                at: now,
-                used: snapshot_used,
-            });
-        }
+        refresh_cache_if_needed(&mut g, now);
 
         let total = g.cached_total;
         if total == 0 {
@@ -416,19 +402,7 @@ impl SystemHeart {
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let now = Instant::now();
 
-        // Same throttled-refresh logic as beat() — the Swarm variant shares
-        // the Inner cache so both paths benefit from the same deduplication.
-        if now.duration_since(g.last_refresh) >= REFRESH_THROTTLE {
-            g.sys.refresh_memory();
-            g.cached_total = g.sys.total_memory();
-            g.cached_used = g.sys.used_memory();
-            g.last_refresh = now;
-            let snapshot_used = g.cached_used;
-            g.history.push(Sample {
-                at: now,
-                used: snapshot_used,
-            });
-        }
+        refresh_cache_if_needed(&mut g, now);
 
         let total = g.cached_total;
         if total == 0 {
@@ -446,6 +420,22 @@ impl SystemHeart {
         let base = classify_pressure_pct(pct, CONSTRICT_THRESHOLD_NORMAL);
         apply_velocity_override(base, velocity)
     }
+}
+
+fn refresh_cache_if_needed(g: &mut std::sync::MutexGuard<'_, Inner>, now: Instant) {
+    if now.duration_since(g.last_refresh) < REFRESH_THROTTLE {
+        return;
+    }
+
+    g.sys.refresh_memory();
+    g.cached_total = g.sys.total_memory();
+    g.cached_used = g.sys.used_memory();
+    g.last_refresh = now;
+    let snapshot_used = g.cached_used;
+    g.history.push(Sample {
+        at: now,
+        used: snapshot_used,
+    });
 }
 
 #[inline]

@@ -3,6 +3,34 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-07 — Sprint Batch 122: Cash-Flow Priority, ML Model Lineage, and Cache Refactor
+
+**Directive:** Add the Cash-Flow Priority Override to UAP governance, deduplicate Physarum cache refresh logic, ship `P14-4` model-lineage backdoor detection, ship `P14-1` multimodal RAG poisoning detection, hunt the next three GitHub targets with `--submit-check`, purge the shipped backlog blocks, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance and Cache Refactor
+
+* `.agent_governance/rules/evolution.md` and `.agent_governance/rules/response-format.md` *(modified)* — added the Cash-Flow Priority Override so any P-tier created to close a Candidate-ledger proof gap automatically outranks broader architectural work when it is the fastest path to a validated Bugcrowd submission.
+* `crates/common/src/physarum.rs` *(modified)* — extracted the throttled memory-cache refresh path into a private helper shared by `beat()` and `beat_swarm()`, removing duplicated updates to `cached_total`, `cached_used`, `last_refresh`, and the pulse history ring.
+
+### P14-4 — Neural Weight Lineage and Activation Backdoor Proofs
+
+* `crates/forge/src/model_lineage.rs` *(created)* — added deterministic detection for unsigned or lineage-less adapter, LoRA, and `.safetensors` loading patterns; emits `security:model_weight_backdoor` when a weight artifact is loaded without visible manifest, signature, digest, or provenance verification. Added fixture-driven tests using a synthetic `.safetensors` header string only.
+* `crates/forge/src/lib.rs` and `crates/forge/src/slop_hunter.rs` *(modified)* — exported and wired the new detector into Python, JavaScript/TypeScript, and Go scan lanes.
+
+### P14-1 — Multimodal Embedding Malware Scanner
+
+* `crates/forge/src/multimodal_poison.rs` *(created)* — added deterministic detection for image/audio/PDF carrier facts that pass through OCR or vision parsing and then reach an LLM context sink without metadata sanitization; emits `security:multimodal_rag_poisoning` at High severity with positive and negative regression tests.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped `P14-1` and `P14-4` frontier blocks under the Absolute Eradication Law once both detectors landed.
+
+### Live-Fire Hunt and Ledger Routing
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked `gleanbugbounty/mcp-server-bugbounty` and `cashapp/cash-app-pay-android-sdk` as `no_findings`; marked `cashapp/hermit` as hunted and routed to low-yield.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — logged the `cashapp/hermit` installer-template `security:unpinned_asset` result as low-yield because the witness never concretized the fetched URL or proved mutable production asset substitution, digest drift, or customer impact.
+
+**Live-fire hunt**: cloned and scanned `gleanbugbounty/mcp-server-bugbounty`, `cashapp/cash-app-pay-android-sdk`, and `cashapp/hermit` with Bugcrowd formatting plus `--submit-check`. The first two produced `no_findings`. Hermit emitted two `security:unpinned_asset` hits in installer templates, but the output remained below Candidate quality because it stopped at a placeholder remote URL instead of a concrete mutable production artifact.
+
+**Verification**: `cargo test -p common physarum -- --test-threads=4` ✓ | `cargo test -p forge model_lineage -- --test-threads=4` ✓ | `cargo test -p forge multimodal_poison -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-07 — Sprint Batch 121: Pipeline Exorcism & Ledger Normalization
 
 **Directive:** Repair the failing GitHub Pages deployment path, collapse duplicated CI bootstrap state in `action.yml`, deterministically normalize GitHub target URLs in the campaign ledger, hydrate all ledger `R&D Follow-Up` tasks into strict P-tier backlog items, verify with `--test-threads=4`, commit locally, and push `main` without release.
