@@ -3,6 +3,41 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-06 — Sprint Batch 119: Nuclei Synthesis, Ledger Hydration, UAP Governance, and CI Cache Repair
+
+**Directive:** Tighten operator response governance, ship `WebProofArtifact` to Nuclei synthesis, attach safe Nuclei YAML to Bugcrowd submissions, repair GitHub Pages/Jekyll drift, harden CI build-cache behavior, hydrate the next three GitHub targets, clean the innovation log, verify with `--test-threads=4`, and commit locally without release.
+
+### Governance and Ledger Law Upgrade
+
+* `.agent_governance/rules/response-format.md` *(modified)* — `[NEXT RECOMMENDED ACTION]` prompts now require quadruple-backtick fences for nested-markdown safety; the Dual-Ledger mandate now requires every new architectural feature in `.INNOVATION_LOG.md` to carry a strict sequential P-tier ID; added the Sprint Batch 119 Ledger Hydration Law requiring Omni-Audit / Max Compute runs to mine `R&D Follow-Up` fields from Candidate and Low-Yield ledgers into formal P-tier backlog items with re-hunt instructions.
+* `.INNOVATION_LOG.md` *(modified)* — physically deleted the shipped Sprint Batch 118 Nuclei frontier block; normalized orphan Phase 10/12 backlog labels from `P10`, `P11`, `P12`, `P12-B`, `P12-C`, and `P12-E` into strict sequential `P10-1`, `P11-1`, `P12-1`, `P12-2`, `P12-3`, and `P12-4`; confirmed `P14-2 — Vector Store Topology Poisoning Proofs` remains queued.
+
+### P1-15 — WebProofArtifact to Nuclei Template Synthesis
+
+* `crates/cli/src/nuclei_templates.rs` *(created)* — added `render_nuclei_template(artifact, target) -> Option<String>`; synthesizes deterministic, non-destructive Nuclei HTTP probes from `url_param`, `header`, `json_body`, `cookie`, and `rag_chunk` web-proof sources; binds source, sink, IFDS trace, evidence marker, and target into metadata plus a BLAKE3 provenance hash; emits `JANITOR_CANARY` word matchers.
+* `crates/cli/src/lib.rs` *(created)* and `crates/cli/src/main.rs` *(modified)* — exported and wired the Nuclei renderer into the CLI crate surface.
+* `crates/cli/src/submit_formatter.rs` *(modified)* — Bugcrowd `SUBMISSION.md` packages now embed an `Attached Nuclei Template` YAML block whenever a finding carries `web_proof_artifact`; added regression coverage proving the package attachment path and YAML-valid DOM-XSS template synthesis.
+
+### Pages and CI Infrastructure
+
+* `.nojekyll` *(created)* — disables implicit GitHub Pages Jekyll processing for branch-served static content, which is the code-side fix for `jekyll-theme-primer: No such file or directory` when Pages is still evaluating the repository as a Jekyll site despite static HTML front-door assets.
+* `.github/workflows/janitor.yml` and `.github/workflows/janitor-pr-gate.yml` *(modified)* — replaced the loose `SCCACHE_GHA_ENABLED` setup with an explicit disk-backed `sccache` configuration (`RUSTC_WRAPPER`, `SCCACHE_DIR`, `SCCACHE_CACHE_SIZE`) plus `actions/cache` restore for `~/.cache/sccache` and end-of-job cache telemetry; this makes cache reuse visible and materially reduces cold compile cost for repeated CI builds.
+
+### Live-Fire Hunt and Tri-Ledger Routing
+
+* `tools/campaign/target_ledger.json` *(modified)* — marked the scanned `electroneum/electroneum-sc`, `electroneum/electroneum`, and `trustwallet/wallet-core` entries as hunted, including duplicate descriptive Electroneum rows, to prevent re-pop under alternate ledger text.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — routed the strongest non-submission-grade outputs to Low-Yield:
+  * `electroneum/electroneum-sc` — `security:ssrf_dynamic_url` remains below payout threshold because the witness does not prove chain-integrity, fund-theft, key-disclosure, or explorer-truth impact.
+  * `electroneum/electroneum` — `security:ssrf_dynamic_url` remains below payout threshold because the Legacy program rewards only blockchain-integrity or user-funds outcomes, which the tooling-path SSRF does not establish.
+  * `trustwallet/wallet-core` — `security:protobuf_any_type_field` remains below payout threshold because no reachable attacker-controlled decode/unpack flow or working PoC was proven.
+
+**Live-fire hunt results:**
+* `/tmp/electroneum-sc` → findings included `security:jwt_validation_bypass`, `security:ssrf_dynamic_url`, `security:unpinned_asset`, and `security:ics_default_credential`; routed conservatively because the program's payout bar is chain-integrity-centric and no eligible exploit chain was proven.
+* `/tmp/electroneum` → findings included `security:ssrf_dynamic_url`, `security:parser_exhaustion_anomaly`, `security:unsafe_string_function`, and `security:optimizer_phantom_authority`; routed conservatively because the Legacy program rejects non-chain-integrity outcomes absent bridge/funds impact.
+* `/tmp/wallet-core` → findings included `security:protobuf_any_type_field` and `security:unsafe_string_function`; routed conservatively because Binance requires a working PoC and the scan did not prove a reachable attacker-controlled decode or overflow path.
+
+**Verification:** `cargo test -p cli nuclei_template -- --test-threads=4` ✓ | `cargo test --workspace -- --test-threads=4` ✓ | `just audit` ✓
+
 ## 2026-05-06 — Sprint Batch 118: Unified WebProofArtifact, Lock-Free Daemon Pulse, Block Hydration & RC.2
 
 **Directive:** Consolidate web evidence for DOM XSS, SSRF, and RAG findings into `WebProofArtifact`, move daemon backpressure to the lock-free Melanin Layer pulse, hydrate three Block open-source targets, add the nuclei-template frontier, bump the workspace to `10.2.0-rc.2`, verify, commit, and execute the release pipeline.

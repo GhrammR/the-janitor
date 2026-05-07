@@ -18,8 +18,9 @@ jobs:
     name: Integrity Scan & Badge Commit
     runs-on: ubuntu-latest
     env:
-      SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
+      SCCACHE_DIR: ~/.cache/sccache
+      SCCACHE_CACHE_SIZE: 2G
     permissions:
       contents: write   # required: commit badge back to main
 
@@ -39,6 +40,14 @@ jobs:
 
       - name: Enable sccache
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+
+      - name: Restore sccache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-janitor-main-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-janitor-main-
 
       # Restore cached janitor binary.  Key mirrors action.yml so PR-gate
       # and self-attestation hits share the same cache entry.
@@ -110,3 +119,8 @@ jobs:
         shell: bash
         run: |
           rm -rf /tmp/the-janitor || true
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: sccache --show-stats || true

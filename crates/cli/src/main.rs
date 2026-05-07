@@ -20,6 +20,7 @@ mod export;
 mod git_drive;
 mod hunt;
 mod jira;
+mod nuclei_templates;
 mod report;
 mod sarif_enterprise;
 mod submit_formatter;

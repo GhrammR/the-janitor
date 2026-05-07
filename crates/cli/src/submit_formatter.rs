@@ -6,6 +6,7 @@
 //! 3. For every in-scope, submission-grade finding with a concrete exploit
 //!    strategy, writes a `SUBMISSION.md` into `.janitor/hunt_reports/`.
 
+use crate::nuclei_templates::render_nuclei_template;
 use common::slop::StructuredFinding;
 use forge::dedup::{deduplicate_findings, DeduplicatedFinding, FindingOccurrence};
 use std::path::{Component, Path, PathBuf};
@@ -389,6 +390,17 @@ pub fn generate_bugcrowd_submission_package(
         }
     }
 
+    if let Some(artifact) = primary.web_proof_artifact.as_ref() {
+        if let Some(template) = render_nuclei_template(artifact, canonical_target) {
+            package.push_str("\n## Attached Nuclei Template\n```yaml\n");
+            package.push_str(&template);
+            if !template.ends_with('\n') {
+                package.push('\n');
+            }
+            package.push_str("```\n");
+        }
+    }
+
     package
 }
 
@@ -668,6 +680,35 @@ mod tests {
             package.contains("<script>alert(1)</script>"),
             "package must preserve the PoC script content"
         );
+    }
+
+    #[test]
+    fn submission_package_embeds_nuclei_template_attachment() {
+        let mut finding = make_finding(
+            "security:dom_xss",
+            Some("app.js"),
+            "High",
+            Some("python3 -m http.server 8765"),
+        );
+        finding.web_proof_artifact = Some(common::slop::WebProofArtifact {
+            source_label: "url_param:returnTo".to_string(),
+            sink_label: "sink:innerHTML".to_string(),
+            ifds_trace: vec!["handler".to_string(), "render".to_string()],
+            evidence_marker: Some("dom_canary:reflected".to_string()),
+            proof_class: common::slop::ProofClass::ReachabilityProof,
+        });
+        let deduplicated = DeduplicatedFinding {
+            finding,
+            occurrences: vec![FindingOccurrence {
+                file: "app.js".to_string(),
+                line: Some(21),
+            }],
+        };
+
+        let package = generate_bugcrowd_submission_package(&deduplicated, "github.com/acme/web");
+        assert!(package.contains("## Attached Nuclei Template"));
+        assert!(package.contains("JANITOR_CANARY"));
+        assert!(package.contains("janitor_template_hash"));
     }
 
     #[test]

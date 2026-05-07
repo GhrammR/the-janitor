@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
+      SCCACHE_DIR: ~/.cache/sccache
+      SCCACHE_CACHE_SIZE: 2G
     # Job-level: read PR diff + write step summary.
     permissions:
       contents: read
@@ -34,6 +35,14 @@ jobs:
 
       - name: Enable sccache
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+
+      - name: Restore sccache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-janitor-pr-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-janitor-pr-
 
       # P4-11: Install Kani formal verifier (fail-open — does not block the gate).
       - name: Install Kani Verifier (fail-open)
@@ -66,3 +75,8 @@ jobs:
           if-no-files-found: ignore
           compression-level: 0
           retention-days: 30
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: sccache --show-stats || true

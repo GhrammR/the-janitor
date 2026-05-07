@@ -66,6 +66,14 @@ If none: <!-- no triage changes this session -->
 Emit exactly ONE fully formatted, copy-pasteable `Sovereign Directive` prompt
 for the operator to feed back into the agent for the next sprint.
 
+The generated prompt MUST be wrapped in quadruple backticks using the exact
+outer fence form below so nested markdown inside the prompt cannot terminate
+the fence early:
+
+````text
+codex "You are executing a Sovereign Directive: ..."
+````
+
 The prompt MUST:
 1. Begin with `codex "You are executing a Sovereign Directive:` and end with a
    closing `"`.
@@ -213,6 +221,19 @@ Candidate Ledger AND (2) a corresponding P-tier architectural proposal in
 the candidate ledger without a corresponding innovation log entry is a governance
 violation. The bounty ledger records the failure; the innovation log records the
 cure. Both entries are mandatory and must be authored in the same session.
+
+Any new architectural feature added to `.INNOVATION_LOG.md` MUST be assigned a
+strict, sequential P-tier ID (for example `P1-15` or `P3-9`). Non-sequential,
+alphabetic, or section-only identifiers are governance-invalid.
+
+### Ledger Hydration Law (Sprint Batch 119)
+
+When performing an Omni-Audit or Max Compute Sprint, you MUST read the
+`R&D Follow-Up` columns in `tools/campaign/CANDIDATE_LEDGER.md` and
+`tools/campaign/LOW_YIELD_LEDGER.md`. Any R&D task that implies a missing
+architectural capability MUST be elevated into a formal strict P-tier item in
+`.INNOVATION_LOG.md`, and that item MUST append explicit instructions to
+re-hunt the affected targets once the feature is built.
 
 ### Threat Model Awareness (mandatory threat model pre-filter)
 

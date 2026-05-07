@@ -60,7 +60,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 36
+      "priority_score": 36,
+      "hunted": true,
+      "hunt_result": "smartchain_low_yield_ssrf_logged"
     },
     {
       "engagement": "aiven_targets",
@@ -236,7 +238,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 35
+      "priority_score": 35,
+      "hunted": true,
+      "hunt_result": "low_yield_protobuf_any_logged"
     },
     {
       "engagement": "immutable_targets",
@@ -316,7 +320,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 34
+      "priority_score": 34,
+      "hunted": true,
+      "hunt_result": "smartchain_low_yield_ssrf_logged"
     },
     {
       "engagement": "electroneum_targets",
@@ -345,7 +351,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "legacy_low_yield_ssrf_logged"
     },
     {
       "engagement": "aiven_targets",
@@ -704,7 +712,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "smartchain_low_yield_ssrf_logged"
     },
     {
       "engagement": "fireblocks_mpc_targets",
