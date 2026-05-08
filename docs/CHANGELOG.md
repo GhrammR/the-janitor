@@ -3,6 +3,38 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-07 — Sprint Batch 125: Pages Eradication & P2-11 CI Sink Demotion Lattice
+
+**Directive:** Delete the dual-workflow Pages tangle, create a pristine `pages.yml`, implement P2-11 CI/local script demotion lattice, hunt 3 targets, and eradicate P2-11 from the Innovation Log.
+
+### GitHub Pages Eradication
+
+* `.github/workflows/deploy_docs.yml` *(deleted)* — removed the `_site/` staging workflow with implicit Jekyll activation.
+* `.github/workflows/static.yml` *(deleted)* — removed duplicate static-deploy workflow.
+* `.github/workflows/pages.yml` *(created)* — pristine artifact-upload pipeline: `checkout@v4` → `configure-pages@v5` → `upload-pages-artifact@v3` → `deploy-pages@v4`. No Jekyll, no intermediate staging directory, no SHA-pinned action hashes that drift against the environment.
+
+### P2-11: CI/Local Script Sink Demotion Lattice
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `is_ci_or_local_script_path(path)` pub function: returns `true` when any path segment is `ci`, `scripts`, `devops`, `build`, or `tests`. Two deterministic tests: `ci_path_segments_are_detected`, `production_paths_are_not_ci`.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_p2_11_ci_sink_demotion(label, findings)`: post-processing pass applied in `scan_buffer` after all findings are collected. Demotes any finding in a CI/script path to `Informational` when `exploit_witness.route_path` is `None` (no proven remote ingress node). Two deterministic tests: `p2_11_ci_path_command_injection_demoted_to_informational`, `p2_11_production_path_command_injection_stays_critical`.
+
+### Target Hydration — Sprint Batch 125
+
+Three distinct-org GitHub targets hunted; all returned `no_findings` and marked hunted in `target_ledger.json`:
+* `cashapp/cash-app-pay-android-sdk` (Block, Android SDK — Kotlin/Gradle surface, no injectable JS/TS/Py sinks)
+* `square/wire` (Square, protobuf wire library — `dynamic_class_loading` guards covered by existing FP suppression)
+* `Uniswap/universal-router` (Immunefi, Solidity router — no JS/TS surface emitting findings)
+
+### Innovation Log Hygiene
+
+* `.INNOVATION_LOG.md` *(modified)* — P2-11 block physically deleted (Absolute Eradication Law). Re-hunt directive for `freedomofpress/securedrop` and `ClickHouse/ClickHouse` preserved in session ledger for next P2-11-aware sprint.
+
+### Verification
+
+* `just audit` exits 0 — fmt + clippy + check + test (4 new passing tests).
+
+---
+
 ## 2026-05-07 — Sprint Batch 123: Code Red (CI/CD Restoration & Ledger Sync)
 
 **Directive:** Restore the pipeline by removing the `aws-lc-sys` OOM path from Rustls, force GitHub Pages to deploy only the static facade without Jekyll interference, tighten Ledger Hydration governance to run every sprint, retroactively hydrate any missing R&D tasks, verify with `--test-threads=4`, and commit locally without release.

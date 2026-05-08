@@ -3444,7 +3444,32 @@ fn scan_buffer(
         findings.extend(forge::swarm_exfil::detect_context_exfil(source, label));
     }
 
+    apply_p2_11_ci_sink_demotion(label, &mut findings);
+
     findings
+}
+
+/// P2-11 demotion lattice: any finding whose file path identifies a CI
+/// pipeline, build helper, devops automation, or test runner is demoted to
+/// `Informational` unless a remote ingress node (HTTP route or public API
+/// endpoint) has been resolved and recorded in `exploit_witness.route_path`.
+///
+/// Local shell access is required to trigger these sinks; they cannot be
+/// exercised by an unauthenticated remote attacker.
+fn apply_p2_11_ci_sink_demotion(label: &str, findings: &mut [StructuredFinding]) {
+    if !forge::slop_hunter::is_ci_or_local_script_path(label) {
+        return;
+    }
+    for finding in findings.iter_mut() {
+        let has_remote_ingress = finding
+            .exploit_witness
+            .as_ref()
+            .and_then(|w| w.route_path.as_ref())
+            .is_some();
+        if !has_remote_ingress {
+            finding.severity = Some("Informational".to_string());
+        }
+    }
 }
 
 fn ingress_surface_for_finding(
@@ -5708,6 +5733,51 @@ class Handler {
         assert!(
             report.contains("Custom audit detail from IFDS trace."),
             "explicit sanitizer_audit must take priority over the IFDS proof statement"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-11: apply_p2_11_ci_sink_demotion
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn p2_11_ci_path_command_injection_demoted_to_informational() {
+        // subprocess.run with shell=True triggers security:subprocess_shell_injection
+        let source = b"import subprocess\nsubprocess.run(cmd, shell=True)\n";
+        let findings = scan_buffer("py", source, "ci/build.py", &[], &[], false);
+        let shell_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.id.contains("shell_injection") || f.id.contains("command_injection"))
+            .collect();
+        assert!(
+            !shell_findings.is_empty(),
+            "subprocess shell=True must still produce a finding in ci/ path"
+        );
+        assert!(
+            shell_findings
+                .iter()
+                .all(|f| f.severity.as_deref() == Some("Informational")),
+            "command injection in ci/ path without ingress must be demoted to Informational"
+        );
+    }
+
+    #[test]
+    fn p2_11_production_path_command_injection_stays_critical() {
+        let source = b"import subprocess\nsubprocess.run(cmd, shell=True)\n";
+        let findings = scan_buffer("py", source, "src/server.py", &[], &[], false);
+        let shell_findings: Vec<_> = findings
+            .iter()
+            .filter(|f| f.id.contains("shell_injection") || f.id.contains("command_injection"))
+            .collect();
+        assert!(
+            !shell_findings.is_empty(),
+            "subprocess shell=True must be detected in src/ path"
+        );
+        assert!(
+            shell_findings
+                .iter()
+                .all(|f| f.severity.as_deref() != Some("Informational")),
+            "command injection in src/server.py must not be demoted — production surface"
         );
     }
 }

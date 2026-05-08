@@ -277,6 +277,18 @@ fn is_deploy_shell_script(path: &str) -> bool {
     file_name.starts_with("deploy_") && file_name.ends_with(".sh")
 }
 
+/// Returns `true` when `path` identifies a CI pipeline, build helper, devops
+/// automation, or local test runner rather than a production server surface.
+///
+/// A finding in one of these paths with no proven remote ingress node dominating
+/// its source MUST be demoted to `Informational` by the P2-11 demotion lattice
+/// in `crates/cli/src/hunt.rs::apply_p2_11_ci_sink_demotion`.
+pub fn is_ci_or_local_script_path(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_ascii_lowercase();
+    p.split('/')
+        .any(|seg| matches!(seg, "ci" | "scripts" | "devops" | "build" | "tests"))
+}
+
 /// Parse `source` with a hard timeout of [`PARSER_TIMEOUT_MICROS`] (500 ms).
 ///
 /// Uses `tree_sitter::ParseOptions::progress_callback` to abort the parse when
@@ -13529,5 +13541,30 @@ mod llm_prompt_injection_tests {
             !findings.is_empty(),
             "messages.create( must trigger llm_prompt_injection"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-11: is_ci_or_local_script_path
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ci_path_segments_are_detected() {
+        assert!(is_ci_or_local_script_path("ci/build.sh"));
+        assert!(is_ci_or_local_script_path("scripts/release.sh"));
+        assert!(is_ci_or_local_script_path("devops/deploy.yml"));
+        assert!(is_ci_or_local_script_path("build/run_tests.sh"));
+        assert!(is_ci_or_local_script_path("tests/integration/setup.py"));
+        assert!(is_ci_or_local_script_path("repo/ci/pipeline.sh"));
+        assert!(is_ci_or_local_script_path("repo/scripts/helpers.js"));
+    }
+
+    #[test]
+    fn production_paths_are_not_ci() {
+        assert!(!is_ci_or_local_script_path("src/server.rs"));
+        assert!(!is_ci_or_local_script_path("src/api/handler.py"));
+        assert!(!is_ci_or_local_script_path("lib/utils.js"));
+        assert!(!is_ci_or_local_script_path(
+            "crates/forge/src/slop_hunter.rs"
+        ));
     }
 }
