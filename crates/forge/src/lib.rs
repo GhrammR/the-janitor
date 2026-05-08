@@ -106,6 +106,7 @@ pub mod symbex;
 pub mod taint_catalog;
 pub mod taint_propagate;
 pub mod toctou;
+pub mod toolchain_degradation;
 pub mod vector_topology;
 pub mod wasm_host;
 
