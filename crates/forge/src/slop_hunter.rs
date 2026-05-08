@@ -762,20 +762,6 @@ fn source_contains_proc_macro_entrypoint(source: &[u8]) -> bool {
 // Query constants (documentary — direct AST walking used instead)
 // ---------------------------------------------------------------------------
 
-// Equivalent to queries/kubernetes.scm — documents the targeted structure.
-// Direct AST walking is used instead of this query because tree-sitter
-// predicates cannot correlate sibling pairs (kind: X AND hosts: ["*"]) in a
-// single match expression.
-#[allow(dead_code)]
-const YAML_K8S_WILDCARD_HOSTS_QUERY: &str = r#"
-; Matches a block-sequence item whose scalar value is the bare wildcard "*".
-; Used to locate wildcard host entries inside Kubernetes VirtualService/Ingress specs.
-(block_sequence_item
-  (flow_node
-    (plain_scalar
-      (string_scalar) @wildcard_host)))
-"#;
-
 // ---------------------------------------------------------------------------
 // Singleton query engine
 // ---------------------------------------------------------------------------
