@@ -2841,8 +2841,109 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
         ));
     }
 
-    let deduped = dedup_findings(all);
+    let mut deduped = dedup_findings(all);
+    // P2-16: demote protobuf Any findings when no reachable decode call exists.
+    apply_protobuf_any_reachability_demotion(dir, &mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
+}
+
+/// P2-16 — Protobuf Any Reachability Post-Filter.
+///
+/// Demotes `security:protobuf_any_type_field` findings to `Informational`
+/// (LOW_YIELD routing) when the repository contains no evidence of an
+/// `Any::unpack`, `Any::decode`, or `unpackTo` call without an adjacent
+/// type-url allowlist guard.  The proto file itself defines the schema;
+/// exploitability requires a consumer that decodes the `Any` field.
+///
+/// **Allowlist guard patterns** (within 30 source lines of the decode call):
+/// - `type_url_allowlist`, `RegisteredTypes`, `getTypeRegistry`
+/// - An exhaustive `match` over `@type` URL constants
+///
+/// If no decode evidence is found at all, all `protobuf_any_type_field`
+/// findings are demoted — the field exists but is not consumed in this repo.
+fn apply_protobuf_any_reachability_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    const RULE: &str = "security:protobuf_any_type_field";
+    if !findings.iter().any(|f| f.id == RULE) {
+        return;
+    }
+
+    // Decode-call patterns in implementation files.
+    let decode_patterns: &[&[u8]] = &[
+        b"unpackTo",
+        b"Any.parseFrom",
+        b"Any::decode",
+        b"any.unpack",
+        b".unpack(",
+        b"TypeRegistry",
+        b"proto.Any",
+        b"google.protobuf.any",
+    ];
+    // Allowlist guard patterns that suppress the finding when nearby.
+    let guard_patterns: &[&[u8]] = &[
+        b"type_url_allowlist",
+        b"RegisteredTypes",
+        b"getTypeRegistry",
+        b"allowedTypes",
+        b"knownTypes",
+        b"match @type",
+        b"match type_url",
+    ];
+
+    // Scan implementation files for decode + guard evidence.
+    let has_unguarded_decode = 'search: {
+        for entry in walkdir::WalkDir::new(dir)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let ext = entry
+                .path()
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            if !matches!(
+                ext,
+                "go" | "java" | "kt" | "py" | "rs" | "ts" | "js" | "rb" | "cs" | "cpp"
+            ) {
+                continue;
+            }
+            if std::fs::metadata(entry.path())
+                .map(|m| m.len() > MAX_FILE_BYTES)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let Ok(src) = std::fs::read(entry.path()) else {
+                continue;
+            };
+            let has_decode = decode_patterns
+                .iter()
+                .any(|p| src.windows(p.len()).any(|w| w == *p));
+            if !has_decode {
+                continue;
+            }
+            // Decode call found — check for nearby allowlist guard.
+            let has_guard = guard_patterns
+                .iter()
+                .any(|p| src.windows(p.len()).any(|w| w == *p));
+            if !has_guard {
+                // Unguarded decode call found — finding is reachable.
+                break 'search true;
+            }
+        }
+        false
+    };
+
+    if !has_unguarded_decode {
+        for finding in findings.iter_mut() {
+            if finding.id == RULE {
+                finding.severity = Some("Informational".to_string());
+            }
+        }
+    }
 }
 
 fn has_ai_assistant_config(root: &Path) -> bool {

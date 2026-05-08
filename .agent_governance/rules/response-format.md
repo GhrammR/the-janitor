@@ -71,7 +71,7 @@ outer fence form below so nested markdown inside the prompt cannot terminate
 the fence early:
 
 ````text
-codex "You are executing a Sovereign Directive: ..."
+agent "You are executing a Sovereign Directive: ..."
 ````
 
 The generated `[NEXT RECOMMENDED ACTION]` prompt MUST strictly use
@@ -79,7 +79,7 @@ The generated `[NEXT RECOMMENDED ACTION]` prompt MUST strictly use
 directly trackable for the operator.
 
 The prompt MUST:
-1. Begin with `codex "You are executing a Sovereign Directive:` and end with a
+1. Begin with `agent "You are executing a Sovereign Directive:` and end with a
    closing `"`.
 2. Name the next two highest-TAM items from `.INNOVATION_LOG.md`, with Item 1
    as the absolute highest commercial-priority frontier (highest
@@ -100,6 +100,13 @@ The prompt MUST:
    specific drift pocket, bloat seam, or forgotten feature and provide one
    token-efficient command that modernizes or prunes it in the next sprint
    without bloating the ledgers.
+
+**Architectural Oracle Execution Law**: If the Architectural Oracle Tip
+identifies a legacy drift or optimization that requires fewer than 50 lines of
+code to fix, the agent receiving that tip MUST implement the fix in the CURRENT
+sprint. Trivial optimizations (e.g., eliminating a `String::clone()`, pinning a
+deprecated action version, collapsing a redundant loop) MUST NOT be deferred to
+a future sprint.
 
 The section must be operator-ready text, not analysis about the text. Do not
 emit vague "consider" language. Do not suggest manual git commands, staging,

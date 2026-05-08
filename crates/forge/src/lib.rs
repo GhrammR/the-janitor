@@ -93,6 +93,7 @@ pub mod rust_build_worm;
 pub mod sanitizer;
 pub mod sanitizer_sym;
 pub mod schema_graph;
+pub mod service_mesh_deputy;
 pub mod shadow_git;
 pub mod sidechannel;
 pub mod slop_filter;

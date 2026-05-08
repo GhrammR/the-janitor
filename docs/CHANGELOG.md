@@ -5964,6 +5964,23 @@ OkHttp and Okio returned no findings.
 * `tools/campaign/target_ledger.json` *(modified)* — marked `cashapp/cash-app-pay-ios-sdk` as hunted clean, `cashapp/hermit` as hunted with a placeholder-grade unpinned-asset candidate not logged, and `cashapp/misk` as hunted with a `protobuf_any` candidate not promoted to the bounty ledger.
 * `.janitor/hunt_reports/` *(runtime artifacts)* — stale `SUBMISSION_security_unpinned_asset.md` was deleted after the tighter placeholder gate invalidated it; the `protobuf_any` submission artifact remained as a non-ledger candidate.
 
+## 2026-05-08 — Sprint Batch 129: Service Mesh Confused Deputy, Protobuf Reachability & Pipeline Repair
+
+* `.agent_governance/rules/response-format.md` *(modified)* — UAP Governance Upgrade: NRA prompt invocation changed from `codex` to `agent`; Architectural Oracle Execution Law added (fixes < 50 lines MUST be implemented in current sprint, not deferred).
+* `.github/workflows/pages.yml` *(modified)* — Pipeline stabilization: `actions/upload-pages-artifact@v3` pinned to `@v3.0.1`; `aws-lc-rs` audited and confirmed absent (workspace already uses `ring` feature via `rustls = { default-features = false, features = ["ring",...] }`).
+* `crates/forge/src/service_mesh_deputy.rs` *(created)* — P1-17 Service Mesh Confused Deputy: `detect_service_mesh_deputy(patch)` with 4 AhoCorasick passes (external-facing indicators, authz bindings, privileged paths, re-stamp guards); emits `security:service_mesh_confused_deputy` at KevCritical with curl AEG template; 7 deterministic tests (2 TP, 4 TN, 1 smuggling combo).
+* `crates/forge/src/lib.rs` *(modified)* — Export `pub mod service_mesh_deputy` (alphabetical: after `schema_graph`, before `shadow_git`).
+* `crates/cli/src/hunt.rs` *(modified)* — P2-16 Protobuf Any Reachability: `apply_protobuf_any_reachability_demotion(dir, findings)` post-filter demotes `security:protobuf_any_type_field` to `Informational` (LOW_YIELD routing) when the repository contains no unguarded `Any::unpack`/`Any::decode`/`unpackTo` call; scans implementation files (Go/Java/Kotlin/Python/Rust/TS/JS) for decode calls and adjacent allowlist guards.
+* `.INNOVATION_LOG.md` *(modified)* — Hard-deleted P1-17 and P2-16 blocks per Absolute Eradication Law.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — Added 4 new candidate rows: immutable/ts-immutable-sdk auth-next-server SSRF (40%), mattermost SSRF admin.go (35%), mattermost SSR template unpinned asset (35%), plus misk protobuf-any from Sprint 128.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — Added 6 new low-yield rows: aave/aave-address-book no-findings, immutable client-side SSRF (5×), immutable DOM XSS overlay, mattermost prototype pollution, mattermost operator-scope SSRF (8×).
+
+**Live-fire hunt**: Cloned and scanned `aave/aave-address-book` (no_findings → LOW_YIELD), `immutable/ts-immutable-sdk` (SSRF server-side → CANDIDATE 40%; client-side × 5 + DOM XSS → LOW_YIELD), `mattermost/mattermost` (server SSRF admin.go + SSR unpinned → CANDIDATE; operator-scope + prototype_pollution → LOW_YIELD).
+
+**Oracle Execution (Sprint 128 tip)**: Audited `crates/cli/src/daemon.rs` lines 263–278; confirmed `send(line.as_str())` already passes `&str` without `String::clone()` — no code change required (tip was already implemented).
+
+**Verification**: `cargo test -p forge service_mesh_deputy -- --test-threads=4` ✓ (7/7) | `cargo check -p cli` ✓ | `just audit` ✓
+
 ## 2026-05-08 — Sprint Batch 128: Toolchain Degradation Shield & Daemon Oracle
 
 * `crates/forge/src/toolchain_degradation.rs` *(created)* — P1-16 Toolchain Degradation Shield: `detect_toolchain_degradation(patch)` scans unified-diff patches for toolchain-config degradation knobs (`.cargo/config.toml` `jobs = 1` / `codegen-units = 1` / `incremental = false`, `.vscode/settings.json` LSP timeouts, `mcp.json` server timeouts, `.github/workflows/*.yml` step timeouts) and emits `security:toolchain_degradation_attack` at KevCritical; when a secondary code-execution payload (`unsafe {`, `eval(`, `os.system(`, etc.) appears in the same diff, upgrades to `security:toolchain_degradation_smuggling` with `proof_class = ToolchainDegradationSmuggling`; 9 deterministic tests (7 true-positive, 2 true-negative).
