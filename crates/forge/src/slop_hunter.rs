@@ -289,6 +289,72 @@ pub fn is_ci_or_local_script_path(path: &str) -> bool {
         .any(|seg| matches!(seg, "ci" | "scripts" | "devops" | "build" | "tests"))
 }
 
+/// Returns `true` when `path` identifies a production server surface.
+///
+/// Findings in production server paths (`server/`, `api/`, `service/`,
+/// `backend/`, `routes/`, `controllers/`, `handlers/`) are prioritized because
+/// they are directly reachable from the public network.  Callers MUST NOT demote
+/// findings in these paths via the P2-11 or P2-13 demotion lattices without a
+/// proven negative-reachability witness.
+pub fn is_production_server_path(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_ascii_lowercase();
+    p.split('/').any(|seg| {
+        matches!(
+            seg,
+            "server"
+                | "servers"
+                | "api"
+                | "apis"
+                | "service"
+                | "services"
+                | "backend"
+                | "handler"
+                | "handlers"
+                | "routes"
+                | "route"
+                | "controllers"
+                | "controller"
+                | "middleware"
+                | "endpoints"
+        )
+    })
+}
+
+/// Returns `true` when `path` identifies a deployment, setup, or operator
+/// bootstrap surface that is not directly reachable from the public network.
+///
+/// Findings in these paths MUST be demoted to `Informational` by the P2-13
+/// demotion lattice unless a production invocation path is proven.
+pub fn is_deployment_or_scripts_path(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_ascii_lowercase();
+    p.split('/').any(|seg| {
+        matches!(
+            seg,
+            "scripts"
+                | "script"
+                | "deployment"
+                | "deploy"
+                | "deployments"
+                | "installer"
+                | "bootstrap"
+                | "setup"
+                | "infra"
+                | "infrastructure"
+                | "provision"
+                | "provisioning"
+                | "ansible"
+                | "terraform"
+                | "helm"
+                | "chart"
+                | "charts"
+                | "k8s"
+                | "kubernetes"
+                | "ops"
+                | "tooling"
+        )
+    })
+}
+
 /// Parse `source` with a hard timeout of [`PARSER_TIMEOUT_MICROS`] (500 ms).
 ///
 /// Uses `tree_sitter::ParseOptions::progress_callback` to abort the parse when
@@ -13566,5 +13632,46 @@ mod llm_prompt_injection_tests {
         assert!(!is_ci_or_local_script_path(
             "crates/forge/src/slop_hunter.rs"
         ));
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-13: is_production_server_path / is_deployment_or_scripts_path
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn production_server_paths_are_detected() {
+        assert!(is_production_server_path("src/server/main.rs"));
+        assert!(is_production_server_path("api/routes.py"));
+        assert!(is_production_server_path("backend/handlers/user.ts"));
+        assert!(is_production_server_path("service/auth.go"));
+        assert!(is_production_server_path("routes/v1/health.js"));
+        assert!(is_production_server_path("controllers/login.rb"));
+        assert!(is_production_server_path("middleware/auth.ts"));
+    }
+
+    #[test]
+    fn non_server_paths_are_not_production() {
+        assert!(!is_production_server_path("tests/integration/setup.py"));
+        assert!(!is_production_server_path("scripts/release.sh"));
+        assert!(!is_production_server_path("deployment/helm/chart.yaml"));
+        assert!(!is_production_server_path("lib/utils.rs"));
+    }
+
+    #[test]
+    fn deployment_and_scripts_paths_are_detected() {
+        assert!(is_deployment_or_scripts_path("scripts/migrate.sh"));
+        assert!(is_deployment_or_scripts_path("deployment/k8s/app.yaml"));
+        assert!(is_deployment_or_scripts_path("deploy/ansible/site.yml"));
+        assert!(is_deployment_or_scripts_path("helm/charts/values.yaml"));
+        assert!(is_deployment_or_scripts_path("infra/terraform/main.tf"));
+        assert!(is_deployment_or_scripts_path("bootstrap/setup.sh"));
+        assert!(is_deployment_or_scripts_path("provision/cloud-init.yml"));
+    }
+
+    #[test]
+    fn production_server_paths_are_not_deployment() {
+        assert!(!is_deployment_or_scripts_path("src/server/main.rs"));
+        assert!(!is_deployment_or_scripts_path("api/routes.py"));
+        assert!(!is_deployment_or_scripts_path("backend/handlers/user.ts"));
     }
 }

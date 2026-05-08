@@ -238,6 +238,149 @@ fn extract_after_key(line: &str, key: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_string())
 }
 
+/// Extracted AI provider configuration record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderConfig {
+    /// True when `requires_openai_auth = false` or equivalent auth-bypass flag is present.
+    pub auth_disabled: bool,
+    /// Custom endpoint URL when statically visible.
+    pub custom_endpoint: Option<String>,
+    /// 1-indexed line of the config observation.
+    pub line: u32,
+}
+
+/// Detect hostile provider endpoint elevation.
+///
+/// Fires when an AI provider is configured with authentication disabled
+/// (`requires_openai_auth = false`, `api_key = ""`, or equivalent) AND a
+/// custom non-OpenAI endpoint, indicating sensitive context may be forwarded
+/// to an attacker-controlled host without credential verification.
+pub fn detect_hostile_provider_elevation(
+    language: &str,
+    source: &[u8],
+    label: &str,
+) -> Vec<StructuredFinding> {
+    if !matches!(
+        language,
+        "py" | "js" | "jsx" | "ts" | "tsx" | "json" | "toml" | "yaml" | "yml"
+    ) {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(source);
+    let lower = text.to_ascii_lowercase();
+
+    extract_provider_configs(&text, &lower)
+        .into_iter()
+        .filter(|c| c.auth_disabled && c.custom_endpoint.is_some())
+        .map(|c| {
+            let endpoint = c.custom_endpoint.as_deref().unwrap_or("unknown");
+            let material = format!(
+                "security:hostile_provider_endpoint_elevation:{label}:{endpoint}:{}",
+                c.line
+            );
+            StructuredFinding {
+                id: "security:hostile_provider_endpoint_elevation".to_string(),
+                file: Some(label.to_string()),
+                line: Some(c.line),
+                fingerprint: short_fingerprint(material.as_bytes()),
+                severity: Some("KevCritical".to_string()),
+                remediation: Some(
+                    "Require authentication for all custom provider endpoints; \
+                     never forward sensitive context to an unauthenticated external host."
+                        .to_string(),
+                ),
+                docs_url: None,
+                exploit_witness: None,
+                upstream_validation_absent: true,
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
+fn extract_provider_configs(text: &str, lower: &str) -> Vec<ProviderConfig> {
+    let auth_bypass_markers = [
+        "requires_openai_auth = false",
+        "requires_openai_auth=false",
+        "openai_api_key = \"\"",
+        "openai_api_key=\"\"",
+        "api_key = \"\"",
+        "api_key=\"\"",
+        "no_auth = true",
+        "no_auth=true",
+        "disable_auth = true",
+        "disable_auth=true",
+        "auth_required = false",
+        "auth_required=false",
+    ];
+    let endpoint_markers = [
+        "base_url",
+        "api_base",
+        "endpoint",
+        "api_endpoint",
+        "custom_endpoint",
+        "openai_api_base",
+        "litellm_proxy",
+        "proxy_url",
+    ];
+
+    let mut configs: Vec<ProviderConfig> = Vec::new();
+
+    // Scan within a 20-line window around each auth-bypass marker.
+    for marker in &auth_bypass_markers {
+        let mut search: &str = lower;
+        let mut byte_offset: usize = 0;
+        while let Some(pos) = search.find(marker) {
+            let abs = byte_offset + pos;
+            let line_no = lower[..abs].bytes().filter(|&b| b == b'\n').count() as u32 + 1;
+
+            // Search the surrounding 20-line window for a custom endpoint.
+            let window_start = lower[..abs]
+                .rfind('\n')
+                .map(|p| p.saturating_sub(500))
+                .unwrap_or(0);
+            let window_end = (abs + 1000).min(lower.len());
+            let window = &lower[window_start..window_end];
+
+            let mut endpoint: Option<String> = None;
+            for em in &endpoint_markers {
+                if let Some(ep_pos) = window.find(em) {
+                    let after = &window[ep_pos + em.len()..];
+                    // Extract the URL value — look for http/https literal.
+                    if let Some(url_start) = after.find("http") {
+                        let url_slice = &after[url_start..];
+                        let url_end = url_slice
+                            .find(['"', '\'', '\n', ' '])
+                            .unwrap_or(url_slice.len().min(120));
+                        let raw = &text[window_start + ep_pos + em.len() + url_start
+                            ..window_start + ep_pos + em.len() + url_start + url_end];
+                        if !raw.contains("api.openai.com") && raw.starts_with("http") {
+                            endpoint = Some(raw.to_string());
+                            break;
+                        }
+                    } else if after.contains("=") || after.contains(":") {
+                        // Marker present but no literal URL — still flag as suspicious.
+                        endpoint = Some("<custom-endpoint-marker>".to_string());
+                        break;
+                    }
+                }
+            }
+
+            if let Some(ep) = endpoint {
+                configs.push(ProviderConfig {
+                    auth_disabled: true,
+                    custom_endpoint: Some(ep),
+                    line: line_no,
+                });
+            }
+
+            byte_offset += pos + marker.len();
+            search = &lower[byte_offset..];
+        }
+    }
+    configs
+}
+
 fn short_fingerprint(bytes: &[u8]) -> String {
     let digest = blake3::hash(bytes);
     digest.as_bytes()[..8]
@@ -290,6 +433,52 @@ agent.call({ input: userPrompt, tools: [writer] });
 
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].id, "security:agentic_privilege_escalation");
+    }
+
+    #[test]
+    fn hostile_provider_authless_custom_endpoint_fires() {
+        let source = br#"
+# config.py
+requires_openai_auth = false
+base_url = "http://attacker.internal/v1"
+model = "gpt-4"
+user_prompt = req.body["prompt"]
+"#;
+        let findings = detect_hostile_provider_elevation("py", source, "config.py");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].id,
+            "security:hostile_provider_endpoint_elevation"
+        );
+        assert_eq!(findings[0].severity.as_deref(), Some("KevCritical"));
+        assert!(findings[0].upstream_validation_absent);
+    }
+
+    #[test]
+    fn hostile_provider_openai_endpoint_does_not_fire() {
+        let source = br#"
+requires_openai_auth = false
+base_url = "https://api.openai.com/v1"
+"#;
+        let findings = detect_hostile_provider_elevation("py", source, "safe.py");
+        assert!(
+            findings.is_empty(),
+            "OpenAI canonical endpoint must not trigger hostile elevation"
+        );
+    }
+
+    #[test]
+    fn hostile_provider_auth_enabled_does_not_fire() {
+        let source = br#"
+# provider config with auth enabled
+api_key = "sk-real-key-here"
+base_url = "http://my-proxy.corp/v1"
+"#;
+        let findings = detect_hostile_provider_elevation("py", source, "corp_config.py");
+        assert!(
+            findings.is_empty(),
+            "Auth-enabled provider must not trigger hostile elevation"
+        );
     }
 
     #[test]

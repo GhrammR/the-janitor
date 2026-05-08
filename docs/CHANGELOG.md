@@ -3,6 +3,38 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-08 — Sprint Batch 131: Witness Finality Strike & Target Ledger Refresh
+
+**Directive:** (1) P2-8 Hostile Provider Endpoint Elevation — `detect_hostile_provider_elevation` in `agentic_graph.rs`; (2) P2-13 Deployment-Surface Guardrails — `is_production_server_path` + `is_deployment_or_scripts_path` in `slop_hunter.rs`; (3) Final Mattermost Stored XSS submission package — `SUBMISSION_security_react_xss_dangerous_html.md` (dual-frame witness); (4) Hunt 3 new distinct-org targets (Uniswap/docs, aave/aave-address-book, smartcontractkit/chainlink); (5) P2-8 + P2-13 eradication from INNOVATION_LOG; (6) just audit exit 0.
+
+### Phase 1 — P2-8: Hostile Provider Endpoint Elevation (`crates/forge/src/agentic_graph.rs`)
+
+- Added `ProviderConfig` struct (`auth_disabled`, `custom_endpoint`, `line`).
+- Added `detect_hostile_provider_elevation(language, source, label) -> Vec<StructuredFinding>` — fires `security:hostile_provider_endpoint_elevation` at `KevCritical` when auth-disabled flag AND non-OpenAI custom endpoint co-occur within a 20-line window.
+- Added `extract_provider_configs` scanner with 12 auth-bypass patterns and 8 endpoint-marker patterns.
+- 3 deterministic tests: hostile fires, OpenAI canonical suppressed, auth-enabled suppressed.
+
+### Phase 2 — P2-13: Deployment-Surface Guardrails (`crates/forge/src/slop_hunter.rs`)
+
+- Added `is_production_server_path` — prioritizes `server/`, `api/`, `service/`, `backend/`, `handler/`, `routes/`, `controllers/`, `middleware/`, `endpoints/`.
+- Added `is_deployment_or_scripts_path` — demotes `scripts/`, `deployment/`, `deploy/`, `helm/`, `terraform/`, `infra/`, `ansible/`, `provision/`, `bootstrap/`, `k8s/`, `kubernetes/`, `ops/`, `tooling/`.
+- 4 deterministic tests.
+
+### Phase 3 — Final Mattermost Submission
+
+- `SUBMISSION_security_react_xss_dangerous_html.md` authored in Ghost Mode format with dual-frame witness (attacker stores via Boards REST API; victim triggers via `dangerouslySetInnerHTML` in blocksEditor).
+- 9 React sinks + 1 innerHTML sink documented with exact file:line references.
+
+### Phase 4 — Target Hydration (3 distinct orgs, all no_findings)
+
+- Uniswap/docs, aave/aave-address-book, smartcontractkit/chainlink — hunted, no billable findings. Chainlink re-hunt deferred pending P2-12/P2-14.
+
+### Phase 5 — Innovation Log Eradication
+
+- P2-8 and P2-13 blocks physically deleted from `.INNOVATION_LOG.md`.
+
+---
+
 ## 2026-05-08 — Sprint Batch 130: Autonomous Web Witness Finality, SSRF Demotion, & UAP Meta-Governance
 
 **Directive:** (1) UAP meta-governance — expand Oracle Tip mandate to Governance Bloat/dead code/stale workflows and Operator Intelligence to holistic systems health; (2) P2-5 Autonomous Web Witness Finality Pack — dual-frame stored XSS harness with JANITOR_CANARY + data-janitor-witness; (3) P2-17 Config-Backed SSRF Demotion; (4) Oracle fix — `rel_path.clone()` elimination via `extract_frontend_routes_from_source: &str` signature; (5) hunt 3 new targets + 2 re-hunts; (6) P2-5/P2-17 Eradication + Tri-Ledger routing.
