@@ -101,15 +101,15 @@ pub(crate) fn extract_controller_surface_with_file(
 pub fn extract_frontend_routes_from_source(
     lang: &str,
     source: &[u8],
-    file: String,
+    file: &str,
 ) -> Vec<FrontendRoute> {
     if !matches!(lang, "js" | "jsx" | "ts" | "tsx") {
         return Vec::new();
     }
     let text = std::str::from_utf8(source).unwrap_or("");
-    let imports = collect_js_imports(text, &file);
-    let mut routes = extract_react_router_routes(text, source, &file, &imports);
-    routes.extend(extract_vue_router_routes(text, source, &file, &imports));
+    let imports = collect_js_imports(text, file);
+    let mut routes = extract_react_router_routes(text, source, file, &imports);
+    routes.extend(extract_vue_router_routes(text, source, file, &imports));
 
     let mut deduped = Vec::with_capacity(routes.len());
     let mut seen = std::collections::BTreeSet::new();
@@ -1118,8 +1118,7 @@ export function Router() {
     return <Route path="/login" element={<Captcha />} />;
 }
 "#;
-        let routes =
-            extract_frontend_routes_from_source("tsx", source, "src/router.tsx".to_string());
+        let routes = extract_frontend_routes_from_source("tsx", source, "src/router.tsx");
         assert_eq!(routes.len(), 1);
         assert_eq!(routes[0].route_path, "/login");
         assert_eq!(routes[0].component.as_deref(), Some("Captcha"));
@@ -1135,7 +1134,7 @@ const routes = [
   { path: "/login", component: LoginView }
 ];
 "#;
-        let routes = extract_frontend_routes_from_source("ts", source, "src/router.ts".to_string());
+        let routes = extract_frontend_routes_from_source("ts", source, "src/router.ts");
         assert_eq!(routes.len(), 1);
         assert_eq!(routes[0].route_path, "/login");
         assert_eq!(routes[0].component.as_deref(), Some("LoginView"));

@@ -96,10 +96,21 @@ The prompt MUST:
 6. Include one strategic operator tip that maximizes revenue / impact.
 7. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
    legacy infrastructure such as `crates/cli/src/daemon.rs`,
-   `crates/common/src/physarum.rs`, and `action.yml`. The tip must name a
-   specific drift pocket, bloat seam, or forgotten feature and provide one
-   token-efficient command that modernizes or prunes it in the next sprint
-   without bloating the ledgers.
+   `crates/common/src/physarum.rs`, and `action.yml`. The tip must scan across
+   ALL of the following drift categories and report the highest-priority find:
+   - **Legacy code drift**: outdated API calls, deprecated trait bounds,
+     `String::clone()` hot-path clones, `#[allow(dead_code)]` suppressors,
+     unused `mod` declarations, unreachable arms.
+   - **Governance Bloat**: stale `.cargo/config.toml` sections, orphaned
+     justfile targets with no callers, outdated MSRV pins in `rust-toolchain.toml`.
+   - **Dead workflow files**: `.github/workflows/` actions pinned to EOL
+     versions (`@v1`, `@v2`) or workflows whose `on:` triggers reference
+     deleted branches.
+   - **Dead Rust modules**: `pub mod` declarations in `lib.rs` with no external
+     callers (verify with `rg 'use forge::<module>'`).
+   The tip must name the exact file and line of the drift pocket and provide the
+   precise `rm <file>`, `sed -i 's/old/new/' <file>`, or one-line code-deletion
+   command that eliminates it — not a vague "consider" suggestion.
 
 **Architectural Oracle Execution Law**: If the Architectural Oracle Tip
 identifies a legacy drift or optimization that requires fewer than 50 lines of
@@ -133,7 +144,8 @@ and explicitly answer:
 [OPERATOR INTELLIGENCE]
 A human-directed operator brief that is NOT fed back into the next agent.
 It must contain one **Entropy Modulator Tip** derived from the last 3 sprint
-entries in `docs/CHANGELOG.md`.
+entries in `docs/CHANGELOG.md`, AND one **Systems Health Signal** covering
+holistic operational awareness beyond pure revenue.
 
 Entropy Modulator protocol:
 1. Inspect the last 3 completed sprints in `docs/CHANGELOG.md`.
@@ -143,6 +155,20 @@ Entropy Modulator protocol:
 4. Name one specific refactor, token-optimization, or procedural bottleneck the
    human operator should address next.
 5. Keep it concise, direct, and addressed to the human, not the next agent.
+
+Systems Health Signal protocol:
+1. Report on one of the following if any signal is present; otherwise state "No
+   active health anomaly detected":
+   - **CI/CD anomaly**: persistent workflow failures, flaky test patterns, or
+     a workflow that has not run successfully in the last 5 commits.
+   - **Operational knowledge gap**: a critical crate with zero doc comments on
+     its public API, or a justfile target with no description comment.
+   - **Active Deception posture**: whether `.janitor/audit_reports/` or
+     `.janitor/hunt_reports/` contain adversarial decoy seeds that could be
+     used to fingerprint attacker reconnaissance tools.
+   - **Hardware constraint alert**: any new P-tier item in `.INNOVATION_LOG.md`
+     that violates the 8GB Law (JVM, Ghidra, fat LTO, local LLM inference)
+     and must be flagged before the operator queues it.
 ```
 
 ## Enforcement

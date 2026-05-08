@@ -2782,12 +2782,10 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
             .unwrap_or(file_path)
             .to_string_lossy()
             .to_string();
-        controller_surfaces.extend(forge::authz::extract_controller_surface_matches_for_file(
-            ext,
-            &source,
-            rel_path.clone(),
-        ));
         frontend_routes.extend(forge::authz::extract_frontend_routes_from_source(
+            ext, &source, &rel_path,
+        ));
+        controller_surfaces.extend(forge::authz::extract_controller_surface_matches_for_file(
             ext, &source, rel_path,
         ));
     }
@@ -2844,6 +2842,8 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     let mut deduped = dedup_findings(all);
     // P2-16: demote protobuf Any findings when no reachable decode call exists.
     apply_protobuf_any_reachability_demotion(dir, &mut deduped);
+    // P2-17: demote SSRF findings whose URL source is operator-config backed.
+    apply_config_backed_ssrf_demotion(&mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
 }
 
@@ -2944,6 +2944,60 @@ fn apply_protobuf_any_reachability_demotion(dir: &Path, findings: &mut [Structur
             }
         }
     }
+}
+
+/// P2-17 — Config-Backed SSRF Demotion Post-Filter.
+///
+/// Demotes `security:ssrf_dynamic_url` findings to `Informational` when the
+/// source file is a recognized operator-config module and no internal-metadata
+/// evidence marker is present.  Config modules set service hostnames from env
+/// vars or static structs; they are operator-controlled, not attacker-controlled.
+///
+/// Demoted when ALL of the following hold:
+/// - The file path indicates a config module (path segment or name contains
+///   `config`, `settings`, `env`, or `options`).
+/// - The finding has no `internal_metadata:` evidence marker (proven SSRF).
+/// - The finding `upstream_validation_absent` flag was not set by taint analysis.
+fn apply_config_backed_ssrf_demotion(findings: &mut [StructuredFinding]) {
+    const RULE: &str = "ssrf_dynamic_url";
+    for finding in findings.iter_mut() {
+        if !finding.id.contains(RULE) {
+            continue;
+        }
+        // Concrete SSRF (proven internal metadata target): never demote.
+        if finding
+            .web_proof_artifact
+            .as_ref()
+            .is_some_and(|a| a.has_marker("internal_metadata"))
+        {
+            continue;
+        }
+        let file = finding.file.as_deref().unwrap_or("");
+        if is_config_module_path(file) {
+            finding.severity = Some("Informational".to_string());
+            finding.upstream_validation_absent = false;
+        }
+    }
+}
+
+/// Returns `true` when `path` indicates an operator-configuration module
+/// (not a request-handler or business-logic file).
+fn is_config_module_path(path: &str) -> bool {
+    let p = path.to_ascii_lowercase();
+    // Segment-level config indicators (avoid over-matching "reconfiguration" etc.)
+    let segments: Vec<&str> = p.split(['/', '\\', '.']).collect();
+    segments.iter().any(|s| {
+        matches!(
+            *s,
+            "config" | "configuration" | "settings" | "options" | "conf"
+        )
+    }) || p.ends_with("config.go")
+        || p.ends_with("config.py")
+        || p.ends_with("config.ts")
+        || p.ends_with("config.js")
+        || p.ends_with("settings.py")
+        || p.ends_with("settings.go")
+        || p.ends_with(".env")
 }
 
 fn has_ai_assistant_config(root: &Path) -> bool {
@@ -3227,7 +3281,8 @@ fn scan_buffer(
                 || rule_id.contains("command_injection")
                 || rule_id.contains("path_traversal")
                 || rule_id.contains("oracle_price_manipulation")
-                || rule_id.contains("flash_loan_callback");
+                || rule_id.contains("flash_loan_callback")
+                || rule_id == "security:react_xss_dangerous_html";
             let mut structured = StructuredFinding {
                 id: rule_id.clone(),
                 file: Some(label.to_string()),
@@ -3256,6 +3311,18 @@ fn scan_buffer(
                     witness.route_path = Some(route.route_path.clone());
                 }
                 attach_web_proof_artifact(&mut structured, &witness, evidence_marker);
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:react_xss_dangerous_html" {
+                // P2-5: Dual-frame stored XSS witness — Frame 1 writes payload, Frame 2 renders.
+                let route = forge::authz::match_frontend_route_for_file(frontend_routes, label)
+                    .map(|r| r.route_path.clone());
+                let witness = forge::exploitability::stored_xss_dual_frame_witness(
+                    label, &rule_id, line, route,
+                );
+                let evidence_marker =
+                    Some("schema_taint:proven stored:cross_user_render".to_string());
+                attach_web_proof_artifact(&mut structured, &witness, evidence_marker);
+                structured.upstream_validation_absent = true;
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
             } else if rule_id == "security:jwt_validation_bypass" {
                 let mut witness =
@@ -5879,6 +5946,114 @@ class Handler {
                 .iter()
                 .all(|f| f.severity.as_deref() != Some("Informational")),
             "command injection in src/server.py must not be demoted — production surface"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-5: Stored XSS dual-frame witness
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn p2_5_react_xss_dangerous_html_gets_dual_frame_witness() {
+        let source = b"const el = <div dangerouslySetInnerHTML={{ __html: userContent }} />;\n";
+        let findings = scan_buffer("tsx", source, "src/components/Post.tsx", &[], &[], false);
+        let xss: Vec<_> = findings
+            .iter()
+            .filter(|f| f.id == "security:react_xss_dangerous_html")
+            .collect();
+        assert!(!xss.is_empty(), "dangerouslySetInnerHTML must fire");
+        let f = &xss[0];
+        assert!(
+            f.upstream_validation_absent,
+            "stored XSS must set upstream_validation_absent"
+        );
+        let artifact = f
+            .web_proof_artifact
+            .as_ref()
+            .expect("dual-frame witness must attach WebProofArtifact");
+        assert!(
+            artifact.has_marker("schema_taint:proven"),
+            "artifact must carry schema_taint:proven evidence marker"
+        );
+        let witness = f
+            .exploit_witness
+            .as_ref()
+            .expect("exploit witness must be present");
+        let repro = witness.repro_cmd.as_deref().unwrap_or("");
+        assert!(
+            repro.contains("JANITOR_XSS_CANARY"),
+            "repro_cmd must embed JANITOR_XSS_CANARY canary token"
+        );
+        assert!(
+            repro.contains("data-janitor-witness"),
+            "repro_cmd must embed data-janitor-witness attribute"
+        );
+        assert!(
+            repro.contains("Frame 1") && repro.contains("Frame 2"),
+            "repro_cmd must contain dual-frame structure"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-17: Config-Backed SSRF Demotion
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn p2_17_config_module_ssrf_demoted_to_informational() {
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:ssrf_dynamic_url".to_string(),
+            file: Some("src/config/api_config.go".to_string()),
+            severity: Some("KevCritical".to_string()),
+            upstream_validation_absent: false,
+            ..Default::default()
+        }];
+        apply_config_backed_ssrf_demotion(&mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("Informational"),
+            "SSRF in config module must be demoted to Informational"
+        );
+    }
+
+    #[test]
+    fn p2_17_production_handler_ssrf_stays_critical() {
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:ssrf_dynamic_url".to_string(),
+            file: Some("server/channels/app/admin.go".to_string()),
+            severity: Some("KevCritical".to_string()),
+            upstream_validation_absent: false,
+            ..Default::default()
+        }];
+        apply_config_backed_ssrf_demotion(&mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("KevCritical"),
+            "SSRF in production handler must not be demoted"
+        );
+    }
+
+    #[test]
+    fn p2_17_concrete_ssrf_with_internal_metadata_never_demoted() {
+        let artifact = common::slop::WebProofArtifact {
+            source_label: "url_param:url".to_string(),
+            sink_label: "sink:fetch".to_string(),
+            ifds_trace: vec![],
+            evidence_marker: Some("internal_metadata:169.254.169.254".to_string()),
+            proof_class: common::slop::ProofClass::ReachabilityProof,
+        };
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:ssrf_dynamic_url".to_string(),
+            file: Some("pkg/config/settings.go".to_string()),
+            severity: Some("KevCritical".to_string()),
+            web_proof_artifact: Some(artifact),
+            upstream_validation_absent: false,
+            ..Default::default()
+        }];
+        apply_config_backed_ssrf_demotion(&mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("KevCritical"),
+            "Concrete SSRF with internal_metadata marker must never be demoted even in config file"
         );
     }
 }

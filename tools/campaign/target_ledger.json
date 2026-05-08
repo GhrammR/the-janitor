@@ -1318,7 +1318,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "opensea_targets",
@@ -1477,7 +1479,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings"
     },
     {
       "engagement": "wise_targets",
@@ -1505,7 +1509,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "model_weight_backdoor_fp_etl_load_file"
     },
     {
       "engagement": "backblaze_targets",
