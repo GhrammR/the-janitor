@@ -19,12 +19,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Stage only the files that make up the public site into a dedicated
+      # publish directory.  Uploading repo root previously included target/,
+      # crates/, .git/, etc. and exceeded the artifact size budget.
+      - name: Stage publish directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _pages_publish
+          cp index.html _pages_publish/
+          # CNAME and .nojekyll are required at site root for custom domain
+          # + raw HTML serving (no Jekyll preprocessing).
+          [ -f CNAME ]      && cp CNAME      _pages_publish/ || true
+          [ -f .nojekyll ]  && cp .nojekyll  _pages_publish/ || true
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3.0.1
         with:
-          path: '.'
+          path: _pages_publish
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
