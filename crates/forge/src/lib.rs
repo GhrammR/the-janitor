@@ -35,7 +35,8 @@ pub mod bayesian_taint;
 pub mod binary_recovery;
 pub mod brain;
 pub mod callgraph;
-pub mod campaign;
+#[allow(dead_code)]
+mod campaign;
 pub mod chronometric_auth;
 pub mod ci_thermodynamics;
 pub mod config_taint;

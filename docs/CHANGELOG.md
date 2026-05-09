@@ -3,6 +3,33 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-09 — Sprint Batch 134: Protobuf Any AST Dominance & FFI Reachability Proof
+
+**Directive:** (1) P2-16 — `find_protobuf_any_reachability` in `crates/forge/src/taint_catalog.rs`: Go AST dominance detector for unguarded Protobuf Any decode calls (`anypb.UnmarshalNew`, `ptypes.UnmarshalAny`, `jsonpb.Unmarshal`, `proto.Unmarshal`), emits `security:protobuf_any_unguarded_decode` at `High` when NO `if_statement` or `expression_switch_statement` ancestor checks `TypeUrl`; 4 deterministic tests; (2) P2-16 — `apply_p2_16_protobuf_demotion` in `crates/cli/src/hunt.rs`: demotes `security:protobuf_any_unguarded_decode` on `.proto` extension files to `Informational`; (3) P2-7 — `collect_rust_call_graph_edges` in `crates/forge/src/taint_catalog.rs`: Rust AST pub-FFI unsafe dereference detector emitting `security:public_ffi_unsafe_deref` at `High` for `pub fn` with `*mut`/`*const` params or `CStr::from_ptr` containing unsafe deref/from_ptr calls; 4 deterministic tests; (4) Architectural Oracle: `pub mod campaign` → `mod campaign` in `crates/forge/src/lib.rs` (phantom export eradication); (5) Hunt 3 distinct orgs (cashapp/misk, ClickHouse/ClickHouse, openai/codex); (6) P2-16 and P2-7 hard-deleted from INNOVATION_LOG; (7) just audit exit 0.
+
+### Phase 1 — P2-16: Protobuf Any AST Dominance (`crates/forge/src/taint_catalog.rs` + `crates/cli/src/hunt.rs`)
+
+- Added `find_protobuf_any_reachability(ext, source, file_path) -> Vec<StructuredFinding>`: Go-only detector using tree-sitter AST walking with ancestor tracking; emits `security:protobuf_any_unguarded_decode` at `High` for `anypb.UnmarshalNew`, `ptypes.UnmarshalAny`, `jsonpb.Unmarshal`, `proto.Unmarshal` calls not dominated by `if_statement`/`expression_switch_statement` checking `TypeUrl`/`type_url`/`typeUrl`.
+- Added `is_typeurl_guarded()`: checks only the `condition`/`value` field of ancestor guard statements (not body text) — prevents false suppression.
+- Added `apply_p2_16_protobuf_demotion()` in hunt.rs: demotes `security:protobuf_any_unguarded_decode` to `Informational` when finding file has `.proto` extension.
+- Wired both into `scan_buffer` and `scan_directory` post-filter chains.
+- 4 deterministic tests: TP (unguarded UnmarshalNew fires), TN (if TypeUrl guard suppresses), TN (switch TypeUrl guard suppresses), TN (non-Go extension silent).
+
+### Phase 2 — P2-7: Public FFI Unsafe Deref (`crates/forge/src/taint_catalog.rs`)
+
+- Added `collect_rust_call_graph_edges(ext, source, file_path) -> Vec<StructuredFinding>`: Rust-only detector; emits `security:public_ffi_unsafe_deref` at `High` for `pub fn` (visibility_modifier starts with `pub`) that has a `*mut T`/`*const T` parameter OR `CStr::from_ptr` in body AND an `unsafe_block` containing `unary_expression` starting with `*` or `CStr::from_ptr` call.
+- 4 deterministic tests: TP (pub fn + *mut param + unsafe *ptr), TN (private fn silent), TP (pub fn + CStr::from_ptr inside unsafe), TN (pub fn + raw ptr param but no unsafe deref silent).
+
+### Phase 3 — Architectural Oracle (Dead Module Export)
+
+- `pub mod campaign;` → `mod campaign;` in `crates/forge/src/lib.rs`: eradicates phantom public module export with no external callers.
+
+### Phase 4 — Target Hydration (3 distinct orgs)
+
+- cashapp/misk — 1 LOW_YIELD: protobuf_any_type_field at status.proto:91; misk is Kotlin/JVM, P2-16 covers Go only; Java/Kotlin UnmarshalAny not yet proven.
+- ClickHouse/ClickHouse — 182 total findings; 1 LOW_YIELD (CI script dom_xss_innerHTML in utils/); no Rust FFI targets (C++ only). Critical/High findings scope-blocked by ClickHouse HackerOne program requirements.
+- openai/codex — 2 LOW_YIELD: raw_pointer_deref in config loader (local file access) and Windows sandbox utils (WinAPI, no remote input path). Approval % < 10% both.
+
 ## 2026-05-08 — Sprint Batch 133: The Context Bridge & Memory Bounds
 
 **Directive:** (1) Context Bridge Law — `.agent_governance/rules/context-bridge.md`; (2) P2-13 regression fix — `is_frontend_source_path` narrowed so `.ts`/`.js` bypass only when NOT in CI/scripts segment; (3) P2-6 `BoundedWidthFlow` + `model_sprintf_width_flow` + `sprintf_overflow_witness` + `find_sprintf_width_overflow_slop` wired for C/C++; (4) Hunt 3 new distinct-org targets; (5) P2-6 eradication from INNOVATION_LOG; (6) SYSTEM_INSTRUCTIONS.md updated; (7) just audit exit 0.

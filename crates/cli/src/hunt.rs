@@ -2840,8 +2840,10 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     }
 
     let mut deduped = dedup_findings(all);
-    // P2-16: demote protobuf Any findings when no reachable decode call exists.
+    // P2-16: demote protobuf Any schema findings when no reachable decode call exists.
     apply_protobuf_any_reachability_demotion(dir, &mut deduped);
+    // P2-16: demote protobuf Any findings whose file extension is .proto (schema-only).
+    apply_p2_16_protobuf_demotion(&mut deduped);
     // P2-17: demote SSRF findings whose URL source is operator-config backed.
     apply_config_backed_ssrf_demotion(&mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
@@ -2942,6 +2944,31 @@ fn apply_protobuf_any_reachability_demotion(dir: &Path, findings: &mut [Structur
             if finding.id == RULE {
                 finding.severity = Some("Informational".to_string());
             }
+        }
+    }
+}
+
+/// P2-16 — Proto Schema Demotion.
+///
+/// Demotes `security:protobuf_any_unguarded_decode` findings to `Informational`
+/// when the finding's source file has a `.proto` extension.  Proto schema files
+/// define message types — they do not decode Any fields themselves.  Exploitability
+/// requires a reachable Go (or Java/C++) consumer that calls an Unmarshal API;
+/// a finding in a `.proto` file alone provides no proven runtime decode path.
+fn apply_p2_16_protobuf_demotion(findings: &mut [StructuredFinding]) {
+    const RULE: &str = "security:protobuf_any_unguarded_decode";
+    for finding in findings.iter_mut() {
+        if finding.id != RULE {
+            continue;
+        }
+        let is_proto_schema = finding
+            .file
+            .as_deref()
+            .and_then(|f| std::path::Path::new(f).extension())
+            .and_then(|e| e.to_str())
+            == Some("proto");
+        if is_proto_schema {
+            finding.severity = Some("Informational".to_string());
         }
     }
 }
@@ -3611,6 +3638,30 @@ fn scan_buffer(
     if !is_compiled_artifact_extension(ext) {
         findings.extend(forge::swarm_exfil::detect_context_exfil(source, label));
     }
+
+    // P2-16: Go AST dominance — unguarded Protobuf Any decode call sites.
+    findings.extend(
+        forge::taint_catalog::find_protobuf_any_reachability(ext, source, label)
+            .into_iter()
+            .map(|mut f| {
+                if f.file.is_none() {
+                    f.file = Some(label.to_string());
+                }
+                f
+            }),
+    );
+
+    // P2-7: Rust public FFI unsafe pointer dereference (0-hop reachability).
+    findings.extend(
+        forge::taint_catalog::collect_rust_call_graph_edges(ext, source, label)
+            .into_iter()
+            .map(|mut f| {
+                if f.file.is_none() {
+                    f.file = Some(label.to_string());
+                }
+                f
+            }),
+    );
 
     apply_p2_11_ci_sink_demotion(label, &mut findings);
 
