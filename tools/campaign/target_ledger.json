@@ -611,7 +611,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_heredoc_url_fp"
     },
     {
       "engagement": "block_targets",
@@ -952,7 +954,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "p2_14_demoted_to_informational"
     },
     {
       "engagement": "immunefi_targets",

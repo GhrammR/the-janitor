@@ -110,9 +110,12 @@ AGENTS.md
 # ------------------------------------------------------------------------------
 # 5. DOCUMENTATION BUILD
 # `mkdocs build` and `mkdocs gh-deploy` generate the `site/` directory.
-# The build output is ephemeral — only the source docs/ are tracked.
+# Jekyll generates `_site/`. Both build outputs are ephemeral — only the
+# source docs/ are tracked. The Pages workflow builds from source and
+# uploads the artifact without committing the rendered output to `main`.
 # ------------------------------------------------------------------------------
 site/
+_site/
 
 
 # ------------------------------------------------------------------------------

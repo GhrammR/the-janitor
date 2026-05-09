@@ -3692,7 +3692,39 @@ fn scan_buffer(
         }
     }
 
+    apply_p2_14_vendored_dom_demotion(label, ext, source, &mut findings);
+
     findings
+}
+
+/// P2-14 demotion lattice: a `security:dom_xss_innerHTML` finding whose
+/// source file path is a vendored, bundled, or minified third-party
+/// library is demoted to `Informational` unless the file *also* contains
+/// a repository-native dynamic DOM reflection witness (an `innerHTML` /
+/// `outerHTML` assignment whose RHS is structurally proven dynamic — an
+/// identifier, call expression, or template string with substitutions).
+///
+/// Vendor bundles routinely emit `innerHTML = '<vendor template>'`
+/// patterns by design; with no proven attacker-controlled data injection
+/// the finding has no exploit path and is not bounty-grade.
+fn apply_p2_14_vendored_dom_demotion(
+    label: &str,
+    ext: &str,
+    source: &[u8],
+    findings: &mut [StructuredFinding],
+) {
+    if !forge::slop_hunter::is_vendored_library_path(label) {
+        return;
+    }
+    let proven = forge::slop_hunter::has_repository_native_dom_reflection(source, ext);
+    if proven {
+        return;
+    }
+    for finding in findings.iter_mut() {
+        if finding.id == "security:dom_xss_innerHTML" {
+            finding.severity = Some("Informational".to_string());
+        }
+    }
 }
 
 /// P2-11 demotion lattice: any finding whose file path identifies a CI

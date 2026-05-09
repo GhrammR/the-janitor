@@ -1066,6 +1066,149 @@ deterministically. Pairs with `.INNOVATION\_LOG.md` P1-17.
 
 \---
 
+## Vector Store Cross-Tenant Bleed via Metadata Filter Predicate Polymorphism (CVP-Authorized 2026)
+
+**Class:** AI/Cloud Multi-Tenant Boundary Confusion / Cryptographic Filter
+Predicate Aliasing in Shared Vector Databases
+**Reference:** CVP authorization 2fe9d3dd-47ba-4bde-ab67-29f86c79f732;
+multi-tenant SaaS RAG products (LangChain, LlamaIndex, Haystack, DSPy)
+indexing customer data into shared Pinecone, Weaviate, Chroma, Qdrant,
+Milvus, or pgvector instances; maps to OWASP A01:2021 (Broken Access
+Control) extended to the AI retrieval layer; unaddressed by current
+SAST/SCA vendors because tenant isolation is enforced at query-time via a
+free-form filter document, not via row-level cryptographic gating.
+
+**Threat profile:** Modern multi-tenant SaaS RAG products embed customer
+documents into a shared vector index. The tenant isolation boundary is the
+metadata `filter` / `where` / `expr` clause passed to the query API. Two
+structural attack patterns emerge:
+
+1. **Filter Origin Polymorphism**: The application accepts a `filter`
+   parameter from request-scoped user input AND merges it (via Python
+   `dict.update`, JS `Object.spread`, or Go `maps.Copy`) with a
+   server-controlled tenant filter. If the user's filter contains the
+   same key (`tenant_id`, `tenantId`, `org_id`, `customer_id`), the merge
+   operator's order determines precedence — and the user's value wins.
+   The attacker queries with `{"tenant_id": "victim_tenant"}` and reads
+   across tenants.
+2. **Filter Operator Polymorphism**: Vector store filter languages
+   support `$or` / `OR` / `should` / `union` operators. A server-merged
+   conjunctive constraint of the form
+   `{"tenant_id": {"$eq": "tenant_self"}}` is evaded if the user-controlled
+   filter contains `{"$or": [{"tenant_id": "victim"}, {"tenant_id":
+   "self"}]}` — Pinecone's filter is conjunctive at the top level, but
+   `$or` injects disjunction within and the conjunction holds vacuously
+   when the disjunction matches the victim.
+3. **Field-Name Aliasing**: Vector stores allow arbitrary metadata keys.
+   When a tenant indexes documents with key `tenant_id`, but a sibling
+   tenant indexes with `tenantId` or `org`, the server-merged filter
+   only constrains one alias and bleeds the other.
+
+The chain is invisible to row-level RBAC scanners because the filter is a
+JSON document parsed at query time, not a SQL predicate. Distinct from
+classic SSRF (no internal HTTP) and distinct from prototype pollution (the
+filter merge is intentional API surface). Distinct from
+`security:embedding_trust_transposition` (which concerns trust in
+retrieved chunks, not retrieval-time access boundary).
+
+**AST / IFDS Detection Strategy:**
+
+1. **Vector store import detection** (`crates/forge/src/vector_topology.rs`
+   extension): flag every module importing `pinecone`, `pinecone-client`,
+   `weaviate.Client`, `chromadb.Client`, `qdrant_client`, `pymilvus`,
+   `sqlalchemy_pgvector`, `langchain_*.vectorstores`,
+   `llama_index.vector_stores`, or the JS/TS equivalents.
+2. **Sink call enumeration**: locate calls to:
+   - Pinecone: `Index.query(filter=)`, `Index.fetch(filter=)`,
+     `Index.delete(filter=)`
+   - Weaviate: `client.query.get(...).with_where(...)`,
+     `collection.query.fetch_objects(filters=)`
+   - Chroma: `collection.query(where=)`, `collection.get(where=)`
+   - Qdrant: `client.search(query_filter=)`,
+     `client.scroll(scroll_filter=)`
+   - Milvus: `collection.search(expr=)`, `collection.query(expr=)`
+   - pgvector via SQLAlchemy: `Session.query(...).filter(...)` with
+     `.from_statement` and embedded WHERE
+3. **IFDS taint trace** (`crates/forge/src/ifds.rs`): backward
+   dataflow from the `filter` / `where` / `expr` argument node to
+   request-scoped sources (`request.json`, `req.body`,
+   `Flask.request.args`, FastAPI `Body`, Express `req.body`,
+   Gin `c.BindJSON`, axum `Json`). Mark each parameter with
+   `ArgEvidence::AttackerControlled` when reached.
+4. **Closed-set constraint check** (Z3-backed): for each sink, walk
+   backwards from the call site to find the construction of the filter
+   dict/object. Verify that BEFORE the sink call, a constant key
+   `tenant_id` (or alias `tenantId`, `org_id`, `customer_id`) was assigned
+   from a server-controlled source (JWT claim
+   `request.user.tenant_id`, session principal, gRPC metadata header
+   already authenticated). Encode the SMT-LIB obligation:
+
+   ```
+   (assert (forall ((q Query))
+     (=> (reaches-sink q)
+         (exists ((k String) (v String))
+           (and (member k tenant-key-aliases)
+                (server-controlled v)
+                (eq-clause-only k v q))))))
+   ```
+
+   Z3 UNSAT → no fire. SAT (witness with attacker-controlled key) →
+   `KevCritical`.
+5. **Polymorphic operator check**: if the filter expression contains a
+   key matching `$or` / `OR` / `should` / `union` whose value originates
+   from an `AttackerControlled` taint source, emit `KevCritical`
+   regardless of the closed-set check (the disjunction defeats it).
+6. **AEG witness synthesis**: extract the route, method, and parameter
+   binding from the `IngressKind::HttpRoute`. Synthesize:
+
+   ```
+   curl -X POST https://api.example.com/rag/search \
+        -H 'Authorization: Bearer <user-token>' \
+        -H 'Content-Type: application/json' \
+        -d '{"query": "*", "filter": {"$or": [
+              {"tenant_id": "victim_tenant"},
+              {"tenant_id": "self_tenant"}]}}'
+   ```
+
+   Bound to the application's exact route and the user's own tenant
+   token; the attack is by a *legitimate authenticated tenant*, not an
+   anonymous attacker.
+7. **Severity correlation and ledger routing**: when the closed-set Z3
+   check returns SAT (attacker-controlled tenant key reaches the sink),
+   route the finding to `tools/campaign/BOUNTY_LEDGER.md` with
+   `Approval % >= 90` and
+   `Exploitation Strategy = VectorStoreFilterPolymorphismCrossTenantBleed`.
+
+**Crates:** existing `tree-sitter-python`, `tree-sitter-typescript`,
+`tree-sitter-javascript`, `tree-sitter-go`; existing IFDS engine; existing
+`rsmt2` Z3 binding; existing `serde_json`. No new dependencies — the
+detector composes the existing taint spine with a new sink-table and a
+new closed-set constraint generator.
+
+**Crucible fixture:** A FastAPI bundle with:
+
+1. A POST `/rag/search` endpoint that accepts `{"query": str, "filter":
+   dict}` and calls
+   `pinecone.Index("docs").query(vector=..., filter=request.filter)`
+   without merging a server-controlled `tenant_id` constraint. Detector
+   emits `KevCritical` with the curl chain.
+2. A negative fixture: same route, but the handler executes
+   `merged = {**request.filter, "tenant_id": jwt_claims["tenant_id"]}`
+   AND validates `"tenant_id" not in request.filter` AND rejects any
+   `$or` / `should` keys before the merge. Z3 UNSAT, no fire.
+
+**Bounty TAM:** $50k–$250k per advisory across SaaS RAG products
+(Glean, Notion AI, Zendesk Answer Bot, Gong AI, ZoomInfo Copilot,
+Atlassian Rovo, ServiceNow Now Assist). Procurement security teams
+audit OAuth scopes and SQL row-level security but rarely audit vector
+filter document construction because it sits at the AI/data plane
+intersection. First-mover advantage in a class no current SAST/SCA
+vendor models because the analysis requires *cross-language IFDS into a
+JSON filter document* combined with closed-set Z3 verification of a
+tenant-scoping invariant. Pairs with `.INNOVATION_LOG.md` P2-15.
+
+\---
+
 ## Cross-Cutting Detection Invariants
 
 1. **Determinism:** every detector here MUST be reproducible with fixed-seed inputs. No wall-clock dependency, no network-dependent verdicts. Provider taxonomies are baked into the binary at compile time via `crates/cli/build.rs`.

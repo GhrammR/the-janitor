@@ -393,6 +393,214 @@ pub fn is_deployment_or_scripts_path(path: &str) -> bool {
     })
 }
 
+/// Returns `true` when `path` identifies a vendored, bundled, or
+/// minified third-party library that ships into the repository as a binary
+/// artifact rather than first-party source code.
+///
+/// Vendored libraries (jQuery, Prism, Lodash, polyfills, generated bundles)
+/// often emit DOM reflection patterns (`innerHTML`, `outerHTML`) by design
+/// for vendor-internal templating.  When the *only* dynamic DOM reflection
+/// in a file is vendored — and the repository has no native attacker-reachable
+/// DOM reflection sink — the finding has no proven exploit path.  P2-14
+/// demotes such findings to `Informational`.
+///
+/// Match rules:
+/// * Path segment `vendor`, `vendored`, `node_modules`, `third_party`,
+///   `third-party`, `dist`, `bundle`, `bundles`, `vendors`.
+/// * File name ending `.bundle.js`, `.bundle.mjs`, `.bundle.cjs`,
+///   `.min.js`, `.min.mjs`, `.min.cjs`.
+/// * File name containing `jquery` (case-insensitive) — covers `_jquery.js`,
+///   `jquery-3.5.1.min.js`, `jquery.slim.js`, etc.
+pub fn is_vendored_library_path(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_ascii_lowercase();
+    if p.split('/').any(|seg| {
+        matches!(
+            seg,
+            "vendor"
+                | "vendors"
+                | "vendored"
+                | "node_modules"
+                | "third_party"
+                | "third-party"
+                | "dist"
+                | "bundle"
+                | "bundles"
+        )
+    }) {
+        return true;
+    }
+    let name = p.rsplit('/').next().unwrap_or("");
+    if name.ends_with(".bundle.js")
+        || name.ends_with(".bundle.mjs")
+        || name.ends_with(".bundle.cjs")
+        || name.ends_with(".min.js")
+        || name.ends_with(".min.mjs")
+        || name.ends_with(".min.cjs")
+    {
+        return true;
+    }
+    name.contains("jquery")
+}
+
+/// Mathematically prove `source` contains a *repository-native* DOM
+/// reflection witness: at least one `innerHTML` or `outerHTML` assignment
+/// whose right-hand side is structurally dynamic (identifier, call
+/// expression, template string with substitutions, member access, or
+/// composition of the above) AND the same right-hand-side subtree
+/// references a recognized attacker-reachable browser source identifier
+/// — `location.hash`, `location.search`, `location.href`,
+/// `URLSearchParams`, `document.cookie`, `decodeURIComponent`,
+/// `JSON.parse`, `fetch(...).json`, `XMLHttpRequest`, `postMessage`, or
+/// the request-scoped tokens `params`, `req`, `request`, `query`,
+/// `body`, `data` when used as identifier/member.
+///
+/// Returns `false` when every `innerHTML` / `outerHTML` assignment is
+/// either a static string literal *or* a vendor-internal dynamic
+/// expression with no externally-reachable taint marker. Vendored
+/// libraries such as jQuery emit `tmp.innerHTML = wrap[1] +
+/// jQuery.htmlPrefilter(elem) + wrap[2]` — structurally dynamic, but
+/// the data flow is internal to the vendor module and not bound to any
+/// repository-native attacker source. P2-14 demotes those findings to
+/// `Informational`.
+///
+/// `extension` selects the tree-sitter grammar; only `js`, `jsx`, `ts`,
+/// `tsx`, `mjs`, `cjs` are recognised. Any other extension returns
+/// `false` (no parse, no proof).
+pub fn has_repository_native_dom_reflection(source: &[u8], extension: &str) -> bool {
+    let lang: tree_sitter::Language = match extension {
+        "js" | "jsx" | "mjs" | "cjs" => tree_sitter_javascript::LANGUAGE.into(),
+        "ts" => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+        "tsx" => tree_sitter_typescript::LANGUAGE_TSX.into(),
+        _ => return false,
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&lang).is_err() {
+        return false;
+    }
+    let Some(tree) = parse_with_timeout(&mut parser, source) else {
+        return false;
+    };
+    if tree.root_node().has_error() {
+        return false;
+    }
+    walk_dom_reflection_attacker_source(tree.root_node(), source)
+}
+
+fn walk_dom_reflection_attacker_source(node: tree_sitter::Node<'_>, source: &[u8]) -> bool {
+    if node.kind() == "assignment_expression" {
+        if let Some(left) = node.child_by_field_name("left") {
+            if left.kind() == "member_expression" {
+                let prop = left
+                    .child_by_field_name("property")
+                    .and_then(|p| p.utf8_text(source).ok());
+                if matches!(prop, Some("innerHTML") | Some("outerHTML")) {
+                    let rhs = node
+                        .child_by_field_name("right")
+                        .or_else(|| third_named_child(node));
+                    if let Some(right) = rhs {
+                        if rhs_is_dynamic_dom_payload(right, source)
+                            && rhs_subtree_references_attacker_source(right, source)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if walk_dom_reflection_attacker_source(child, source) {
+            return true;
+        }
+    }
+    false
+}
+
+fn rhs_is_dynamic_dom_payload(node: tree_sitter::Node<'_>, source: &[u8]) -> bool {
+    match node.kind() {
+        "string" | "number" | "true" | "false" | "null" | "undefined" => false,
+        "identifier"
+        | "call_expression"
+        | "subscript_expression"
+        | "new_expression"
+        | "await_expression"
+        | "yield_expression" => true,
+        "template_string" => {
+            let mut cursor = node.walk();
+            let has_substitution = node
+                .children(&mut cursor)
+                .any(|child| child.kind() == "template_substitution");
+            has_substitution
+        }
+        "member_expression" => {
+            node.child_by_field_name("property")
+                .and_then(|p| p.utf8_text(source).ok())
+                != Some("length")
+        }
+        "binary_expression"
+        | "parenthesized_expression"
+        | "ternary_expression"
+        | "conditional_expression" => {
+            let mut cursor = node.walk();
+            let any_dynamic = node
+                .named_children(&mut cursor)
+                .any(|child| rhs_is_dynamic_dom_payload(child, source));
+            any_dynamic
+        }
+        _ => {
+            let mut cursor = node.walk();
+            let any_dynamic = node
+                .named_children(&mut cursor)
+                .any(|child| rhs_is_dynamic_dom_payload(child, source));
+            any_dynamic
+        }
+    }
+}
+
+/// Walk the RHS subtree and return `true` if it textually references a
+/// recognized attacker-reachable browser/server source. The match is
+/// applied to the literal source bytes spanned by the subtree — this
+/// captures both `location.hash`, `req.body.x`, and template
+/// substitutions whose tokens reach attacker-controlled inputs.
+fn rhs_subtree_references_attacker_source(node: tree_sitter::Node<'_>, source: &[u8]) -> bool {
+    let Ok(text) = node.utf8_text(source) else {
+        return false;
+    };
+    const ATTACKER_SOURCE_TOKENS: &[&str] = &[
+        "location.hash",
+        "location.search",
+        "location.href",
+        "location.pathname",
+        "window.location",
+        "document.cookie",
+        "document.URL",
+        "document.documentURI",
+        "URLSearchParams",
+        "decodeURIComponent",
+        "JSON.parse",
+        "XMLHttpRequest",
+        "postMessage",
+        ".responseText",
+        "fetch(",
+        "req.body",
+        "req.query",
+        "req.params",
+        "request.body",
+        "request.query",
+        "request.params",
+        "ctx.request",
+        "this.props.",
+        "this.state.",
+    ];
+    for token in ATTACKER_SOURCE_TOKENS {
+        if text.contains(token) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Parse `source` with a hard timeout of [`PARSER_TIMEOUT_MICROS`] (500 ms).
 ///
 /// Uses `tree_sitter::ParseOptions::progress_callback` to abort the parse when
@@ -9781,6 +9989,119 @@ el.innerHTML = get_string("label") + userInput + "</div>";
                 .any(|f| f.description.contains("dom_xss_innerHTML")),
             "user-controlled data mixed with i18n must still fire dom_xss_innerHTML"
         );
+    }
+
+    // ── P2-14 vendored library path + DOM reflection proof tests ──────────
+
+    #[test]
+    fn test_p2_14_is_vendored_library_path_segments() {
+        assert!(is_vendored_library_path("vendor/jquery/jquery.js"));
+        assert!(is_vendored_library_path(
+            "packages/web/vendor/lib/jquery.js"
+        ));
+        assert!(is_vendored_library_path("third_party/lodash/lodash.js"));
+        assert!(is_vendored_library_path("third-party/zone.js/zone.js"));
+        assert!(is_vendored_library_path("node_modules/react/index.js"));
+        assert!(is_vendored_library_path("frontend/dist/main.js"));
+        assert!(is_vendored_library_path("public/bundle/main.js"));
+    }
+
+    #[test]
+    fn test_p2_14_is_vendored_library_path_filenames() {
+        assert!(is_vendored_library_path("static/main.bundle.js"));
+        assert!(is_vendored_library_path("public/app.min.js"));
+        assert!(is_vendored_library_path("static/jquery-3.5.1.min.js"));
+        assert!(is_vendored_library_path(
+            "source/javascripts/lib/_jquery.js"
+        ));
+        assert!(is_vendored_library_path("assets/JQuery.slim.js"));
+    }
+
+    #[test]
+    fn test_p2_14_is_vendored_library_path_first_party_negative() {
+        assert!(!is_vendored_library_path("src/components/Login.tsx"));
+        assert!(!is_vendored_library_path("webapp/src/utils.ts"));
+        assert!(!is_vendored_library_path("server/handlers/api.go"));
+        assert!(!is_vendored_library_path("crates/cli/src/main.rs"));
+        assert!(!is_vendored_library_path("frontend/src/index.js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_location_hash() {
+        // True positive: dynamic RHS referencing window.location.hash —
+        // a canonical attacker-reachable browser source.
+        let src = b"element.innerHTML = decodeURIComponent(location.hash.slice(1));\n";
+        assert!(has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_url_search_params_inline() {
+        // True positive: URLSearchParams reads location.search inside the RHS
+        // subtree itself — the attacker-source binding is local to the
+        // innerHTML assignment.
+        let src =
+            b"document.body.innerHTML = `<div>${new URLSearchParams(location.search).get('msg')}</div>`;\n";
+        assert!(has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_request_body() {
+        // True positive: request-scoped body field reaches innerHTML.
+        let src = b"el.outerHTML = `<span>${req.body.title}</span>`;\n";
+        assert!(has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_vendor_internal_identifier() {
+        // True negative: structurally dynamic RHS (identifier, call, subscript)
+        // but no attacker-reachable source marker. Mirrors vendored jQuery
+        // patterns: `tmp.innerHTML = wrap[1] + jQuery.htmlPrefilter(elem) + wrap[2]`.
+        let src = br#"
+function buildTree(elem) {
+    var wrap = [ "<table>", "</table>" ];
+    var tmp = document.createElement('div');
+    tmp.innerHTML = wrap[0] + jQuery.htmlPrefilter(elem) + wrap[1];
+    return tmp;
+}
+"#;
+        assert!(!has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_static_literal_only() {
+        // True negative: only static string literals — no dynamic RHS proven.
+        let src = b"el.innerHTML = '<div>Welcome</div>';\nspan.outerHTML = \"<span>x</span>\";\n";
+        assert!(!has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_no_innerhtml_at_all() {
+        // True negative: no innerHTML / outerHTML assignment in the source.
+        let src = b"const x = computeValue();\nconst y = x + 1;\n";
+        assert!(!has_repository_native_dom_reflection(src, "js"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_unsupported_extension() {
+        // True negative: extension is not JS/TS — no parse, no proof.
+        let src = b"element.innerHTML = decodeURIComponent(location.hash);\n";
+        assert!(!has_repository_native_dom_reflection(src, "py"));
+        assert!(!has_repository_native_dom_reflection(src, "go"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_typescript_attacker_source() {
+        // True positive: TypeScript with location.hash reaches innerHTML.
+        let src = b"const el: HTMLElement = document.getElementById('out')!;\n\
+                    el.innerHTML = decodeURIComponent(location.hash);\n";
+        assert!(has_repository_native_dom_reflection(src, "ts"));
+    }
+
+    #[test]
+    fn test_p2_14_repository_native_dom_reflection_mixed_one_attacker_source_wins() {
+        // True positive: at least one attacker-reachable assignment wins.
+        let src = b"el1.innerHTML = '<div>static</div>';\nel2.innerHTML = location.hash;\n";
+        assert!(has_repository_native_dom_reflection(src, "js"));
     }
 
     // ── HCL / S3 public ACL tests ─────────────────────────────────────────
