@@ -3,6 +3,43 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-08 — Sprint Batch 133: The Context Bridge & Memory Bounds
+
+**Directive:** (1) Context Bridge Law — `.agent_governance/rules/context-bridge.md`; (2) P2-13 regression fix — `is_frontend_source_path` narrowed so `.ts`/`.js` bypass only when NOT in CI/scripts segment; (3) P2-6 `BoundedWidthFlow` + `model_sprintf_width_flow` + `sprintf_overflow_witness` + `find_sprintf_width_overflow_slop` wired for C/C++; (4) Hunt 3 new distinct-org targets; (5) P2-6 eradication from INNOVATION_LOG; (6) SYSTEM_INSTRUCTIONS.md updated; (7) just audit exit 0.
+
+### Phase 1 — Context Bridge Law (`crates/forge/src/slop_hunter.rs`)
+
+- Created `.agent_governance/rules/context-bridge.md`: mandates SYSTEM_INSTRUCTIONS.md update after every sprint shipping new detectors or architectural changes.
+
+### Phase 2 — P2-13 Regression Fix (`crates/forge/src/slop_hunter.rs`)
+
+- `is_frontend_source_path` rewritten: `.tsx`/`.jsx` bypass on extension alone; `.ts`/`.js` bypass only when NOT inside `ci/`, `scripts/`, `devops/`, `build/`, or `tests/` path segments; explicit frontend dirs (`webapp/src/`, `/components/`) always qualify. Fixes false-negative where CI helper scripts ending in `.js` (e.g. `repo/scripts/helpers.js`) incorrectly bypassed the `is_ci_or_local_script_path` demotion guard.
+
+### Phase 3 — P2-6: Bounded Overflow Witness (`crates/forge/src/exploitability.rs` + `slop_hunter.rs`)
+
+- Added `BoundedWidthFlow { sink_fn, width_param_index, max_safe_width }`.
+- Added `model_sprintf_width_flow(source) -> Vec<BoundedWidthFlow>` — scans for `sprintf`/`snprintf`/`vsnprintf`/`vsprintf` with `%*s` (dynamic width) or unbounded `%s`; suppresses literal-bounded `%<digit>s` calls.
+- Added `sprintf_overflow_witness(file_path, line, sink_fn) -> ExploitWitness` — ASAN-oriented repro_cmd with `JANITOR_OVERFLOW_CANARY`/`JANITOR_PAD` tokens; `upstream_validation_absent: true`.
+- Added `find_sprintf_width_overflow_slop(source) -> Vec<SlopFinding>` in `slop_hunter.rs`; wired into `find_slop` for `c`, `h`, `cpp`, `cxx`, `cc`, `hpp`.
+- 3 deterministic tests in `exploitability.rs`.
+
+### Phase 4 — Target Hydration (3 distinct orgs)
+
+- mattermost/mattermost — 1 CANDIDATE (TLS skip verify `s3store.go:163`), 4 LOW_YIELD (false positives: git-ref SHA, API docs credential, SVG model_weight FP, scripts/ eval). Ledgers updated.
+- mattermost/mattermost-plugin-boards — 1 LOW_YIELD (client-side SSRF, 45 sinks, SOP-blocked).
+- Uniswap/docs, aave/aave-address-book — no_findings (docs/address-book repos, not in scope).
+
+### Phase 5 — Innovation Log Eradication
+
+- P2-6 block physically deleted from `.INNOVATION_LOG.md`.
+
+### Phase 6 — SYSTEM_INSTRUCTIONS.md Update
+
+- Version reference updated `v10.2.0-beta.1` → `v10.2.0-rc.2`.
+- I.A. section added: `detect_hostile_provider_elevation`, `is_production_server_path`/`is_deployment_or_scripts_path`, `is_frontend_source_path`, `BoundedWidthFlow`/`model_sprintf_width_flow`/`sprintf_overflow_witness`, Context Bridge Law.
+
+---
+
 ## 2026-05-08 — Sprint Batch 131: Witness Finality Strike & Target Ledger Refresh
 
 **Directive:** (1) P2-8 Hostile Provider Endpoint Elevation — `detect_hostile_provider_elevation` in `agentic_graph.rs`; (2) P2-13 Deployment-Surface Guardrails — `is_production_server_path` + `is_deployment_or_scripts_path` in `slop_hunter.rs`; (3) Final Mattermost Stored XSS submission package — `SUBMISSION_security_react_xss_dangerous_html.md` (dual-frame witness); (4) Hunt 3 new distinct-org targets (Uniswap/docs, aave/aave-address-book, smartcontractkit/chainlink); (5) P2-8 + P2-13 eradication from INNOVATION_LOG; (6) just audit exit 0.

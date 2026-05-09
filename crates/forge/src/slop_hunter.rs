@@ -284,6 +284,10 @@ fn is_deploy_shell_script(path: &str) -> bool {
 /// its source MUST be demoted to `Informational` by the P2-11 demotion lattice
 /// in `crates/cli/src/hunt.rs::apply_p2_11_ci_sink_demotion`.
 pub fn is_ci_or_local_script_path(path: &str) -> bool {
+    // Hard bypass: production frontend source files are never CI/script paths.
+    if is_frontend_source_path(path) {
+        return false;
+    }
     let p = path.replace('\\', "/").to_ascii_lowercase();
     p.split('/')
         .any(|seg| matches!(seg, "ci" | "scripts" | "devops" | "build" | "tests"))
@@ -320,12 +324,46 @@ pub fn is_production_server_path(path: &str) -> bool {
     })
 }
 
+/// Returns `true` when `path` identifies a production frontend source file.
+///
+/// `.tsx`/`.jsx` are React-specific and qualify on extension alone.
+/// `.ts`/`.js` qualify on extension only when NOT inside a CI/scripts segment
+/// (`ci/`, `scripts/`, `devops/`, `build/`, `tests/`) — CI helper scripts are
+/// often `.js` and must not bypass demotion guards.
+/// Explicit frontend directories (`webapp/src/`, `/components/`) always qualify.
+pub fn is_frontend_source_path(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_ascii_lowercase();
+    // React-specific extensions — safe to bypass on extension alone.
+    if p.ends_with(".tsx") || p.ends_with(".jsx") {
+        return true;
+    }
+    // Explicit frontend directories always qualify regardless of extension.
+    if p.contains("webapp/src/") || p.contains("/components/") {
+        return true;
+    }
+    // Generic .ts/.js qualify as frontend only when outside CI/script segments.
+    if p.ends_with(".ts") || p.ends_with(".js") {
+        let in_ci_seg = p
+            .split('/')
+            .any(|seg| matches!(seg, "ci" | "scripts" | "devops" | "build" | "tests"));
+        return !in_ci_seg;
+    }
+    false
+}
+
 /// Returns `true` when `path` identifies a deployment, setup, or operator
 /// bootstrap surface that is not directly reachable from the public network.
 ///
 /// Findings in these paths MUST be demoted to `Informational` by the P2-13
 /// demotion lattice unless a production invocation path is proven.
+///
+/// Hard bypass: production frontend source files (`.tsx`, `.jsx`, `.ts`, `.js`,
+/// `webapp/src/`, `components/`) are never demoted regardless of other segments.
 pub fn is_deployment_or_scripts_path(path: &str) -> bool {
+    // Hard bypass: frontend source is always production-scope.
+    if is_frontend_source_path(path) {
+        return false;
+    }
     let p = path.replace('\\', "/").to_ascii_lowercase();
     p.split('/').any(|seg| {
         matches!(
@@ -1092,12 +1130,14 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             let mut f = find_c_slop(eng, source);
             f.extend(crate::legacy_c_mining::find_legacy_c_mining_targets(source));
             f.extend(crate::optimizer_authority::detect_optimizer_phantom_authority(source, "c"));
+            f.extend(find_sprintf_width_overflow_slop(source));
             f
         }
         "cpp" | "cxx" | "cc" | "hpp" => {
             let mut f = find_cpp_slop(eng, source);
             f.extend(crate::legacy_c_mining::find_legacy_c_mining_targets(source));
             f.extend(crate::optimizer_authority::detect_optimizer_phantom_authority(source, "cpp"));
+            f.extend(find_sprintf_width_overflow_slop(source));
             f
         }
         "hcl" | "tf" => find_hcl_slop_ast(eng, source),
@@ -2345,6 +2385,72 @@ fn find_wildcard_in_sequence(
 // ---------------------------------------------------------------------------
 // C: banned libc functions
 // ---------------------------------------------------------------------------
+
+/// Emit `SlopFinding`s for `sprintf`/`snprintf`/`vsnprintf` calls whose format
+/// string contains a dynamic width specifier (`%*`) or an unbounded `%s`.
+///
+/// Delegates flow extraction to [`crate::exploitability::model_sprintf_width_flow`]
+/// and converts each [`crate::exploitability::BoundedWidthFlow`] into a
+/// `KevCritical` finding with an ASAN-oriented reproduction command embedded in
+/// the description.
+fn find_sprintf_width_overflow_slop(source: &[u8]) -> Vec<SlopFinding> {
+    let flows = crate::exploitability::model_sprintf_width_flow(source);
+    if flows.is_empty() {
+        return Vec::new();
+    }
+
+    let text = String::from_utf8_lossy(source);
+    let mut findings = Vec::new();
+
+    for (line_idx, line) in text.lines().enumerate() {
+        let lower = line.to_ascii_lowercase();
+        let is_sink = lower.contains("sprintf(")
+            || lower.contains("snprintf(")
+            || lower.contains("vsnprintf(")
+            || lower.contains("vsprintf(");
+        if !is_sink {
+            continue;
+        }
+        let has_dynamic = line.contains("%*")
+            || (line.contains("%s")
+                && !line
+                    .as_bytes()
+                    .windows(3)
+                    .any(|w| w[0] == b'%' && w[1].is_ascii_digit() && w[2] == b's'));
+        if !has_dynamic {
+            continue;
+        }
+
+        let sink_fn = if lower.contains("vsnprintf(") || lower.contains("vsprintf(") {
+            if lower.contains("vsnprintf(") {
+                "vsnprintf"
+            } else {
+                "vsprintf"
+            }
+        } else if lower.contains("snprintf(") {
+            "snprintf"
+        } else {
+            "sprintf"
+        };
+
+        let byte_offset: usize = text.lines().take(line_idx).map(|l| l.len() + 1).sum();
+
+        findings.push(SlopFinding {
+            start_byte: byte_offset,
+            end_byte: byte_offset + line.len(),
+            description: format!(
+                "security:bounded_overflow_witness — {sink_fn}(): format string contains \
+                 dynamic width specifier or unbounded %s; attacker-controlled width can \
+                 exceed destination buffer (CWE-120 / CERT MSC30-C). \
+                 ASAN repro: `CC=clang CFLAGS='-fsanitize=address -g' make && \
+                 printf -v PAD '%*s' 65537 '' && ./binary \"$PAD\"`"
+            ),
+            domain: DOMAIN_ALL,
+            severity: Severity::KevCritical,
+        });
+    }
+    findings
+}
 
 /// Detect calls to dangerous libc functions in C/C-header source.
 ///
@@ -9861,6 +9967,41 @@ spec:
         let findings = find_slop("cpp", src);
         assert!(findings.is_empty(), "strncpy() in C++ must not be flagged");
     }
+
+    // -----------------------------------------------------------------------
+    // P2-6: bounded_overflow_witness — dynamic width sprintf detection
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn sprintf_dynamic_width_fires_kev_critical() {
+        let src = b"void f(int w, char *s) { char buf[64]; sprintf(buf, \"%*s\", w, s); }\n";
+        let findings = find_slop("c", src);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("bounded_overflow_witness")),
+            "dynamic %*s in sprintf must fire bounded_overflow_witness"
+        );
+        assert!(
+            findings
+                .iter()
+                .any(|f| matches!(f.severity, Severity::KevCritical)),
+            "bounded_overflow_witness must be KevCritical"
+        );
+    }
+
+    #[test]
+    fn snprintf_literal_width_does_not_fire_overflow() {
+        // snprintf with explicit literal size — safe; must NOT emit bounded_overflow_witness
+        let src = b"void f(char *s) { char buf[256]; snprintf(buf, sizeof(buf), \"%256s\", s); }\n";
+        let findings = find_slop("cpp", src);
+        assert!(
+            !findings
+                .iter()
+                .any(|f| f.description.contains("bounded_overflow_witness")),
+            "literal field-width %256s must not fire bounded_overflow_witness"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -13659,5 +13800,42 @@ mod llm_prompt_injection_tests {
         assert!(!is_deployment_or_scripts_path("src/server/main.rs"));
         assert!(!is_deployment_or_scripts_path("api/routes.py"));
         assert!(!is_deployment_or_scripts_path("backend/handlers/user.ts"));
+    }
+
+    // -----------------------------------------------------------------------
+    // P2-13 regression fix: frontend source hard bypass
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn frontend_source_path_detected() {
+        assert!(is_frontend_source_path(
+            "webapp/src/components/blocksEditor/blocks/text/index.tsx"
+        ));
+        assert!(is_frontend_source_path("src/components/App.jsx"));
+        assert!(is_frontend_source_path("webapp/src/utils.ts"));
+        assert!(is_frontend_source_path("dist/bundle.js"));
+    }
+
+    #[test]
+    fn non_frontend_paths_not_detected() {
+        assert!(!is_frontend_source_path("scripts/migrate.sh"));
+        assert!(!is_frontend_source_path("deployment/helm/chart.yaml"));
+        assert!(!is_frontend_source_path("src/main.rs"));
+    }
+
+    #[test]
+    fn frontend_tsx_bypasses_deployment_demotion() {
+        // webapp/src/ .tsx files must NOT be demoted regardless of other path segments.
+        assert!(!is_deployment_or_scripts_path(
+            "webapp/src/components/blocksEditor/blocks/text/index.tsx"
+        ));
+        assert!(!is_deployment_or_scripts_path("webapp/src/utils.ts"));
+    }
+
+    #[test]
+    fn frontend_tsx_bypasses_ci_script_demotion() {
+        // .tsx files in a scripts/ dir still count as frontend, not CI.
+        assert!(!is_ci_or_local_script_path("scripts/webpack/entry.tsx"));
+        assert!(!is_ci_or_local_script_path("webapp/src/App.ts"));
     }
 }
