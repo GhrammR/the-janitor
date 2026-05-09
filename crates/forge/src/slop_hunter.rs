@@ -4265,6 +4265,26 @@ fn should_ignore_supply_chain_match(
         return true;
     }
 
+    // Suppress unpinned_asset matches inside Go string literals > 2KB.
+    // Addresses false positives in generated Go files where URLs are embedded
+    // inside JSON-stringified ABI blobs or Solidity StandardInput payloads.
+    if language == "go" {
+        let Some(eng) = engine() else {
+            return false;
+        };
+        let tree = match parsed.ensure_tree(eng.go_lang.clone(), "go") {
+            Ok(Some(tree)) => tree,
+            Ok(None) | Err(_) => return false,
+        };
+        let root = tree.root_node();
+        let end = mat.end().saturating_sub(1);
+        if let Some(node) = root.descendant_for_byte_range(mat.start(), end) {
+            if enclosing_go_string_is_massive(node) {
+                return true;
+            }
+        }
+    }
+
     if !matches!(language, "js" | "jsx" | "ts" | "tsx") {
         return false;
     }
@@ -4286,6 +4306,23 @@ fn should_ignore_supply_chain_match(
     node_or_parent_is_comment(node)
         || (node_or_parent_is_string_literal(node)
             && !string_literal_flows_to_asset_execution_sink(node, source))
+}
+
+/// Returns `true` if `node` (or any ancestor) is a Go `interpreted_string_literal`
+/// or `raw_string_literal` spanning more than 2048 bytes.
+fn enclosing_go_string_is_massive(node: Node<'_>) -> bool {
+    const MASSIVE_THRESHOLD: usize = 2048;
+    let mut cursor = Some(node);
+    while let Some(current) = cursor {
+        if matches!(
+            current.kind(),
+            "interpreted_string_literal" | "raw_string_literal"
+        ) {
+            return (current.end_byte() - current.start_byte()) > MASSIVE_THRESHOLD;
+        }
+        cursor = current.parent();
+    }
+    false
 }
 
 fn external_script_tag_has_sri(source: &[u8], start: usize) -> bool {
@@ -10399,6 +10436,39 @@ AKIAoAEYuREgAX8687Nw283LCyp9Mw=='";
                 .iter()
                 .any(|f| f.description.contains("unpinned_asset")),
             "find_slop must forward supply-chain findings"
+        );
+    }
+
+    // ── Phase 0: Massive Go string literal suppression ─────────────────────
+
+    /// TP: A short Go string containing a .github.io URL must still fire.
+    #[test]
+    fn go_short_string_github_io_fires() {
+        let src = b"var docURL = \"https://some-org.github.io/sdk/v2/bundle.js\"\n";
+        let findings = find_slop("go", src);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("unpinned_asset")),
+            "a .github.io URL in a short Go string must be flagged as unpinned_asset"
+        );
+    }
+
+    /// TN: A .github.io URL embedded inside a Go raw-string literal > 2KB must be suppressed.
+    #[test]
+    fn go_massive_raw_string_github_io_suppressed() {
+        // Build a raw-string literal that is > 2048 bytes with the URL buried inside.
+        let padding = "x".repeat(2200);
+        let src = format!(
+            "var blob = `{}https://gen-artifacts.github.io/abi/v1.json{}`\n",
+            padding, padding
+        );
+        let findings = find_slop("go", src.as_bytes());
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("unpinned_asset")),
+            "a .github.io URL embedded inside a massive Go raw-string literal (>2KB) must be suppressed"
         );
     }
 }

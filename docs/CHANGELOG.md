@@ -3,6 +3,41 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-09 — Sprint Batch 135: Asset Payload Guard, RAG AST Dataflow Proof, CFG-Aware C Double-Free Witness
+
+**Directive:** (1) Architectural Oracle: `pub mod kani_bridge` → `mod kani_bridge` in `crates/forge/src/lib.rs` (phantom export eradication, confirmed with `cargo check -p forge`); (2) Phase 0 — Go massive-string literal suppression: `enclosing_go_string_is_massive()` guard added to `should_ignore_supply_chain_match` in `slop_hunter.rs` — suppresses `security:unpinned_asset` when URL is inside a Go `interpreted_string_literal` or `raw_string_literal` > 2048 bytes (addresses chainlink ABI blob FP); 2 TP/TN tests added; CANDIDATE_LEDGER chainlink `unpinned_asset` row deleted; LOW_YIELD_LEDGER updated with FP entry; (3) Phase 1 — P2-12: `requires_rag_answer_sink_dataflow(source, ext)` in `crates/forge/src/vector_topology.rs` — byte-level data-dependency tracer that extracts query-call LHS assignment variable and proves it flows into a downstream LLM sink argument region; 4 TP/TN tests; wired into `scan_buffer` in `crates/cli/src/hunt.rs` to demote `security:embedding_trust_transposition` to `Informational` when dataflow not proven; (4) Phase 2 — P2-15 Phase A: `find_c_double_free_witness(ext, source, file_path)` in `crates/forge/src/taint_catalog.rs` — CFG-aware C AST double-free detector; branch exclusivity check (if/else same if_statement → safe), null-guard and return-guard suppression; 4 deterministic TP/TN tests; wired into `scan_buffer`; (5) Hunt 3 targets: fireblocks/mpc-lib (goto-cleanup patterns correctly suppressed — no sequential double-free), freedomofpress/securedrop (existing CANDIDATE entries confirmed, no new findings), aave/aave-v3-core (net-new org, no findings → LOW_YIELD); (6) P2-12 and P2-15 hard-deleted from INNOVATION_LOG; (7) just audit exit 0.
+
+### Architectural Oracle — Phantom Export Eradication
+
+- `crates/forge/src/lib.rs` line 65: `pub mod kani_bridge;` → `#[allow(dead_code)]\nmod kani_bridge;`
+
+### Phase 0 — Go Massive String Literal Suppression (`crates/forge/src/slop_hunter.rs`)
+
+- Added `enclosing_go_string_is_massive(node: Node<'_>) -> bool`: walks ancestor chain for `interpreted_string_literal` or `raw_string_literal` node, returns `true` when `end_byte - start_byte > 2048`.
+- In `should_ignore_supply_chain_match`: new Go branch parses source with `eng.go_lang`, finds AST node at match offset, calls `enclosing_go_string_is_massive` to suppress FP on massive ABI blob strings.
+- 2 tests: `go_short_string_github_io_fires` (TP) and `go_massive_raw_string_github_io_suppressed` (TN).
+- CANDIDATE_LEDGER: deleted chainlink `unpinned_asset` row. LOW_YIELD_LEDGER: added FP entry.
+
+### Phase 1 — P2-12: RAG Answer-Sink Dataflow Proof (`crates/forge/src/vector_topology.rs` + `crates/cli/src/hunt.rs`)
+
+- Added `requires_rag_answer_sink_dataflow(source: &[u8], ext: &str) -> bool` with `extract_assignment_lhs` (backward `=`/`:=` scan), `find_matching_paren` (parenthesis depth counter).
+- Traces: query call LHS variable → LLM sink argument region → variable presence check.
+- 4 tests: `rag_dataflow_proven_when_var_flows_to_sink` (TP/Python), `rag_dataflow_not_proven_when_var_unlinked` (TN/Python), `rag_dataflow_false_for_non_rag_ext` (TN/Rust extension gate), `rag_dataflow_proven_for_go_short_decl` (TP/Go `:=`).
+- `hunt.rs scan_buffer`: after `apply_p2_11_ci_sink_demotion`, demotes `security:embedding_trust_transposition` to `Informational` for py/ts/js/go files where dataflow is not proven.
+
+### Phase 2 — P2-15 Phase A: CFG-Aware C Double-Free (`crates/forge/src/taint_catalog.rs` + `crates/cli/src/hunt.rs`)
+
+- Added `find_c_double_free_witness`, `walk_c_double_free`, `check_c_function_for_double_free`, `collect_c_free_calls`, `extract_c_free_arg`, `c_has_null_or_return_guard`, `c_guard_in_range`.
+- CFG constraints: branch exclusivity (`same if_statement` + opposite `is_consequence`) → safe; `p = NULL` or `return` between `free(p)` pairs → safe; sequential in same compound_statement without guard → emit `security:c_double_free` at `High`.
+- 4 tests in `double_free_tests` module.
+- `hunt.rs scan_buffer`: P2-15 findings wired in after P2-7 extension.
+
+### Phase 3 — Target Hydration
+
+- **fireblocks/mpc-lib**: 0 findings. Goto-cleanup error patterns (with `return` between free pairs) correctly suppressed by `c_has_null_or_return_guard`.
+- **freedomofpress/securedrop**: 6 findings (5× missing_ownership_check KevCritical, 1× subprocess_shell_injection Informational). Existing CANDIDATE entries confirmed. No new entries.
+- **aave/aave-v3-core** (net-new org): 0 findings. Solidity/TypeScript DeFi protocol. Routed to LOW_YIELD as no_findings.
+
 ## 2026-05-09 — Sprint Batch 134: Protobuf Any AST Dominance & FFI Reachability Proof
 
 **Directive:** (1) P2-16 — `find_protobuf_any_reachability` in `crates/forge/src/taint_catalog.rs`: Go AST dominance detector for unguarded Protobuf Any decode calls (`anypb.UnmarshalNew`, `ptypes.UnmarshalAny`, `jsonpb.Unmarshal`, `proto.Unmarshal`), emits `security:protobuf_any_unguarded_decode` at `High` when NO `if_statement` or `expression_switch_statement` ancestor checks `TypeUrl`; 4 deterministic tests; (2) P2-16 — `apply_p2_16_protobuf_demotion` in `crates/cli/src/hunt.rs`: demotes `security:protobuf_any_unguarded_decode` on `.proto` extension files to `Informational`; (3) P2-7 — `collect_rust_call_graph_edges` in `crates/forge/src/taint_catalog.rs`: Rust AST pub-FFI unsafe dereference detector emitting `security:public_ffi_unsafe_deref` at `High` for `pub fn` with `*mut`/`*const` params or `CStr::from_ptr` containing unsafe deref/from_ptr calls; 4 deterministic tests; (4) Architectural Oracle: `pub mod campaign` → `mod campaign` in `crates/forge/src/lib.rs` (phantom export eradication); (5) Hunt 3 distinct orgs (cashapp/misk, ClickHouse/ClickHouse, openai/codex); (6) P2-16 and P2-7 hard-deleted from INNOVATION_LOG; (7) just audit exit 0.

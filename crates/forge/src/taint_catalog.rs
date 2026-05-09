@@ -3314,3 +3314,382 @@ pub fn safe_write(ptr: *mut u8, val: u8) {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// P2-15 Phase A — CFG-Aware C Double-Free Witness
+// ---------------------------------------------------------------------------
+
+/// Metadata for a single `free(ptr)` call site collected during AST walk.
+struct CFreeCall {
+    /// Name of the pointer argument (identifier text).
+    ptr_name: String,
+    /// Source byte offset of the `free(` call expression start.
+    offset: usize,
+    /// Start byte of the enclosing `compound_statement` (function body or inner block).
+    block_start: usize,
+    /// If inside an `if_statement` branch: `(if_start_byte, is_consequence)`.
+    /// `true` = consequence branch; `false` = alternative (else) branch.
+    branch_ctx: Option<(usize, bool)>,
+}
+
+/// Detects sequential double-free vulnerabilities in C source files using
+/// CFG-aware AST dominance analysis.
+///
+/// A double-free is reported when:
+/// - `free(p)` appears twice in the same compound_statement block.
+/// - The two calls are **not** in mutually exclusive branches (if/else).
+/// - No intervening `p = NULL` assignment or `return` statement separates them.
+///
+/// Emits `security:c_double_free` at `High` severity.
+pub fn find_c_double_free_witness(
+    ext: &str,
+    source: &[u8],
+    file_path: &str,
+) -> Vec<common::slop::StructuredFinding> {
+    if !matches!(ext, "c" | "h" | "cpp" | "cc" | "cxx") {
+        return Vec::new();
+    }
+    if source.len() > 1_048_576 {
+        return Vec::new();
+    }
+    let mut parser = tree_sitter::Parser::new();
+    if parser
+        .set_language(&tree_sitter_c::LANGUAGE.into())
+        .is_err()
+    {
+        return Vec::new();
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return Vec::new();
+    };
+    let root = tree.root_node();
+    let mut findings = Vec::new();
+    walk_c_double_free(root, source, file_path, &mut findings, 0);
+    findings
+}
+
+fn walk_c_double_free(
+    node: Node<'_>,
+    source: &[u8],
+    file_path: &str,
+    findings: &mut Vec<common::slop::StructuredFinding>,
+    depth: usize,
+) {
+    if depth > 64 {
+        return;
+    }
+    if node.kind() == "function_definition" {
+        if let Some(body) = node.child_by_field_name("body") {
+            check_c_function_for_double_free(body, source, file_path, findings);
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        walk_c_double_free(child, source, file_path, findings, depth + 1);
+    }
+}
+
+fn check_c_function_for_double_free(
+    body: Node<'_>,
+    source: &[u8],
+    file_path: &str,
+    findings: &mut Vec<common::slop::StructuredFinding>,
+) {
+    let mut calls: Vec<CFreeCall> = Vec::new();
+    collect_c_free_calls(body, source, None, None, &mut calls, 0);
+
+    let mut reported: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let names: Vec<String> = {
+        let mut seen = std::collections::HashSet::new();
+        calls
+            .iter()
+            .filter(|c| seen.insert(c.ptr_name.clone()))
+            .map(|c| c.ptr_name.clone())
+            .collect()
+    };
+
+    for name in names {
+        if reported.contains(&name) {
+            continue;
+        }
+        let same: Vec<&CFreeCall> = calls.iter().filter(|c| c.ptr_name == name).collect();
+        if same.len() < 2 {
+            continue;
+        }
+        'outer: for ai in 0..same.len() {
+            for bi in ai + 1..same.len() {
+                let a = same[ai];
+                let b = same[bi];
+
+                // Branch exclusivity: safe when both are in the SAME if_statement
+                // but in opposite branches (consequence vs alternative).
+                if let (Some((if_a, cons_a)), Some((if_b, cons_b))) = (a.branch_ctx, b.branch_ctx) {
+                    if if_a == if_b && cons_a != cons_b {
+                        continue; // Mutually exclusive — safe.
+                    }
+                }
+
+                // Sequential block check: same compound_statement with no guard.
+                if a.block_start == b.block_start {
+                    let (first, second) = if a.offset < b.offset {
+                        (a.offset, b.offset)
+                    } else {
+                        (b.offset, a.offset)
+                    };
+                    if c_has_null_or_return_guard(body, source, &name, first, second) {
+                        continue;
+                    }
+                    let line = (source[..first]
+                        .iter()
+                        .filter(|&&byte| byte == b'\n')
+                        .count()
+                        + 1) as u32;
+                    findings.push(common::slop::StructuredFinding {
+                        id: "security:c_double_free".to_string(),
+                        severity: Some("High".to_string()),
+                        remediation: Some(format!(
+                            "`free({name})` called twice on the same sequential execution path \
+                             without an intervening null-assignment or return; set `{name} = NULL;` \
+                             after the first free to make the second call a safe no-op."
+                        )),
+                        file: Some(file_path.to_string()),
+                        line: Some(line),
+                        ..Default::default()
+                    });
+                    reported.insert(name.clone());
+                    break 'outer;
+                }
+            }
+        }
+    }
+}
+
+/// Recursively collects all `free(<identifier>)` call sites inside `node`,
+/// tracking the enclosing block and branch context.
+fn collect_c_free_calls(
+    node: Node<'_>,
+    source: &[u8],
+    block_start: Option<usize>,
+    branch_ctx: Option<(usize, bool)>,
+    calls: &mut Vec<CFreeCall>,
+    depth: usize,
+) {
+    if depth > 128 {
+        return;
+    }
+    match node.kind() {
+        "compound_statement" => {
+            let new_block = node.start_byte();
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                collect_c_free_calls(child, source, Some(new_block), branch_ctx, calls, depth + 1);
+            }
+        }
+        "if_statement" => {
+            let if_start = node.start_byte();
+            if let Some(cons) = node.child_by_field_name("consequence") {
+                collect_c_free_calls(
+                    cons,
+                    source,
+                    block_start,
+                    Some((if_start, true)),
+                    calls,
+                    depth + 1,
+                );
+            }
+            if let Some(alt) = node.child_by_field_name("alternative") {
+                // In tree-sitter-c, `alternative` is an `else_clause` with a `body` field.
+                if let Some(alt_body) = alt.child_by_field_name("body") {
+                    collect_c_free_calls(
+                        alt_body,
+                        source,
+                        block_start,
+                        Some((if_start, false)),
+                        calls,
+                        depth + 1,
+                    );
+                } else {
+                    let mut cursor = alt.walk();
+                    for child in alt.children(&mut cursor) {
+                        if child.is_named() {
+                            collect_c_free_calls(
+                                child,
+                                source,
+                                block_start,
+                                Some((if_start, false)),
+                                calls,
+                                depth + 1,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        "call_expression" => {
+            if let Some(ptr_name) = extract_c_free_arg(node, source) {
+                if let Some(block) = block_start {
+                    calls.push(CFreeCall {
+                        ptr_name,
+                        offset: node.start_byte(),
+                        block_start: block,
+                        branch_ctx,
+                    });
+                }
+            }
+            // Do not recurse into the call's own arguments.
+        }
+        _ => {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                collect_c_free_calls(child, source, block_start, branch_ctx, calls, depth + 1);
+            }
+        }
+    }
+}
+
+/// Extracts the pointer argument name from a `free(<identifier>)` call expression.
+/// Returns `None` if the function is not `free` or the argument is not a plain identifier.
+fn extract_c_free_arg(node: Node<'_>, source: &[u8]) -> Option<String> {
+    let func = node.child_by_field_name("function")?;
+    if func.utf8_text(source).ok()? != "free" {
+        return None;
+    }
+    let args = node.child_by_field_name("arguments")?;
+    let mut cursor = args.walk();
+    for arg in args.children(&mut cursor) {
+        if arg.kind() == "identifier" {
+            return arg.utf8_text(source).ok().map(str::to_string);
+        }
+    }
+    None
+}
+
+/// Returns `true` if the AST between `start` and `end` byte offsets contains
+/// either a `p = NULL`/`p = 0` assignment or a `return` statement — either of
+/// which makes the second `free(p)` unreachable or safe.
+fn c_has_null_or_return_guard(
+    root: Node<'_>,
+    source: &[u8],
+    ptr_name: &str,
+    start: usize,
+    end: usize,
+) -> bool {
+    c_guard_in_range(root, source, ptr_name, start, end, 0)
+}
+
+fn c_guard_in_range(
+    node: Node<'_>,
+    source: &[u8],
+    ptr_name: &str,
+    start: usize,
+    end: usize,
+    depth: usize,
+) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    let ns = node.start_byte();
+    let ne = node.end_byte();
+    if ne <= start || ns >= end {
+        return false;
+    }
+    match node.kind() {
+        "assignment_expression" => {
+            let lhs = node
+                .child_by_field_name("left")
+                .and_then(|n| n.utf8_text(source).ok())
+                .unwrap_or("");
+            let rhs = node
+                .child_by_field_name("right")
+                .and_then(|n| n.utf8_text(source).ok())
+                .unwrap_or("");
+            if lhs == ptr_name && matches!(rhs, "NULL" | "null" | "nullptr" | "0") {
+                return true;
+            }
+        }
+        "return_statement" => {
+            if ns > start && ns < end {
+                return true;
+            }
+        }
+        _ => {}
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if c_guard_in_range(child, source, ptr_name, start, end, depth + 1) {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod double_free_tests {
+    use super::find_c_double_free_witness;
+
+    /// TP: Sequential `free(p); ... free(p);` in same block — must fire.
+    #[test]
+    fn c_double_free_sequential_fires() {
+        let src = r#"
+void vuln(char *p) {
+    free(p);
+    process(p);
+    free(p);
+}
+"#;
+        let findings = find_c_double_free_witness("c", src.as_bytes(), "src/vuln.c");
+        assert!(
+            !findings.is_empty(),
+            "sequential free(p); free(p); must produce a double-free finding"
+        );
+        assert_eq!(findings[0].id, "security:c_double_free");
+        assert_eq!(findings[0].severity.as_deref(), Some("High"));
+    }
+
+    /// TN: `free(p)` in if-consequence + `free(p)` in else — branch exclusive, must be silent.
+    #[test]
+    fn c_double_free_silent_for_if_else_branches() {
+        let src = r#"
+void safe_branch(char *p, int flag) {
+    if (flag) {
+        free(p);
+    } else {
+        free(p);
+    }
+}
+"#;
+        let findings = find_c_double_free_witness("c", src.as_bytes(), "src/safe.c");
+        assert!(
+            findings.is_empty(),
+            "if/else branch-exclusive free(p) must not produce a double-free finding"
+        );
+    }
+
+    /// TN: Intervening `p = NULL` guard between two `free(p)` calls — must be silent.
+    #[test]
+    fn c_double_free_silent_when_null_guard_present() {
+        let src = r#"
+void guarded(char *p) {
+    free(p);
+    p = NULL;
+    free(p);
+}
+"#;
+        let findings = find_c_double_free_witness("c", src.as_bytes(), "src/guarded.c");
+        assert!(
+            findings.is_empty(),
+            "free(p); p = NULL; free(p); must not produce a double-free finding"
+        );
+    }
+
+    /// TN: Non-C extension must return no findings.
+    #[test]
+    fn c_double_free_silent_for_non_c_ext() {
+        let src = b"free(p); free(p);";
+        let findings = find_c_double_free_witness("rs", src, "src/lib.rs");
+        assert!(
+            findings.is_empty(),
+            "non-C extension must not be analyzed for double-free"
+        );
+    }
+}

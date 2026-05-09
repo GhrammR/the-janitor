@@ -3663,7 +3663,34 @@ fn scan_buffer(
             }),
     );
 
+    // P2-15 Phase A: CFG-aware C double-free witness.
+    findings.extend(
+        forge::taint_catalog::find_c_double_free_witness(ext, source, label)
+            .into_iter()
+            .map(|mut f| {
+                if f.file.is_none() {
+                    f.file = Some(label.to_string());
+                }
+                f
+            }),
+    );
+
     apply_p2_11_ci_sink_demotion(label, &mut findings);
+
+    // P2-12: Demote embedding_trust_transposition when RAG answer-sink dataflow is not proven.
+    // A vector-query call present in the file is insufficient for a bounty-grade finding;
+    // the query result variable must structurally flow into a downstream LLM invoke call.
+    if matches!(ext, "py" | "ts" | "js" | "go") {
+        let dataflow_proven =
+            forge::vector_topology::requires_rag_answer_sink_dataflow(source, ext);
+        if !dataflow_proven {
+            for f in findings.iter_mut() {
+                if f.id == "security:embedding_trust_transposition" {
+                    f.severity = Some("Informational".to_string());
+                }
+            }
+        }
+    }
 
     findings
 }

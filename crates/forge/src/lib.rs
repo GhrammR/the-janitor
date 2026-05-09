@@ -62,7 +62,8 @@ pub mod idor;
 pub mod ifds;
 pub mod intent_divergence;
 pub mod invisible_payload;
-pub mod kani_bridge;
+#[allow(dead_code)]
+mod kani_bridge;
 pub mod labyrinth;
 pub mod legacy_c_mining;
 pub mod library_identity;
