@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:2bec0028-a5a1-4ad2-8a61-eac43c6fa8c6",
+  "serialNumber": "urn:uuid:fd45c696-c1b6-45fb-9710-ca7a5c246598",
   "metadata": {
-    "timestamp": "2026-05-06T22:07:48.672112634Z",
+    "timestamp": "2026-05-10T09:57:12.668013931Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.2",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.4",
       "name": "parallel-bounce",
-      "version": "10.2.0-rc.2",
+      "version": "10.2.0-rc.4",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/parallel-bounce@10.2.0-rc.2?download_url=file://.",
+      "purl": "pkg:cargo/parallel-bounce@10.2.0-rc.4?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.2 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.4 bin-target-0",
           "name": "parallel-bounce",
-          "version": "10.2.0-rc.2",
-          "purl": "pkg:cargo/parallel-bounce@10.2.0-rc.2?download_url=file://.#src/main.rs"
+          "version": "10.2.0-rc.4",
+          "purl": "pkg:cargo/parallel-bounce@10.2.0-rc.4?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -734,7 +734,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.2",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.0-rc.4",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#rayon@1.12.0",

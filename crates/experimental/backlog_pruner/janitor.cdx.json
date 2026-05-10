@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:6e7ed3cb-11e0-4caa-b9b6-490d34569072",
+  "serialNumber": "urn:uuid:86afc8d7-e63b-4014-a84a-99407cc43d89",
   "metadata": {
-    "timestamp": "2026-05-06T22:07:48.504741105Z",
+    "timestamp": "2026-05-10T09:57:12.510161606Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.2",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.4",
       "name": "backlog_pruner",
-      "version": "10.2.0-rc.2",
+      "version": "10.2.0-rc.4",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/backlog_pruner@10.2.0-rc.2?download_url=file://.",
+      "purl": "pkg:cargo/backlog_pruner@10.2.0-rc.4?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.2 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.4 bin-target-0",
           "name": "backlog_pruner",
-          "version": "10.2.0-rc.2",
-          "purl": "pkg:cargo/backlog_pruner@10.2.0-rc.2?download_url=file://.#src/lib.rs"
+          "version": "10.2.0-rc.4",
+          "purl": "pkg:cargo/backlog_pruner@10.2.0-rc.4?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -1808,7 +1808,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.2",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.0-rc.4",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.5",

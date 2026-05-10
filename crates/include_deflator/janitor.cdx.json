@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:5356b217-a05e-4253-b936-767b2367b409",
+  "serialNumber": "urn:uuid:65651f07-7176-4122-8388-2cd25369806d",
   "metadata": {
-    "timestamp": "2026-05-06T22:07:48.557952477Z",
+    "timestamp": "2026-05-10T09:57:12.561136547Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,23 +14,23 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4",
       "name": "include_deflator",
-      "version": "10.2.0-rc.2",
+      "version": "10.2.0-rc.4",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/include_deflator@10.2.0-rc.2?download_url=file://.",
+      "purl": "pkg:cargo/include_deflator@10.2.0-rc.4?download_url=file://.",
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4 bin-target-0",
           "name": "include_deflator",
-          "version": "10.2.0-rc.2",
-          "purl": "pkg:cargo/include_deflator@10.2.0-rc.2?download_url=file://.#src/lib.rs"
+          "version": "10.2.0-rc.4",
+          "purl": "pkg:cargo/include_deflator@10.2.0-rc.4?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -2580,7 +2580,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.2",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.5",
