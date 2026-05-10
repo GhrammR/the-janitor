@@ -1374,6 +1374,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_saml_xsw_and_xxe(source));
             f.extend(find_oauth_state_omission(source));
             f.extend(find_llm_prompt_injection_sinks(source));
+            f.extend(find_llm_unbounded_prompt_concat_slop(source));
             f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             // Phase 2 R&D: dangerous-call AST walk (exec/eval/pickle/os.system/__import__)
             f.extend(find_python_slop_ast(eng, parsed));
@@ -1415,6 +1416,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>) -> Vec<SlopFinding> {
             f.extend(find_js_phantom_payload_slop(eng, parsed));
             f.extend(find_js_slopsquat_imports(eng, parsed));
             f.extend(find_llm_prompt_injection_sinks(source));
+            f.extend(find_llm_unbounded_prompt_concat_slop(source));
             f.extend(crate::chronometric_auth::detect_clock_skew_auth_split_brain(source));
             f.extend(crate::oauth_account_fusion::detect_oauth_account_fusion(
                 source,
@@ -3207,6 +3209,54 @@ fn find_llm_prompt_injection_sinks(source: &[u8]) -> Vec<SlopFinding> {
         }
     }
     Vec::new()
+}
+
+/// Adapter: converts `StructuredFinding` results from the high-precision
+/// `llm_prompt_injection` module into `SlopFinding` so they can join the
+/// `find_slop` dispatch pipeline.  Fires only when ALL three precision filters
+/// pass: LLM sink in file + role indicator in string + user-controlled interp.
+fn find_llm_unbounded_prompt_concat_slop(source: &[u8]) -> Vec<SlopFinding> {
+    let Ok(src_str) = std::str::from_utf8(source) else {
+        return Vec::new();
+    };
+    let structured = crate::llm_prompt_injection::find_llm_unbounded_prompt_concat(None, src_str);
+    if structured.is_empty() {
+        return Vec::new();
+    }
+    let line_starts: Vec<usize> = std::iter::once(0)
+        .chain(src_str.char_indices().filter_map(
+            |(i, c)| {
+                if c == '\n' {
+                    Some(i + 1)
+                } else {
+                    None
+                }
+            },
+        ))
+        .collect();
+    structured
+        .into_iter()
+        .filter_map(|f| {
+            let line_idx = f.line?.saturating_sub(1) as usize;
+            let start = *line_starts.get(line_idx)?;
+            let end = line_starts
+                .get(line_idx + 1)
+                .copied()
+                .unwrap_or(source.len());
+            Some(SlopFinding {
+                start_byte: start,
+                end_byte: end,
+                description: format!(
+                    "{} — user-controlled variable interpolated directly into \
+                     system-prompt string literal; attacker can override operator \
+                     instructions (prompt injection boundary violation)",
+                    f.id
+                ),
+                domain: DOMAIN_FIRST_PARTY,
+                severity: Severity::Critical,
+            })
+        })
+        .collect()
 }
 
 fn find_latex_camoleak_payload(source: &[u8]) -> Vec<SlopFinding> {

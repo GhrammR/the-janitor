@@ -364,6 +364,27 @@ Includes all Sovereign capabilities, plus:
 
 ---
 
+## VERIFIABLE SECURITY POSTURE
+
+**Claims without evidence are marketing. Evidence without claims is a data dump. Below is both.**
+
+| Claim | Evidence |
+|:------|:---------|
+| CI is green | [GitHub Actions — main branch](https://github.com/janitor-security/the-janitor/actions) |
+| Release binary is tamper-evident | Every release ships a `.sha384` sidecar + ML-DSA-65 `.sig`; verify with `janitor verify-asset` |
+| SLSA Level 4 reproducible builds | Dual-build Docker comparison on every release — see [release workflow](https://github.com/janitor-security/the-janitor/blob/main/.github/workflows/janitor.yml) |
+| Dependency CVEs tracked | [Dependabot PRs](https://github.com/janitor-security/the-janitor/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot) — auto-surfaced, triaged on each release cycle |
+| OpenSSF Scorecard | Runs on every push — see [scorecard.yml](https://github.com/janitor-security/the-janitor/blob/main/.github/workflows/scorecard.yml) |
+| Security disclosure | [security@thejanitor.app](mailto:security@thejanitor.app) — coordinated, no-pressure, 90-day max window |
+
+**What is certified today**: BUSL-1.1 licensed open-source binary. Dual-PQC-signed CBOMs. SHA-384 ledger. SLSA Level 4 build provenance. OpenSSF Scorecard continuous monitoring.
+
+**What is a roadmap item**: SOC 2 Type II audit (Industrial Tier on request). FedRAMP Moderate ATO (targeting 2027).
+
+**Enterprise pilots and Anthropic grant inquiries**: [security@thejanitor.app](mailto:security@thejanitor.app). Include your use case, deployment environment, and compliance requirements. Pilot licenses (30-day, full Industrial Tier) are available for qualifying evaluations.
+
+---
+
 ## License (BUSL-1.1)
 
 **The Janitor** is licensed under the [Business Source License 1.1 (BUSL-1.1)](https://spdx.org/licenses/BUSL-1.1.html).
