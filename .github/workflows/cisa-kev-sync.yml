@@ -84,10 +84,17 @@ jobs:
           fi
           /tmp/janitor-bin/janitor --version
 
-      - name: Run update-wisdom --ci-mode
+      - name: Run update-wisdom --kev-manifest-only
+        # The weekly diff PR only consumes .janitor/wisdom_manifest.json — it does
+        # NOT need the wisdom.rkyv binary mirror.  Coupling this workflow to a
+        # separate (potentially-undeployed) signed-mirror endpoint was the root
+        # cause of the 2026-Q2 weekly-sync outage.  --kev-manifest-only fetches
+        # ONLY the CISA KEV catalog (with 3-attempt exponential backoff) and
+        # writes the JSON manifest, leaving full wisdom.rkyv sync to ad-hoc
+        # `janitor update-wisdom --ci-mode` runs.
         run: |
           set -euo pipefail
-          /tmp/janitor-bin/janitor update-wisdom . --ci-mode
+          /tmp/janitor-bin/janitor update-wisdom . --kev-manifest-only
           echo "Manifest written:"
           wc -l .janitor/wisdom_manifest.json
 

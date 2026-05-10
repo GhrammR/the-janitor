@@ -656,6 +656,14 @@ enum Commands {
         /// the KEV catalog across runs without parsing binary rkyv data.
         #[arg(long, default_value_t = false)]
         ci_mode: bool,
+        /// Fetch ONLY the CISA KEV catalog and write `.janitor/wisdom_manifest.json`.
+        ///
+        /// Skips the wisdom.rkyv binary-registry mirror sync entirely.  The weekly
+        /// KEV diff PR workflow only needs the JSON manifest, so coupling it to a
+        /// possibly-undeployed wisdom.rkyv mirror was a fragility.  Mutually
+        /// exclusive with `--ci-mode` (which performs the full strict sync).
+        #[arg(long, default_value_t = false, conflicts_with = "ci_mode")]
+        kev_manifest_only: bool,
     },
     /// Synchronize the OSV malicious-package corpus into `.janitor/slopsquat_corpus.rkyv`.
     UpdateSlopsquat {
@@ -1577,7 +1585,17 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|| path.join(".janitor").join("symbols.rkyv"));
             daemon::unix::serve(std::path::Path::new(socket), &registry_path).await?;
         }
-        Commands::UpdateWisdom { path, ci_mode } => cmd_update_wisdom(path, *ci_mode)?,
+        Commands::UpdateWisdom {
+            path,
+            ci_mode,
+            kev_manifest_only,
+        } => {
+            if *kev_manifest_only {
+                cmd_update_wisdom_kev_manifest_only(path)?;
+            } else {
+                cmd_update_wisdom(path, *ci_mode)?;
+            }
+        }
         Commands::UpdateSlopsquat { path } => cmd_update_slopsquat(path, &execution_tier)?,
         Commands::IngestCampaigns { dir } => campaign_ingest::cmd_ingest_campaigns(dir)?,
         Commands::Export {
@@ -5549,36 +5567,7 @@ fn cmd_update_wisdom_with_urls(
     println!("\u{1f9e0} Wisdom Registry synchronized with Janitor Sentinel.");
 
     if ci_mode {
-        // 3-attempt exponential backoff: 1 s → 2 s → 4 s.
-        // A single transient CISA endpoint failure must not silently produce
-        // an empty KEV manifest and tank the weekly sync.
-        const MAX_KEV_BYTES: u64 = 32 * 1024 * 1024;
-        let mut kev_bytes_opt: Option<Vec<u8>> = None;
-        for attempt in 0u32..3 {
-            if attempt > 0 {
-                std::thread::sleep(std::time::Duration::from_secs(1u64 << (attempt - 1)));
-            }
-            let mut resp = match ureq::get(kev_url).call() {
-                Ok(r) => r,
-                Err(_e) => continue, // CodeQL: URL redacted — may carry credentials.
-            };
-            match resp
-                .body_mut()
-                .with_config()
-                .limit(MAX_KEV_BYTES)
-                .read_to_vec()
-            {
-                Ok(bytes) => {
-                    kev_bytes_opt = Some(bytes);
-                    break;
-                }
-                Err(_e) => continue,
-            }
-        }
-        let kev_bytes = kev_bytes_opt.ok_or_else(|| {
-            anyhow::anyhow!("update-wisdom --ci-mode: CISA KEV fetch failed after 3 attempts")
-        })?;
-
+        let kev_bytes = fetch_kev_with_retry(kev_url, "update-wisdom --ci-mode")?;
         let entries = parse_kev_json_entries(&kev_bytes)?;
 
         let manifest = serde_json::json!({
@@ -5609,6 +5598,133 @@ fn cmd_update_wisdom_with_urls(
     }
 
     Ok(())
+}
+
+/// Fetch ONLY the CISA KEV catalog and write `.janitor/wisdom_manifest.json`.
+///
+/// This codepath exists so the weekly KEV diff workflow can continue to operate
+/// even when the wisdom.rkyv binary mirror is undeployed or unreachable.  The
+/// JSON manifest is the only artifact the workflow's PR consumes; coupling its
+/// production to a separate (and possibly unavailable) signed binary mirror was
+/// the root cause of the 2026-Q2 weekly-sync outage.  The full strict
+/// `--ci-mode` path is still the right tool for full intelligence sync.
+fn cmd_update_wisdom_kev_manifest_only(project_root: &Path) -> anyhow::Result<()> {
+    const DEFAULT_CISA_KEV_URL: &str =
+        "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json";
+    let kev_url = env::var("JANITOR_CISA_KEV_URL")
+        .ok()
+        .filter(|url| !url.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_CISA_KEV_URL.to_string());
+    cmd_update_wisdom_kev_manifest_only_with_url(project_root, &kev_url)
+}
+
+fn cmd_update_wisdom_kev_manifest_only_with_url(
+    project_root: &Path,
+    kev_url: &str,
+) -> anyhow::Result<()> {
+    let janitor_dir = project_root.join(".janitor");
+    std::fs::create_dir_all(&janitor_dir)
+        .with_context(|| format!("creating {}", janitor_dir.display()))?;
+
+    let kev_bytes = fetch_kev_with_retry(kev_url, "update-wisdom --kev-manifest-only")?;
+    let entries = parse_kev_json_entries(&kev_bytes)?;
+
+    let manifest = serde_json::json!({
+        "source":       "CISA Known Exploited Vulnerabilities Catalog",
+        "generated_at": utc_now_iso8601(),
+        "entry_count":  entries.len(),
+        "entries":      entries,
+    });
+
+    write_wisdom_manifest(&janitor_dir, &manifest)?;
+
+    println!(
+        "\u{1f4cb} KEV manifest written: {} entries \u{2192} {}",
+        manifest["entry_count"],
+        janitor_dir.join("wisdom_manifest.json").display()
+    );
+
+    Ok(())
+}
+
+/// Classify a `ureq::Error` into a static-string label suitable for diagnostic
+/// logs without leaking URL fragments or credentials.  CodeQL's
+/// cleartext-logging-sensitive-data rule treats `ureq::Error::Display` output
+/// as a taint sink because it embeds the request URL — using only this static
+/// classifier in user-facing logs severs that sink while preserving enough
+/// signal to distinguish network from auth from server-side faults.
+fn classify_ureq_error(e: &ureq::Error) -> &'static str {
+    match e {
+        ureq::Error::StatusCode(c) => {
+            if (400..500).contains(c) {
+                "http_client_error_4xx"
+            } else if (500..600).contains(c) {
+                "http_server_error_5xx"
+            } else {
+                "http_other_status"
+            }
+        }
+        _ => "network_or_unknown",
+    }
+}
+
+/// Fetch the raw CISA KEV catalog JSON bytes with 3-attempt exponential backoff.
+///
+/// 4xx responses are treated as permanent and short-circuit the retry loop —
+/// no useful retry can recover from a 401/403/404 against a static asset.
+/// All other failures (connection refused, timeout, 5xx, body-read truncation)
+/// are retried with 1s → 2s → 4s backoff.
+fn fetch_kev_with_retry(kev_url: &str, mode_label: &str) -> anyhow::Result<Vec<u8>> {
+    const MAX_KEV_BYTES: u64 = 32 * 1024 * 1024;
+    const MAX_ATTEMPTS: u32 = 3;
+    let mut last_class: &'static str = "no_attempt_completed";
+    for attempt in 0u32..MAX_ATTEMPTS {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_secs(1u64 << (attempt - 1)));
+        }
+        let mut resp = match ureq::get(kev_url).call() {
+            Ok(r) => r,
+            Err(e) => {
+                last_class = classify_ureq_error(&e);
+                eprintln!(
+                    "[kev-fetch] attempt {}/{MAX_ATTEMPTS} failed (class={last_class})",
+                    attempt + 1
+                );
+                if last_class == "http_client_error_4xx" {
+                    break;
+                }
+                continue;
+            }
+        };
+        match resp
+            .body_mut()
+            .with_config()
+            .limit(MAX_KEV_BYTES)
+            .read_to_vec()
+        {
+            Ok(bytes) => {
+                if attempt > 0 {
+                    eprintln!(
+                        "[kev-fetch] succeeded on attempt {}/{MAX_ATTEMPTS}",
+                        attempt + 1
+                    );
+                }
+                return Ok(bytes);
+            }
+            Err(_e) => {
+                last_class = "body_read_failed";
+                eprintln!(
+                    "[kev-fetch] attempt {}/{MAX_ATTEMPTS} body-read failed",
+                    attempt + 1
+                );
+                continue;
+            }
+        }
+    }
+    eprintln!("[kev-fetch] all attempts failed (last_class={last_class})");
+    anyhow::bail!(
+        "{mode_label}: CISA KEV fetch failed after {MAX_ATTEMPTS} attempts (class={last_class})"
+    )
 }
 
 const OSV_DUMP_BASE_URL: &str = "https://osv-vulnerabilities.storage.googleapis.com";
@@ -6087,46 +6203,131 @@ fn select_wisdom_quorum_candidate(
     ))
 }
 
+/// 3-attempt exponential-backoff wrapper around [`fetch_verified_wisdom_payload_once`].
+///
+/// 4xx responses short-circuit (a 401/403/404 against a signed-mirror endpoint
+/// is permanent — no useful retry recovers from it).  All other failures
+/// (timeout, connection-reset, 5xx, body-read truncation) are retried with
+/// 1 s → 2 s → 4 s backoff.  Classification labels are static strings; the
+/// underlying URL and error details are never logged (CodeQL: mirror URL may
+/// carry rotation credentials in its query string).
 fn fetch_verified_wisdom_payload(
     wisdom_url: &str,
     wisdom_sig_url: &str,
     mode_label: &str,
 ) -> anyhow::Result<VerifiedWisdomPayload> {
-    let mut response = ureq::get(wisdom_url)
-        .call()
-        // CodeQL: URL and error details redacted — mirror URL may contain credentials.
-        .map_err(|_e| anyhow::anyhow!("{mode_label}: wisdom archive fetch failed"))?;
+    const MAX_ATTEMPTS: u32 = 3;
+    let mut last_class: &'static str = "no_attempt_completed";
+    for attempt in 0u32..MAX_ATTEMPTS {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_secs(1u64 << (attempt - 1)));
+        }
+        match fetch_verified_wisdom_payload_once(wisdom_url, wisdom_sig_url, mode_label) {
+            Ok(p) => {
+                if attempt > 0 {
+                    eprintln!(
+                        "[wisdom-fetch] succeeded on attempt {}/{MAX_ATTEMPTS}",
+                        attempt + 1
+                    );
+                }
+                return Ok(p);
+            }
+            Err((class, _e)) => {
+                last_class = class;
+                eprintln!(
+                    "[wisdom-fetch] attempt {}/{MAX_ATTEMPTS} failed (class={last_class})",
+                    attempt + 1
+                );
+                if class == "http_client_error_4xx" {
+                    break;
+                }
+            }
+        }
+    }
+    eprintln!("[wisdom-fetch] all attempts failed (last_class={last_class})");
+    anyhow::bail!("{mode_label}: wisdom archive fetch failed (class={last_class})")
+}
+
+/// Single-shot wisdom fetch.  Returns Err with a static classification label
+/// alongside the original error (the original is intentionally discarded by
+/// the retry wrapper to avoid logging mirror URLs or rotation credentials).
+fn fetch_verified_wisdom_payload_once(
+    wisdom_url: &str,
+    wisdom_sig_url: &str,
+    mode_label: &str,
+) -> Result<VerifiedWisdomPayload, (&'static str, anyhow::Error)> {
+    let mut response = match ureq::get(wisdom_url).call() {
+        Ok(r) => r,
+        Err(e) => {
+            let class = classify_ureq_error(&e);
+            return Err((
+                class,
+                anyhow::anyhow!("{mode_label}: wisdom archive fetch failed (class={class})"),
+            ));
+        }
+    };
     // Circuit breaker: wisdom archives are typically a few hundred KiB.
     // 64 MiB provides a generous safety margin against unbounded heap growth.
     const MAX_WISDOM_BYTES: u64 = 64 * 1024 * 1024;
-    let bytes = response
+    let bytes = match response
         .body_mut()
         .with_config()
         .limit(MAX_WISDOM_BYTES)
         .read_to_vec()
-        // CodeQL: error details redacted.
-        .map_err(|_e| anyhow::anyhow!("update-wisdom: reading wisdom response body failed"))?;
+    {
+        Ok(b) => b,
+        Err(_e) => {
+            return Err((
+                "body_read_failed",
+                anyhow::anyhow!("update-wisdom: reading wisdom response body failed"),
+            ))
+        }
+    };
 
-    let mut sig_response = ureq::get(wisdom_sig_url)
-        .call()
-        // CodeQL: URL and error details redacted — mirror URL may contain credentials.
-        .map_err(|_e| anyhow::anyhow!("{mode_label}: wisdom signature fetch failed"))?;
+    let mut sig_response = match ureq::get(wisdom_sig_url).call() {
+        Ok(r) => r,
+        Err(e) => {
+            let class = classify_ureq_error(&e);
+            return Err((
+                class,
+                anyhow::anyhow!(
+                    "{mode_label}: wisdom signature fetch failed (class={class})"
+                ),
+            ));
+        }
+    };
     // Circuit breaker: Ed25519 signatures are exactly 64 bytes; 4 KiB is generous.
     const MAX_SIG_BYTES: u64 = 4 * 1024;
-    let sig_bytes = sig_response
+    let sig_bytes = match sig_response
         .body_mut()
         .with_config()
         .limit(MAX_SIG_BYTES)
         .read_to_vec()
-        // CodeQL: error details redacted.
-        .map_err(|_e| {
-            anyhow::anyhow!("update-wisdom: reading wisdom signature response body failed")
-        })?;
+    {
+        Ok(b) => b,
+        Err(_e) => {
+            return Err((
+                "sig_body_read_failed",
+                anyhow::anyhow!("update-wisdom: reading wisdom signature response body failed"),
+            ))
+        }
+    };
 
-    verify_wisdom_signature(&bytes, &sig_bytes)
-        .context("update-wisdom: detached wisdom signature verification failed")?;
-    let signature = common::wisdom::normalize_signature_string(&sig_bytes)
-        .ok_or_else(|| anyhow::anyhow!("update-wisdom: detached signature was empty"))?;
+    if let Err(e) = verify_wisdom_signature(&bytes, &sig_bytes) {
+        return Err((
+            "signature_invalid",
+            e.context("update-wisdom: detached wisdom signature verification failed"),
+        ));
+    }
+    let signature = match common::wisdom::normalize_signature_string(&sig_bytes) {
+        Some(s) => s,
+        None => {
+            return Err((
+                "signature_empty",
+                anyhow::anyhow!("update-wisdom: detached signature was empty"),
+            ))
+        }
+    };
     let hash = blake3::hash(&bytes).to_hex().to_string();
     Ok(VerifiedWisdomPayload {
         bytes,
@@ -6905,9 +7106,128 @@ mod governor_routing_tests {
 #[cfg(test)]
 mod wisdom_sync_tests {
     use super::{
+        classify_ureq_error, cmd_update_wisdom_kev_manifest_only_with_url,
         cmd_update_wisdom_with_urls, select_wisdom_quorum_candidate, VerifiedWisdomPayload,
     };
     use std::fs;
+
+    #[test]
+    fn classify_ureq_error_distinguishes_status_classes() {
+        assert_eq!(
+            classify_ureq_error(&ureq::Error::StatusCode(404)),
+            "http_client_error_4xx",
+            "404 must classify as 4xx"
+        );
+        assert_eq!(
+            classify_ureq_error(&ureq::Error::StatusCode(401)),
+            "http_client_error_4xx",
+            "401 must classify as 4xx"
+        );
+        assert_eq!(
+            classify_ureq_error(&ureq::Error::StatusCode(503)),
+            "http_server_error_5xx",
+            "503 must classify as 5xx"
+        );
+        assert_eq!(
+            classify_ureq_error(&ureq::Error::StatusCode(302)),
+            "http_other_status",
+            "non-error status must classify as other"
+        );
+    }
+
+    #[test]
+    fn kev_manifest_only_fails_with_classification_when_kev_unreachable() {
+        let temp_root = std::env::temp_dir().join(format!(
+            "janitor-kev-manifest-only-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&temp_root).expect("temp root must be created");
+
+        let error = cmd_update_wisdom_kev_manifest_only_with_url(
+            &temp_root,
+            "http://127.0.0.1:9/known_exploited_vulnerabilities.json",
+        )
+        .expect_err("manifest-only must fail when KEV endpoint is unreachable");
+        let msg = error.to_string();
+        assert!(
+            msg.contains("CISA KEV fetch failed"),
+            "error must identify the failure point"
+        );
+        assert!(
+            msg.contains("class="),
+            "error must carry a static classification label"
+        );
+        assert!(
+            !temp_root.join(".janitor").join("wisdom.rkyv").exists(),
+            "manifest-only failure must never fabricate a wisdom.rkyv archive"
+        );
+        assert!(
+            !temp_root
+                .join(".janitor")
+                .join("wisdom_manifest.json")
+                .exists(),
+            "manifest-only failure must not write a partial manifest"
+        );
+
+        let _ = fs::remove_dir_all(&temp_root);
+    }
+
+    #[test]
+    fn kev_manifest_only_writes_manifest_on_success() {
+        // Spin up a local HTTP server that returns a minimal CISA KEV JSON body
+        // and verify the manifest-only path writes the expected JSON manifest
+        // without ever touching wisdom.rkyv.
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener must bind");
+        let port = listener.local_addr().expect("addr").port();
+        let server_thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 4096];
+            let _ = stream.read(&mut buf);
+            let body = br#"{"vulnerabilities":[{"cveID":"CVE-2026-0001","vendorProject":"vendor","product":"prod","vulnerabilityName":"name","dateAdded":"2026-01-01"}]}"#;
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body);
+        });
+
+        let temp_root = std::env::temp_dir().join(format!(
+            "janitor-kev-manifest-only-ok-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir_all(&temp_root).expect("temp root must be created");
+
+        let url = format!("http://127.0.0.1:{port}/kev.json");
+        cmd_update_wisdom_kev_manifest_only_with_url(&temp_root, &url)
+            .expect("manifest-only must succeed against a working KEV endpoint");
+
+        let manifest_path = temp_root.join(".janitor").join("wisdom_manifest.json");
+        assert!(
+            manifest_path.exists(),
+            "manifest-only success must write wisdom_manifest.json"
+        );
+        assert!(
+            !temp_root.join(".janitor").join("wisdom.rkyv").exists(),
+            "manifest-only must NEVER write wisdom.rkyv (decoupling invariant)"
+        );
+
+        let body = fs::read_to_string(&manifest_path).expect("manifest readable");
+        assert!(
+            body.contains("CVE-2026-0001"),
+            "manifest must contain the served CVE id"
+        );
+        assert!(
+            body.contains("CISA Known Exploited Vulnerabilities Catalog"),
+            "manifest must record the canonical source label"
+        );
+
+        let _ = server_thread.join();
+        let _ = fs::remove_dir_all(&temp_root);
+    }
 
     #[test]
     fn ci_mode_fails_closed_when_wisdom_fetch_fails() {
