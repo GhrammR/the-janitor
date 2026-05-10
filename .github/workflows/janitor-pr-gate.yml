@@ -72,7 +72,7 @@ jobs:
         uses: ./
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fail_on_slop: 'true'
+          governor_url: ${{ secrets.JANITOR_GOVERNOR_URL }}
 
       - name: Upload bounce log
         # Always upload so reviewers can inspect findings even on gate failure.

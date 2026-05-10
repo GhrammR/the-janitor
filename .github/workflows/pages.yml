@@ -5,8 +5,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: 'pages'
   cancel-in-progress: true
@@ -16,6 +14,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -31,8 +33,8 @@ jobs:
           cp index.html _pages_publish/
           # CNAME and .nojekyll are required at site root for custom domain
           # + raw HTML serving (no Jekyll preprocessing).
-          [ -f CNAME ]      && cp CNAME      _pages_publish/ || true
-          [ -f .nojekyll ]  && cp .nojekyll  _pages_publish/ || true
+          if [ -f CNAME ];    then cp CNAME    _pages_publish/; fi
+          if [ -f .nojekyll ]; then cp .nojekyll _pages_publish/; fi
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
