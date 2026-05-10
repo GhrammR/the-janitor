@@ -74,8 +74,11 @@ jobs:
 
           # Fetch the last (THRESHOLD + 2) completed runs of this workflow so we
           # can determine consecutive-failure depth without ambiguity.
+          # `--repo` is mandatory: this job does not check out source, so gh has
+          # no git context to auto-detect the repository from.
           LIMIT=$((THRESHOLD + 2))
           RUNS_JSON=$(gh run list \
+            --repo "${REPO}" \
             --workflow="${WORKFLOW_PATH}" \
             --status=completed \
             --limit="${LIMIT}" \
