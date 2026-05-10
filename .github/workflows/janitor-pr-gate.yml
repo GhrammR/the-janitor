@@ -16,7 +16,10 @@ jobs:
     timeout-minutes: 15
     env:
       RUSTC_WRAPPER: sccache
-      SCCACHE_DIR: ~/.cache/sccache
+      # Workspace-owned path, parity with janitor.yml.  Avoids the
+      # `~/.cache/sccache/preprocessor: Permission denied (os error 13)`
+      # crash when a prior step left a $HOME cache dir owned by another uid.
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
       SCCACHE_CACHE_SIZE: 2G
     # Job-level: read PR diff + write step summary.
     permissions:
@@ -36,10 +39,16 @@ jobs:
       - name: Enable sccache
         uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
+      - name: Prepare sccache directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$SCCACHE_DIR"
+
       - name: Restore sccache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/.cache/sccache
+          path: ${{ github.workspace }}/.cache/sccache
           key: ${{ runner.os }}-sccache-janitor-pr-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sccache-janitor-pr-

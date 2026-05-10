@@ -54,20 +54,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/janitor-bin
-          # Download binary + integrity artifacts (exact names — avoid over-matching
-          # --pattern "janitor" which also matches janitor.sha384, janitor.sig, etc.)
+          # Mandatory artifacts: the binary plus its SHA-384 sidecar.
+          # `gh release download --pattern "janitor"` matches the literal asset
+          # name "janitor" only — it does NOT glob over janitor.sha384 / .sig.
           gh release download --repo janitor-security/the-janitor \
             --pattern "janitor" \
             --pattern "janitor.sha384" \
-            --pattern "janitor.sig" \
             --dir /tmp/janitor-bin \
             --clobber
+          # Optional artifact: ML-DSA-65 signature.  Older releases (pre-PQC)
+          # ship without one — failing the whole job because the asset is
+          # absent is a regression, so swallow the non-zero exit.
+          gh release download --repo janitor-security/the-janitor \
+            --pattern "janitor.sig" \
+            --dir /tmp/janitor-bin \
+            --clobber 2>/dev/null || true
           [ -f /tmp/janitor-bin/janitor ] || { echo "FATAL: janitor binary not found after download"; exit 1; }
           chmod +x /tmp/janitor-bin/janitor
           # Verify binary integrity before executing — mirrors the discipline in action.yml
-          /tmp/janitor-bin/janitor verify-asset \
-            --file /tmp/janitor-bin/janitor \
-            --hash /tmp/janitor-bin/janitor.sha384
+          if [ -f /tmp/janitor-bin/janitor.sig ]; then
+            /tmp/janitor-bin/janitor verify-asset \
+              --file /tmp/janitor-bin/janitor \
+              --hash /tmp/janitor-bin/janitor.sha384 \
+              --sig  /tmp/janitor-bin/janitor.sig
+          else
+            /tmp/janitor-bin/janitor verify-asset \
+              --file /tmp/janitor-bin/janitor \
+              --hash /tmp/janitor-bin/janitor.sha384
+          fi
           /tmp/janitor-bin/janitor --version
 
       - name: Run update-wisdom --ci-mode

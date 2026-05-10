@@ -86,6 +86,13 @@ runs:
       run: |
         set -euo pipefail
         ACTION_TAG="${{ github.action_ref }}"
+        # When the action is consumed via `uses: ./` (dogfood / self-host),
+        # github.action_ref is empty.  Fall back to BOOTSTRAP_TAG so the gate
+        # still verifies the latest published artifact instead of resolving to
+        # the URL `…/releases/download/v/janitor` (404).
+        if [ -z "${ACTION_TAG}" ]; then
+            ACTION_TAG="${BOOTSTRAP_TAG}"
+        fi
         # Normalize: ensure the tag starts with 'v' for the GitHub Release URL.
         [[ "${ACTION_TAG}" == v* ]] || ACTION_TAG="v${ACTION_TAG}"
         mkdir -p "${CURRENT_DIR}" "${BOOTSTRAP_DIR}"
