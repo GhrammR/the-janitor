@@ -21,9 +21,6 @@
 //! // → same structural hash
 //! ```
 
-pub mod adapter_kotlin;
-pub mod adapter_scala;
-pub mod adapter_swift;
 pub mod agentic_graph;
 pub mod agentic_tool_audit;
 pub mod agnostic_shield;
