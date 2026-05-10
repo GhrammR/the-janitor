@@ -70,8 +70,13 @@ jobs:
           echo "${ACTIONLINT_SHA256}  ${ARCHIVE}" | sha256sum -c -
           tar xzf "$ARCHIVE" actionlint
           chmod +x actionlint
-          # Run actionlint against every workflow + action.yml.
-          ./actionlint -color .github/workflows/*.yml action.yml
+          # actionlint validates GitHub Actions WORKFLOW files only.
+          # action.yml is a composite-action definition (different schema:
+          # `inputs:` + `runs:` instead of `on:` + `jobs:`), so it cannot be
+          # passed to actionlint without spurious "missing on/jobs" errors.
+          # Composite-action validation is handled by the YAML parse + SHA-pin
+          # steps; actionlint's value here is workflow-shaped only.
+          ./actionlint -color .github/workflows/*.yml
 
       - name: SHA-pin discipline
         shell: bash
