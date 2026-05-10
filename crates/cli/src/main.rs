@@ -6290,9 +6290,7 @@ fn fetch_verified_wisdom_payload_once(
             let class = classify_ureq_error(&e);
             return Err((
                 class,
-                anyhow::anyhow!(
-                    "{mode_label}: wisdom signature fetch failed (class={class})"
-                ),
+                anyhow::anyhow!("{mode_label}: wisdom signature fetch failed (class={class})"),
             ));
         }
     };

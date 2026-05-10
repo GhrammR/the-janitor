@@ -214,8 +214,7 @@ pub fn find_llm_unbounded_prompt_concat(
                             .to_string(),
                     ),
                     docs_url: Some(
-                        "https://thejanitor.app/findings/llm-prompt-injection-boundary"
-                            .to_string(),
+                        "https://thejanitor.app/findings/llm-prompt-injection-boundary".to_string(),
                     ),
                     ..Default::default()
                 });
@@ -280,7 +279,11 @@ def echo(user_input):
     #[test]
     fn detects_python_fstring_prompt_injection() {
         let findings = find_llm_unbounded_prompt_concat(Some("a.py"), TP_PYTHON_FSTRING);
-        assert_eq!(findings.len(), 1, "TP Python f-string must fire exactly once");
+        assert_eq!(
+            findings.len(),
+            1,
+            "TP Python f-string must fire exactly once"
+        );
         assert_eq!(findings[0].id, "security:llm_prompt_injection_boundary");
         assert_eq!(findings[0].severity.as_deref(), Some("Critical"));
         assert_eq!(findings[0].file.as_deref(), Some("a.py"));
@@ -335,7 +338,8 @@ def echo(user_input):
 
     #[test]
     fn does_not_fire_without_role_indicator() {
-        let findings = find_llm_unbounded_prompt_concat(Some("echo.py"), TN_USER_INTERP_BUT_NO_ROLE);
+        let findings =
+            find_llm_unbounded_prompt_concat(Some("echo.py"), TN_USER_INTERP_BUT_NO_ROLE);
         assert!(
             findings.is_empty(),
             "user interpolation outside a role-prompt context is not the target bug"
@@ -351,7 +355,11 @@ def r(user_input):
     return openai.chat.completions.create(model="gpt-4", messages=[{"role": "system", "content": s}])
 "#;
         let findings = find_llm_unbounded_prompt_concat(Some("u.py"), SRC);
-        assert_eq!(findings.len(), 1, "uppercase role indicator must still match");
+        assert_eq!(
+            findings.len(),
+            1,
+            "uppercase role indicator must still match"
+        );
     }
 
     #[test]
