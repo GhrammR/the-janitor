@@ -425,7 +425,7 @@ mod tests {
                 f.id == "security:oauth_scope_drift"
                     && f.remediation.as_deref().unwrap_or("").contains("admin:org")
             }),
-            "expected oauth_scope_drift for admin:org, got: {findings:?}"
+            "expected oauth_scope_drift finding for admin:org scope"
         );
     }
 
@@ -439,7 +439,7 @@ mod tests {
         let findings = find_oauth_scope_drift(source, "auth.js", false);
         assert!(
             findings.is_empty(),
-            "expected no findings for read-only scopes, got: {findings:?}"
+            "expected no findings for read-only scopes"
         );
     }
 
@@ -451,7 +451,7 @@ mod tests {
             findings
                 .iter()
                 .any(|f| f.severity.as_deref() == Some("KevCritical")),
-            "expected KevCritical severity with kev_match=true, got: {findings:?}"
+            "expected KevCritical severity when kev_match is true"
         );
     }
 
