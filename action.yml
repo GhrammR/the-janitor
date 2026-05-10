@@ -56,7 +56,7 @@ runs:
 
     - name: Restore Bootstrap Cache
       id: bootstrap-cache
-      uses: actions/cache@v4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: /tmp/janitor-bin/bootstrap
         key: janitor-bootstrap-${{ runner.os }}-${{ env.BOOTSTRAP_TAG }}

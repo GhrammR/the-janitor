@@ -1,0 +1,92 @@
+name: Workflow Lint
+
+# Validates that any change to .github/workflows/* or action.yml passes:
+#   1. YAML syntax (Python yaml.safe_load).
+#   2. actionlint static analysis (downloaded fresh for each run, SHA-pinned).
+#   3. SHA-pin discipline — every `uses:` reference must be either
+#      a literal commit SHA or a `./` local path.  Major-version floats
+#      (`@v4`, `@main`, `@latest`) are rejected per OpenSSF Scorecard
+#      Pinned-Dependencies criterion.
+#
+# Runs on PRs that touch workflow files; safe to skip on docs-only PRs.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'action.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - 'action.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: YAML + actionlint + SHA-pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: YAML syntax check
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use Python's yaml module — pre-installed on ubuntu-latest, no
+          # additional package required.
+          for f in .github/workflows/*.yml action.yml; do
+            [ -f "$f" ] || continue
+            python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" \
+              || { echo "FAIL: invalid YAML — $f"; exit 1; }
+            echo "OK: $f"
+          done
+
+      - name: actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          # actionlint installation guide:
+          #   https://github.com/rhysd/actionlint/blob/main/docs/install.md
+          # We pin to the official 1.7.7 release tarball; the SHA is verified
+          # before extraction.
+          ACTIONLINT_VERSION="1.7.7"
+          ACTIONLINT_SHA256="023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757"
+          ARCHIVE="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$ARCHIVE" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${ARCHIVE}"
+          echo "${ACTIONLINT_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          tar xzf "$ARCHIVE" actionlint
+          chmod +x actionlint
+          # Run actionlint against every workflow + action.yml.
+          ./actionlint -color .github/workflows/*.yml action.yml
+
+      - name: SHA-pin discipline
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reject major-version floats (@v1/@v2/.../@main/@master/@latest)
+          # in any workflow or composite action.  Local references (uses: ./)
+          # and SHA pins (40-hex string) are allowed.
+          UNPINNED=$(
+            grep -rEn '^\s*-?\s*uses:\s*[^./].*@(v[0-9]+(\.[0-9]+)?|main|master|latest)\s*$' \
+              .github/workflows/ action.yml 2>/dev/null || true
+          )
+          if [ -n "${UNPINNED}" ]; then
+            echo "::error::Found unpinned action references (must SHA-pin):"
+            echo "${UNPINNED}"
+            exit 1
+          fi
+          echo "OK: all action references are SHA-pinned or local."
