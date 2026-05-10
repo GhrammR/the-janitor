@@ -1,0 +1,148 @@
+name: Systems Health Signal Monitor
+
+# Watches mission-critical workflows and opens an auto-closing tracking issue
+# when a workflow fails for >= THRESHOLD consecutive runs.  De-duplicates by
+# label so a single open issue tracks any one workflow's outage; auto-comments
+# and closes when the workflow returns a success run.
+#
+# Tuning / disabling: docs/health-signal-monitor.md
+
+on:
+  workflow_run:
+    # Subset of workflows whose continued failure is operationally significant.
+    # Add a workflow's display name (the `name:` field, NOT the file path) to
+    # extend coverage.
+    workflows:
+      - "CISA KEV Weekly Sync"
+      - "CodeQL"
+      - "OpenSSF Scorecard"
+      - "MSRV Sync"
+      - "Janitor Self-Audit"
+    types: [completed]
+
+# Workflow-level: deny by default.
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    name: Health Signal Monitor
+    runs-on: ubuntu-latest
+    # Job-level: read run history + manage issues.  No write access to source.
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: audit
+
+      - name: Evaluate consecutive failures and act
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Open a tracking issue when this many recent runs in a row fail.
+          THRESHOLD: '2'
+          REPO: ${{ github.repository }}
+          WORKFLOW_NAME: ${{ github.event.workflow.name }}
+          WORKFLOW_PATH: ${{ github.event.workflow.path }}
+          LATEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          LATEST_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Sanitize the workflow name into a stable, lowercase, slug-safe label.
+          LABEL_SLUG="$(printf '%s' "${WORKFLOW_NAME}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | tr -c 'a-z0-9-' '-' \
+            | sed -E 's/-+/-/g; s/^-//; s/-$//')"
+          LABEL="health-signal/${LABEL_SLUG}"
+
+          echo "[health-signal] workflow='${WORKFLOW_NAME}' path='${WORKFLOW_PATH}'"
+          echo "[health-signal] latest_conclusion='${LATEST_RUN_CONCLUSION}'"
+          echo "[health-signal] threshold=${THRESHOLD} label='${LABEL}'"
+
+          # Idempotently ensure the dedup label exists.  `gh label create` returns
+          # exit 1 when the label already exists; tolerate that.
+          gh label create "${LABEL}" \
+            --repo "${REPO}" \
+            --color "B60205" \
+            --description "Auto-managed by health-signal monitor — ${WORKFLOW_NAME}" \
+            2>/dev/null || true
+
+          # Fetch the last (THRESHOLD + 2) completed runs of this workflow so we
+          # can determine consecutive-failure depth without ambiguity.
+          LIMIT=$((THRESHOLD + 2))
+          RUNS_JSON=$(gh run list \
+            --workflow="${WORKFLOW_PATH}" \
+            --status=completed \
+            --limit="${LIMIT}" \
+            --json conclusion,databaseId,createdAt \
+            --jq '.')
+          if [ -z "${RUNS_JSON}" ] || [ "${RUNS_JSON}" = "[]" ]; then
+            echo "[health-signal] no completed runs visible — exiting cleanly"
+            exit 0
+          fi
+
+          # Look up any open tracking issue for this workflow.
+          ISSUE_NUM="$(gh issue list \
+            --repo "${REPO}" \
+            --label "${LABEL}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          MOST_RECENT_CONCLUSION="$(printf '%s' "${RUNS_JSON}" | jq -r '.[0].conclusion // empty')"
+
+          # ── Recovery path: most recent run succeeded; close any open tracker.
+          if [ "${MOST_RECENT_CONCLUSION}" = "success" ]; then
+            if [ -n "${ISSUE_NUM}" ]; then
+              gh issue comment "${ISSUE_NUM}" \
+                --repo "${REPO}" \
+                --body "Workflow **${WORKFLOW_NAME}** has recovered. Latest success: ${LATEST_RUN_URL}"
+              gh issue close "${ISSUE_NUM}" --repo "${REPO}"
+              echo "[health-signal] closed recovery issue #${ISSUE_NUM}"
+            else
+              echo "[health-signal] no-op (latest run succeeded, no open tracker)"
+            fi
+            exit 0
+          fi
+
+          # ── Failure path: count consecutive failures from the head of the list.
+          CONSEC="$(printf '%s' "${RUNS_JSON}" \
+            | jq '[.[] | .conclusion] | (index("success") // length)')"
+          echo "[health-signal] consecutive_failures=${CONSEC}"
+
+          if [ "${CONSEC}" -lt "${THRESHOLD}" ]; then
+            echo "[health-signal] below threshold (${CONSEC} < ${THRESHOLD}) — exiting"
+            exit 0
+          fi
+
+          # Either open a new tracker or comment on the existing one.
+          if [ -n "${ISSUE_NUM}" ]; then
+            gh issue comment "${ISSUE_NUM}" \
+              --repo "${REPO}" \
+              --body "Still failing — ${CONSEC} consecutive failures. Latest run: ${LATEST_RUN_URL}"
+            echo "[health-signal] appended failure comment to issue #${ISSUE_NUM}"
+          else
+            BODY="Workflow **${WORKFLOW_NAME}** has failed ${CONSEC} times in a row.
+
+          | Field | Value |
+          | --- | --- |
+          | Workflow path | \`${WORKFLOW_PATH}\` |
+          | Latest failed run | ${LATEST_RUN_URL} |
+          | Threshold | ${THRESHOLD} consecutive failures |
+          | Auto-close | When the workflow next returns a \`success\` conclusion |
+
+          This issue is auto-managed by \`.github/workflows/health-signal.yml\`.
+          To tune the threshold, list of monitored workflows, or disable the
+          monitor, see \`docs/health-signal-monitor.md\`."
+            gh issue create \
+              --repo "${REPO}" \
+              --title "[health-signal] ${WORKFLOW_NAME} failing for ${CONSEC} consecutive runs" \
+              --body "${BODY}" \
+              --label "${LABEL}"
+            echo "[health-signal] opened new tracker for ${WORKFLOW_NAME}"
+          fi
