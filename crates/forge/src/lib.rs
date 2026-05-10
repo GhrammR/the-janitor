@@ -68,6 +68,7 @@ pub mod labyrinth;
 pub mod legacy_c_mining;
 pub mod library_identity;
 pub mod llm_decompile;
+pub mod llm_prompt_injection;
 pub mod memory_bomb;
 pub mod memory_proof;
 pub mod mesh_taint;
