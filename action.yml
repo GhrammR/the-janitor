@@ -1,11 +1,12 @@
 name: 'Janitor Firewall'
 description: >
   Zero-upload structural firewall for AI-generated PRs.
-  Fails hard on any error — symmetric failure ensures the Governor Check Run
-  is never left pending. The sole PR gate is the 'Janitor Integrity Check'
-  run issued by the Governor via the GitHub Checks API.
+  Fails hard on any error — symmetric failure ensures the gate is never left
+  pending. When a Governor URL is configured, the canonical PR verdict is the
+  'Janitor Integrity Check' run issued through the GitHub Checks API. When no
+  Governor URL is configured, the workflow job itself is the gate.
 
-# Only three inputs. All other configuration is governor-side.
+# Only four inputs. All other configuration is governor-side.
 inputs:
   token:
     description: 'GitHub token (contents: read, pull-requests: read)'
@@ -25,10 +26,12 @@ inputs:
   governor_url:
     description: >
       Base URL of your Sovereign Governor deployment.
-      The Janitor does not use a cloud default — you MUST configure your own
-      Governor endpoint.  Example: https://governor.your-org.internal
-      Contact sales@thejanitor.app to provision a hosted or self-hosted Governor.
-    required: true
+      Optional: when omitted, the action runs a local-only bounce gate on the
+      runner and fails the job on a rejected patch, but does not POST to a
+      Governor.  Provide a URL to publish the verdict through the Governor
+      control plane.  Example: https://governor.your-org.internal
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -156,7 +159,7 @@ runs:
           --repo "${{ github.repository }}" \
           > .janitor-pr.patch
 
-    # Step 5 — Exchange credentials, run bounce, POST result to Governor.
+    # Step 5 — Run bounce locally, and POST the result to the Governor when configured.
     #
     # set -eo pipefail: any command failure (curl, janitor bounce, jq) exits
     # immediately with a non-zero code, failing the Action visibly rather than
@@ -168,13 +171,41 @@ runs:
       run: |
         set -euo pipefail
         HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+        GOVERNOR="${{ inputs.governor_url }}"
+        BOUNCE_ARGS=(
+          bounce .
+          --patch .janitor-pr.patch
+          --pr-number "${{ github.event.pull_request.number }}"
+          --head-sha "$HEAD_SHA"
+        )
+        if [ "${{ inputs.deep_scan }}" = "true" ]; then
+          BOUNCE_ARGS+=(--deep-scan)
+        fi
+
+        # Dependabot PRs do not receive repository secrets.  When no Governor
+        # endpoint is configured, enforce the gate locally by parsing the JSON
+        # verdict emitted by `janitor bounce`.
+        if [ -z "${GOVERNOR}" ]; then
+            echo "Governor URL absent — running local-only structural gate."
+            BOUNCE_OUT=$("$JANITOR_BIN" "${BOUNCE_ARGS[@]}" --format json)
+            printf '%s\n' "${BOUNCE_OUT}"
+            BOUNCE_JSON=$(printf '%s\n' "${BOUNCE_OUT}" | sed -n '/^{/,/^}/p')
+            if [ -z "${BOUNCE_JSON}" ]; then
+                echo "failed to parse local bounce JSON verdict" >&2
+                exit 1
+            fi
+            if [ "$(printf '%s\n' "${BOUNCE_JSON}" | jq -er '.gate_passed')" != "true" ]; then
+                echo "Janitor gate rejected patch in local-only mode." >&2
+                exit 1
+            fi
+            exit 0
+        fi
 
         # Resolve installation ID — prefer explicit input, fall back to the
         # installation context embedded in the App's webhook event payload.
         # If still absent or 0, call /v1/resolve-id to auto-resolve via the
         # Governor's App token — eliminates the "Wrong ID" support overhead.
         INSTALL_ID="${{ inputs.installation_id || github.event.installation.id || '0' }}"
-        GOVERNOR="${{ inputs.governor_url }}"
         if [ "${INSTALL_ID}" = "0" ] || [ -z "${INSTALL_ID}" ]; then
             RESOLVED=$(curl -sf -X POST \
                 "${GOVERNOR}/v1/resolve-id" \
@@ -198,13 +229,9 @@ runs:
           -H "Content-Type: application/json" \
           -d "$TOKEN_PAYLOAD" | jq -er '.token')
 
-        "$JANITOR_BIN" bounce . \
-          --patch         .janitor-pr.patch \
-          --pr-number     "${{ github.event.pull_request.number }}" \
+        "$JANITOR_BIN" "${BOUNCE_ARGS[@]}" \
           --governor-url  "${GOVERNOR}" \
-          --analysis-token "$ANALYSIS_TOKEN" \
-          --head-sha      "$HEAD_SHA" \
-          ${{ inputs.deep_scan == 'true' && '--deep-scan' || '' }}
+          --analysis-token "$ANALYSIS_TOKEN"
 
     # Step 6 — Publish Integrity Dashboard to GitHub Actions Step Summary.
     #

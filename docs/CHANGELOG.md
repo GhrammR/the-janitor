@@ -3,6 +3,33 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-10 — Sprint Batch 137: Secretless PR Gate Hardening, Token-Permissions Rationale, Trust-Boundary Corrections
+
+**Directive:** (1) fix the failing Janitor workflow gate path on secretless Dependabot PRs; (2) triage the open Token-Permissions workflow findings and the five blocked Dependabot PRs; (3) verify the scheduled KEV, Systems Health Signal, and Entropy Modulator feature paths are fully wired; (4) harden website trust/compliance copy for enterprise security reviews and grant diligence.
+
+### Phase 1 — Secretless Janitor PR Gate (`action.yml`)
+
+- `action.yml` *(modified)* — `governor_url` input downgraded from required to optional with a safe empty-string default; composite action now builds a shared `BOUNCE_ARGS` vector and, when no Governor URL is present, executes `janitor bounce --format json` locally on the runner, extracts the JSON verdict, and fails the job only if `.gate_passed != true`. This closes the secretless Dependabot path where repository secrets are unavailable but the structural gate still must run.
+- `action.yml` *(modified)* — Governor mode preserved: installation resolution, analysis-token exchange, and remote verdict publishing remain active when `governor_url` is configured.
+
+### Phase 2 — Workflow Permission Auditability
+
+- `.github/workflows/codeql.yml`, `.github/workflows/dependency-review.yml`, `.github/workflows/health-signal.yml`, `.github/workflows/pages.yml`, `.github/workflows/scorecard.yml` *(modified)* — added inline `required-by-design` rationale comments beside every non-read `GITHUB_TOKEN` scope so Scorecard Token-Permissions findings have an auditable disposition trail in-repo.
+
+### Phase 3 — Trust-Boundary and Enterprise Docs
+
+- `docs/index.md`, `docs/privacy.md`, `docs/terms.md`, `docs/pricing_faq.md`, `docs/architecture.md`, `docs/ci-change-checklist.md`, `docs/discovery.md` *(modified)* — corrected overstated claims about total offline operation, Sentinel source handling, composite-action validation scope, compliance status, MCP tool-count drift, and Dependabot downgrade semantics.
+- `docs/security.md` *(created)* — public security posture note with current data boundary, evidence links, workflow-permission rationale table, accepted-risk language, compliance status, and enterprise/grant contact path.
+- `docs/public-governance-template.md` *(created)* — sanitized template for publishing partial governance without disclosing thresholds, decoy seeds, or bypass heuristics.
+
+### Phase 4 — Verification and Backlog Triage
+
+- Verified the previously reported actionlint failures were already fixed on `main`; the live blocker on all five open Dependabot PRs is `Janitor PR Gate`, not `Workflow Lint`.
+- Replayed Dependabot PR `#90` locally through `janitor bounce` using the exact PR patch; structural verdict passed with `slop_score: 0`, proving the failure was transport/config in the composite action rather than a real slop rejection.
+- Confirmed scheduled KEV sync uses `--kev-manifest-only`, Systems Health Signal still deduplicates on `health-signal/<workflow-slug>` issue labels, and the LLM prompt-injection / Entropy Modulator detector remains wired into active JS/TS/Python dispatch.
+
+**Verification**: `./actionlint -color .github/workflows/*.yml` ✓ | `python3 -c "import yaml; [yaml.safe_load(open(f)) for f in ['action.yml','.github/workflows/codeql.yml','.github/workflows/dependency-review.yml','.github/workflows/health-signal.yml','.github/workflows/pages.yml','.github/workflows/scorecard.yml']]"` ✓ | `cargo test -p cli --bin janitor kev_manifest_only` ✓ | `cargo test -p forge --lib llm_prompt_injection` ✓ | `cargo run -p cli -- bounce . --patch /tmp/pr90.patch --pr-number 90 --author dependabot[bot] --format json` ✓
+
 ## 2026-05-09 — Sprint Batch 136: Infrastructure Asceticism, P2-14 DOM Reflection Proof, CVP Threat Synthesis (P2-15)
 
 **Directive:** (1) Phase 1 — Infrastructure Asceticism: `_site/` added to `.gitignore` adjacent to existing `site/` rule; `site/` already untracked (0 files in git index); `pages.yml` confirmed not committing build output to `main`. (2) Phase 2 — CVP Threat Synthesis (CVP ID `2fe9d3dd-47ba-4bde-ab67-29f86c79f732`): authored "Vector Store Cross-Tenant Bleed via Metadata Filter Predicate Polymorphism" in `tools/campaign/ATTACK_LEDGER.md` (CVP-Authorized 2026 section) and matching P2-15 architectural proposal in `.INNOVATION_LOG.md` covering Pinecone, Weaviate, Chroma, Qdrant, Milvus, pgvector with Z3-backed closed-set tenant invariant + AEG curl synthesis. (3) Phase 3 — P2-14 Vendored Library Suppression with DOM Reflection Proof: `pub fn is_vendored_library_path` matching `vendor/`, `vendored/`, `node_modules/`, `third_party/`, `third-party/`, `dist/`, `bundle/`, `*.bundle.js`, `*.min.js`, and any filename containing `jquery`; `pub fn has_repository_native_dom_reflection` parsing JS/TS via tree-sitter to locate `innerHTML`/`outerHTML` assignments with structurally dynamic RHS AND attacker-reachable browser/server source token (`location.hash`, `URLSearchParams`, `req.body`, etc.); `apply_p2_14_vendored_dom_demotion` wired into `scan_buffer` in `crates/cli/src/hunt.rs` after the P2-12 lattice; 12 deterministic TP/TN tests. (4) Phase 4 — re-hunt confirmed all `security:dom_xss_innerHTML` findings on `smartcontractkit/chainlink-docs` `source/javascripts/lib/_jquery.js` (lines 1184, 4334, 5508, …) demoted to `Informational`; popped `cashapp/hermit` — 2× `unpinned_asset` heredoc-URL FPs route to LOW_YIELD; both targets marked hunted in `tools/campaign/target_ledger.json`. (5) Phase 5 — P2-14 hard-deleted from `.INNOVATION_LOG.md`; new P2-16 (Heredoc & Help-Text URL Suppression for `unpinned_asset`) added per Dual-Ledger Mandate satisfying the existing `cashapp/hermit` LOW_YIELD R&D follow-up; cargo test --workspace --test-threads=4 exit 0; just audit exit 0.

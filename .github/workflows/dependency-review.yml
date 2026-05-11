@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write # required-by-design: action comments the dependency summary on the PR
     # External OpenSSF API timeouts must not block PR merges.
     # The Janitor slop-gate (janitor-pr-gate.yml) is the primary blocking check.
     continue-on-error: true

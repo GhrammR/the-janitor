@@ -24,7 +24,7 @@ hide:
 
 ## THE ENFORCEMENT LAYER
 
-The Janitor is not a linter. It is not a SAST scanner. It is a **structural enforcement layer** that runs on your hardware, in your pipeline, on every pull request — before the merge button is available. The Janitor is the only deterministic defense against 'Mythos-class' AI agents, mathematically verifying intent before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
+The Janitor is not a linter. It is not a SAST scanner. It is a **structural enforcement layer** that runs on your hardware, in your pipeline, on every pull request — before the merge button is available. The Janitor is a deterministic pre-merge defense for autonomous and AI-assisted pull requests, verifying structural policy before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
 
 ## Why Not CodeQL, Snyk, or SonarQube?
 
@@ -93,7 +93,7 @@ Commit-status publishing for **GitHub**, **GitLab**, and **Azure DevOps** — au
 
 ![Janitor Sentinel Demo](assets/sentinel_demo.webp)
 
-*Janitor Sentinel automatically downgrades vetoes when it detects safe patterns (e.g., Dependabot).*
+*Janitor Sentinel exempts trusted automation from issue-link penalties; dependency bumps still undergo full structural analysis.*
 
 ### Datacenter Sustainability
 
@@ -375,11 +375,12 @@ Includes all Sovereign capabilities, plus:
 | SLSA Level 4 reproducible builds | Dual-build Docker comparison on every release — see [release workflow](https://github.com/janitor-security/the-janitor/blob/main/.github/workflows/janitor.yml) |
 | Dependency CVEs tracked | [Dependabot PRs](https://github.com/janitor-security/the-janitor/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot) — auto-surfaced, triaged on each release cycle |
 | OpenSSF Scorecard | Runs on every push — see [scorecard.yml](https://github.com/janitor-security/the-janitor/blob/main/.github/workflows/scorecard.yml) |
+| Workflow permission rationale | [Security posture note](security.md) — enumerates every non-read GitHub token scope and why it exists |
 | Security disclosure | [security@thejanitor.app](mailto:security@thejanitor.app) — coordinated, no-pressure, 90-day max window |
 
 **What is certified today**: BUSL-1.1 licensed open-source binary. Dual-PQC-signed CBOMs. SHA-384 ledger. SLSA Level 4 build provenance. OpenSSF Scorecard continuous monitoring.
 
-**What is a roadmap item**: SOC 2 Type II audit (Industrial Tier on request). FedRAMP Moderate ATO (targeting 2027).
+**What is a roadmap item**: SOC 2 Type II audit (not yet completed). FedRAMP Moderate ATO (targeting 2027; not authorized today).
 
 **Enterprise pilots and Anthropic grant inquiries**: [security@thejanitor.app](mailto:security@thejanitor.app). Include your use case, deployment environment, and compliance requirements. Pilot licenses (30-day, full Industrial Tier) are available for qualifying evaluations.
 

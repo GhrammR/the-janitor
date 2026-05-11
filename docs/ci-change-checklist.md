@@ -10,7 +10,7 @@ list eliminates the most common preventable causes.
 Tick each item before requesting review:
 
 - [ ] **YAML parses.** Run `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` against every changed file.
-- [ ] **actionlint clean.** Run `actionlint .github/workflows/*.yml action.yml` (the Workflow Lint job runs this on every PR — green = sufficient).
+- [ ] **actionlint clean.** Run `actionlint .github/workflows/*.yml` (the Workflow Lint job runs this on every PR — green = sufficient). `action.yml` is YAML-validated separately because it is a composite-action schema, not a workflow schema.
 - [ ] **All `uses:` are SHA-pinned or `./`.** Major-version floats (`@v4`, `@main`) are rejected by the Workflow Lint job's SHA-pin step.
 - [ ] **Dogfood path** (`uses: ./`): if you reference the action in this same workflow, sanity-check that empty `github.action_ref` is handled. The fallback exists in `action.yml` — don't break it.
 - [ ] **`set -euo pipefail`** at the top of every multi-line `run:` block. Without it, a failed `gh run download --pattern` returns 0 and tanks downstream steps silently.
@@ -47,7 +47,7 @@ grep -rEn '^\s*-?\s*uses:\s*[^./].*@(v[0-9]+(\.[0-9]+)?|main|master|latest)\s*$'
 
 # actionlint (one-time install)
 go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-actionlint .github/workflows/*.yml action.yml
+actionlint .github/workflows/*.yml
 ```
 
 ## Deliberate exceptions

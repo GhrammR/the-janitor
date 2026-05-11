@@ -503,6 +503,11 @@ New env var: `GOVERNOR_INVERT_MODE=1` — gates all inversion behaviour in the G
 New CLI flags: `janitor bounce --report-url <url> --analysis-token <jwt>`
 New `AppState` fields: `invert_mode: bool`, `token_rate_limit: DashMap`, `pending_checks: DashMap`
 
+**Current deployment boundary**: the public GitHub Action and Janitor Sentinel
+path use runner-side analysis plus Governor score reporting. References to the
+legacy clone path in this document are implementation-history notes, not the
+recommended deployment model.
+
 ---
 
 ## X. SOVEREIGN CONTROL PLANE (AIR-GAP READY)
