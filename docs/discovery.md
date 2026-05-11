@@ -118,7 +118,7 @@ az mcp server register \
   --scope organization
 ```
 
-After registration, any Azure AI Foundry agent or Copilot Studio orchestrator in the organization can discover and invoke the nine Janitor tools by name.
+After registration, any Azure AI Foundry agent or Copilot Studio orchestrator in the organization can discover and invoke the registered Janitor tools by name.
 
 ### Ingestion: LangGraph / LangChain
 

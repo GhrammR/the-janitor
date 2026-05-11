@@ -4,11 +4,13 @@
 
 ## Why no per-seat pricing?
 
-Because The Janitor never uploads your code.
+Because The Janitor is not metered as a cloud code-analysis service.
 
-Every scan, bounce, and audit runs **locally on your hardware**. We have no cloud
-pipeline to meter, no per-developer API call to count, and no egress to bill. The
-binary sits on your machine; it reads your repository; the findings never leave.
+Every scan, bounce, and audit runs **locally on your hardware** or on your own
+GitHub Actions runner. Optional control-plane features exist (`update-wisdom`,
+Governor reporting, webhooks), but those are organization-level integrations,
+not per-developer usage meters. The binary sits on your machine; it reads your
+repository; core analysis stays local.
 
 Per-seat pricing makes sense for SaaS products that provision server-side
 resources per user. We do not. One token, one organization, unlimited developers
@@ -21,7 +23,9 @@ and CI runners.
 The Sovereign / Air-Gap Tier is the procurement path for organizations operating
 under **IL5, IL6, FedRAMP High, or equivalent classified-adjacent environments**
 where code must never traverse a network boundary — including to a vendor's
-license server.
+license server. The Janitor is **not** FedRAMP-authorized today; this tier is
+for organizations that need an offline deployment model while conducting their
+own accreditation or enclave-specific review.
 
 **What it includes:**
 
@@ -41,12 +45,16 @@ license server.
   without network access.
 - **Air-Gap Intel Transfers** — BLAKE3 + Ed25519 offline wisdom feed
   verification; classified networks receive a signed capsule, not a live pull.
-- **SOC 2 Type II attestation packages** on request.
+- **SOC 2 readiness mapping materials** on request. No completed SOC 2 Type II
+  attestation is claimed today.
 - **Dedicated SLA** — 4-hour emergency rotation SLA for confirmed compromises.
 
 **Starting price**: $49,900 / year.
 
 Contact: [sales@thejanitor.app](mailto:sales@thejanitor.app)
+
+Security reviews, pilot deployments, and grant diligence:
+[security@thejanitor.app](mailto:security@thejanitor.app)
 
 ---
 

@@ -36,16 +36,16 @@ Support is limited to documentation, community channels, and the tier SLA define
 
 The Janitor performs automated dead-symbol detection, structural clone analysis, shadow-tree simulation, and code cleanup operations. All analysis runs locally on your hardware. The Janitor does not receive, transmit, store, or process your source code on any remote server.
 
-Remote network calls are limited to:
+Optional network calls are limited to the features you enable:
 
-- **Token verification**: a single POST to `https://api.thejanitor.app/v1/verify` when `--token` is supplied.
-- **Audit attestation**: a POST to `https://api.thejanitor.app/v1/attest` when a signed audit log is requested (Lead Specialist / Industrial Core tiers).
-- **Wisdom synchronisation**: a GET from `https://api.thejanitor.app/v1/wisdom.rkyv` when `janitor update-wisdom` is invoked.
-- **Anonymous telemetry**: a minimal zero-knowledge hash submitted on rollback events (opt-out: delete `.janitor/telemetry.json`).
+- **Wisdom synchronisation**: `janitor update-wisdom` fetches signed threat-intelligence material.
+- **Governor reporting / attestation**: when `--governor-url` is configured or the Janitor Sentinel GitHub App is used, the runner POSTs score metadata and attestation material to the configured Governor endpoint.
+- **Configured outbound integrations**: webhooks, Jira sync, or similar operator-configured destinations.
+- **Anonymous rollback telemetry**: a minimal zero-knowledge hash may be submitted on rollback events (opt-out: delete `.janitor/telemetry.json`).
 
 No source file contents, file paths, or symbol names are transmitted in any of the above calls.
 
-**Janitor Sentinel (GitHub App)**: When using the Janitor Sentinel GitHub App, source code submitted for analysis is processed transiently on Janitor infrastructure (Fly.io) and permanently deleted upon completion of analysis. Janitor makes no claim of ownership over customer source code. The clone is held only for the duration of the structural analysis (typically under 60 seconds) and is not written to persistent storage.
+**Janitor Sentinel (GitHub App)**: The Janitor binary executes on your GitHub Actions runner. The Governor receives score metadata, fingerprints, and attestation material; it does not receive source code, file paths, or symbol names.
 
 ---
 
