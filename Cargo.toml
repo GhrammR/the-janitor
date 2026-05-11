@@ -29,7 +29,7 @@ uuid = { version = "1.10", features = ["v4"] }
 libfuzzer-sys = "0.4"
 serial_test = "3"
 opentelemetry = "0.31"
-opentelemetry-otlp = "0.31"
+opentelemetry-otlp = "0.32"
 
 # Cryptography
 blake3 = "1.5"
