@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      security-events: write
-      actions: read
+      security-events: write # required-by-design: upload CodeQL SARIF to code scanning
+      actions: read          # required-by-design: CodeQL action reads workflow metadata
       contents: read
 
     strategy:

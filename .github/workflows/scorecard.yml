@@ -16,10 +16,10 @@ jobs:
     name: Scorecard analysis
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      id-token: write
+      security-events: write # required-by-design: upload Scorecard SARIF to code scanning
+      id-token: write        # required-by-design: Scorecard uses OIDC for provenance
       contents: read
-      actions: read
+      actions: read          # required-by-design: Scorecard inspects workflow configuration
 
     steps:
       - name: Harden runner
