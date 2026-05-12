@@ -2,6 +2,47 @@
 
 Append-only log of every major directive received and the specific changes
 implemented as a result.
+
+## 2026-05-12 — Sprint Batch 138: Publication Closure, Backlog Merge Wave, Hunt Ledger Reconciliation
+
+**Directive:** (1) publish the Pages/security remediation and finish the blocked backlog PR wave; (2) rebase, validate, and merge Dependabot PRs `#70`, `#85`, `#90`, and `#92`; (3) run `janitor hunt` against three distinct-org local clones and route results through Tri-Ledger with deterministic proof-gap notes; (4) reconcile the public website security posture page with the repository-level `SECURITY.md` policy entrypoint; (5) keep local artifacts out of the git index.
+
+### Phase 1 — Backlog Publication Closure
+
+- Merged PR `#101` after Structural Firewall remediation: `docs/security.md` published into MkDocs nav, Pages workflow switched from a static `index.html` artifact to strict MkDocs site deployment, and Bash help-text/heredoc suppression for `security:unpinned_asset` landed in `crates/forge/src/slop_hunter.rs`.
+- Rebased, locally validated, and merged Dependabot PRs:
+  - `#70` `rand 0.10.1` — `cargo check -p mint-token` passed after rebasing the dependency and lockfile onto current `main`.
+  - `#85` `goblin 0.10.5` — `cargo check -p forge` passed.
+  - `#90` `junction 2.0.0` — `cargo check -p shadow` and `cargo test -p shadow` passed.
+  - `#92` `ndarray 0.17.2` — `cargo check -p forge` passed.
+
+### Phase 2 — Hunt and Ledger Routing
+
+- `janitor hunt /home/ghrammr/dev/the-janitor/sprint135_aave --concurrency 2 --format json` — 0 findings; LOW_YIELD retention reaffirmed for `https://github.com/aave/aave-v3-core`.
+- `janitor hunt /home/ghrammr/dev/the-janitor/sprint135_securedrop --concurrency 2 --format json` — 6 findings reproduced exactly: 5× `security:missing_ownership_check` with no `repro_cmd` and 1× `security:subprocess_shell_injection` in a local verification script. Candidate and LOW_YIELD routing remain unchanged because the proof gap is still the missing live authorization witness.
+- `janitor hunt /tmp/janitor-maxcompute-uniswap-v4-core --concurrency 2 --format json` — 0 findings; routed to LOW_YIELD because the current engine has no autonomous Solidity exploit-witness lane for this contract-only repository.
+- `tools/campaign/LOW_YIELD_LEDGER.md` and `tools/campaign/target_ledger.json` updated with the 2026-05-12 rerun outcomes and machine-readable `hunt_result` stamps.
+
+### Phase 3 — Public Security Posture Navigation
+
+- `SECURITY.md` now points operators and reporters to `docs/security.md` for the public trust-boundary statement.
+- `docs/security.md` continues to point back to `SECURITY.md` for coordinated disclosure and supported-version policy, preserving the split between public posture and GitHub security-policy entrypoint.
+
+### Verification
+
+- GitHub Actions green proof on rebased PR heads:
+  - `#70`: Dependency Review `25766272127`, Janitor PR Gate `25766272115`, MSRV `25766272126`, CodeQL `25766272134`
+  - `#85`: Dependency Review `25766604892`, Janitor PR Gate `25766604897`, MSRV `25766604942`, CodeQL `25766604911`
+  - `#90`: Dependency Review `25766712388`, Janitor PR Gate `25766712401`, MSRV `25766712390`, CodeQL `25766712418`
+  - `#92`: Dependency Review `25766873958`, Janitor PR Gate `25766873988`, MSRV `25766873963`, CodeQL `25766873938`
+- Local validation:
+  - `./actionlint -color .github/workflows/*.yml` ✓
+  - `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓
+  - `cargo test -p forge github_io_url_inside_bash -- --test-threads=1` ✓
+  - `cargo check -p mint-token` ✓
+  - `cargo check -p forge` ✓
+  - `cargo check -p shadow` ✓
+  - `cargo test -p shadow` ✓
 ## 2026-05-10 — Sprint Batch 137: Secretless PR Gate Hardening, Token-Permissions Rationale, Trust-Boundary Corrections
 
 **Directive:** (1) fix the failing Janitor workflow gate path on secretless Dependabot PRs; (2) triage the open Token-Permissions workflow findings and the five blocked Dependabot PRs; (3) verify the scheduled KEV, Systems Health Signal, and Entropy Modulator feature paths are fully wired; (4) harden website trust/compliance copy for enterprise security reviews and grant diligence.

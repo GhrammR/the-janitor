@@ -842,7 +842,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_reconfirmed_20260512"
     },
     {
       "engagement": "immunefi_targets",
@@ -884,7 +886,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_reconfirmed_20260512"
     },
     {
       "engagement": "immunefi_targets",
@@ -1383,7 +1387,7 @@
       ],
       "priority_score": 32,
       "hunted": true,
-      "hunt_result": "candidate_missing_ownership_checks_logged_low_yield_local_script_logged"
+      "hunt_result": "candidate_missing_ownership_checks_reconfirmed_20260512_low_yield_script_unchanged"
     },
     {
       "engagement": "securedrop_targets",

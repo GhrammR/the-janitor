@@ -117,6 +117,7 @@ AGENTS.md
 .claude/mcp.json
 # Internal R&D intelligence — never push to public repo.
 .INNOVATION_LOG.md
+ARTICLE_REVIEW.md
 
 
 # ------------------------------------------------------------------------------
@@ -178,6 +179,7 @@ actionlint_*.tar.gz
 tools/jadx/lib/*.jar
 sprint*/
 *.Zone.Identifier
+*:Zone.Identifier
 
 
 # ------------------------------------------------------------------------------
