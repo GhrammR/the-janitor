@@ -2,7 +2,9 @@
 
 This page records the current public trust boundary, the evidence behind public
 claims, and the accepted-risk rationale for the GitHub workflow permissions used
-by this repository.
+by this repository. For private vulnerability intake and coordinated
+disclosure, use the repository security policy in
+[`SECURITY.md`](https://github.com/janitor-security/the-janitor/blob/main/SECURITY.md).
 
 ## Current Data Boundary
 
@@ -11,6 +13,18 @@ by this repository.
 - The Governor receives score metadata, fingerprints, and attestation material only.
 - Optional outbound traffic is limited to configured integrations such as
   `update-wisdom`, Governor reporting, Jira sync, or webhooks.
+
+## Security Rationale
+
+The public posture is intentionally limited to the guarantees customers and
+researchers need to reason about deployment risk:
+
+- Trust decisions are derived from local source, manifests, and workflow
+  configuration rather than cloud-hosted inference.
+- Evidence generation is reproducible: the same repository state and policy set
+  produce the same result.
+- Release and documentation publication are separate from scan execution so the
+  public website does not become part of the analysis trust boundary.
 
 ## Evidence Links
 
@@ -42,6 +56,27 @@ resource it targets if the workflow is compromised. This repository constrains
 that risk by keeping write scopes job-local, SHA-pinning actions, and keeping
 workflow-level permissions read-only.
 
+## Governance Split
+
+The public governance surface is deliberately narrower than the internal
+governance surface.
+
+### Public
+
+- Trust boundary description
+- Security rationale
+- High-level governance template and disclosure posture
+
+### Private
+
+- Detector thresholds and scoring cutoffs
+- Decoy seeds and reconnaissance-fingerprinting material
+- Bypass heuristics and suppression rules that would materially aid evasion
+- Incident playbooks and operator-only response procedures
+
+This split keeps customers informed without publishing the exact thresholds or
+counter-adversarial mechanics that would weaken the platform.
+
 ## Compliance Status
 
 - **Available today**: SHA-pinned workflows, workflow linting, CodeQL, Scorecard,
@@ -49,8 +84,12 @@ workflow-level permissions read-only.
 - **Not certified today**: SOC 2 Type II, FedRAMP authorization.
 - **Roadmap**: SOC 2 Type II preparation and FedRAMP Moderate pursuit remain roadmap items, not completed certifications.
 
-## Contact Paths
+## Reporting and Navigation
 
-- Security disclosure: [security@thejanitor.app](mailto:security@thejanitor.app)
+- Repository reporting policy:
+  [`SECURITY.md`](https://github.com/janitor-security/the-janitor/blob/main/SECURITY.md)
+- Public architecture background: [Architecture](architecture.md)
+- Deployment and operator setup: [Setup](setup.md)
 - Privacy questions: [privacy@thejanitor.app](mailto:privacy@thejanitor.app)
-- Enterprise pilots, grants, and security reviews: [security@thejanitor.app](mailto:security@thejanitor.app)
+- Enterprise pilots, grants, and security reviews:
+  [security@thejanitor.app](mailto:security@thejanitor.app)

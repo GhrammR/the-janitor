@@ -4543,6 +4543,23 @@ fn should_ignore_supply_chain_match(
         }
     }
 
+    if matches!(language, "sh" | "bash" | "zsh") && mat.pattern().as_usize() == PATTERN_GITHUB_IO {
+        let Some(eng) = engine() else {
+            return false;
+        };
+        let tree = match parsed.ensure_tree(eng.bash_lang.clone(), "sh") {
+            Ok(Some(tree)) => tree,
+            Ok(None) | Err(_) => return false,
+        };
+        let root = tree.root_node();
+        let end = mat.end().saturating_sub(1);
+        if let Some(node) = root.descendant_for_byte_range(mat.start(), end) {
+            if bash_github_io_match_is_inert(node, parsed.source) {
+                return true;
+            }
+        }
+    }
+
     if !matches!(language, "js" | "jsx" | "ts" | "tsx") {
         return false;
     }
@@ -4581,6 +4598,65 @@ fn enclosing_go_string_is_massive(node: Node<'_>) -> bool {
         cursor = current.parent();
     }
     false
+}
+
+fn bash_github_io_match_is_inert(node: Node<'_>, source: &[u8]) -> bool {
+    if node_or_parent_is_comment(node) {
+        return true;
+    }
+
+    let mut cursor = Some(node);
+    let mut inside_string_like = false;
+    while let Some(current) = cursor {
+        if matches!(
+            current.kind(),
+            "string" | "raw_string" | "heredoc_body" | "string_content"
+        ) {
+            inside_string_like = true;
+        }
+        if matches!(current.kind(), "command" | "redirected_statement") {
+            if !inside_string_like {
+                return false;
+            }
+            let cmd_name = bash_context_command_name(current, source);
+            if matches!(cmd_name.as_str(), "curl" | "wget" | "fetch" | "aria2c") {
+                return false;
+            }
+            if matches!(cmd_name.as_str(), "echo" | "printf") {
+                return true;
+            }
+            if cmd_name == "cat" {
+                return !bash_command_has_output_redirection(current, source);
+            }
+            return false;
+        }
+        cursor = current.parent();
+    }
+    false
+}
+
+fn bash_context_command_name(node: Node<'_>, source: &[u8]) -> String {
+    if node.kind() == "command" {
+        return node
+            .child_by_field_name("name")
+            .and_then(|name| name.utf8_text(source).ok())
+            .unwrap_or("")
+            .to_string();
+    }
+    let mut cursor = node.walk();
+    let command_name = node
+        .named_children(&mut cursor)
+        .find(|child| child.kind() == "command")
+        .and_then(|child| child.child_by_field_name("name"))
+        .and_then(|name| name.utf8_text(source).ok())
+        .unwrap_or("");
+    command_name.to_string()
+}
+
+fn bash_command_has_output_redirection(node: Node<'_>, source: &[u8]) -> bool {
+    node.utf8_text(source)
+        .map(|text| text.contains('>'))
+        .unwrap_or(false)
 }
 
 fn external_script_tag_has_sri(source: &[u8], start: usize) -> bool {
@@ -10755,6 +10831,51 @@ AKIAoAEYuREgAX8687Nw283LCyp9Mw=='";
                 .iter()
                 .all(|f| !f.description.contains("unpinned_asset")),
             "documentation-only .github.io URLs in Go comments must remain inert"
+        );
+    }
+
+    #[test]
+    fn test_github_io_url_inside_bash_heredoc_help_is_ignored() {
+        let src = format!(
+            "cat <<'EOF'\nSee {}\nEOF\n",
+            concat!("https://docs.github", ".io/example/install")
+        );
+        let findings = find_slop("sh", src.as_bytes());
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("unpinned_asset")),
+            "help-text heredoc URLs in Bash must not trigger unpinned_asset"
+        );
+    }
+
+    #[test]
+    fn test_github_io_url_inside_bash_printf_is_ignored() {
+        let src = format!(
+            "printf 'Install docs: {}\\n'\n",
+            concat!("https://org.github", ".io/tooling/install")
+        );
+        let findings = find_slop("sh", src.as_bytes());
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("unpinned_asset")),
+            "stdout-only printf URLs in Bash must not trigger unpinned_asset"
+        );
+    }
+
+    #[test]
+    fn test_github_io_url_inside_bash_fetch_sink_is_detected() {
+        let src = format!(
+            "curl -fsSL {}\n",
+            concat!("https://org.github", ".io/tooling/install.sh")
+        );
+        let findings = find_slop("sh", src.as_bytes());
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("unpinned_asset")),
+            "runtime fetch URLs in Bash must remain detected"
         );
     }
 

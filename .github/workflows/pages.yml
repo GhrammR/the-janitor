@@ -14,6 +14,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pages: write    # required-by-design: publish the prepared artifact to GitHub Pages
@@ -22,19 +23,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Stage only the files that make up the public site into a dedicated
-      # publish directory.  Uploading repo root previously included target/,
-      # crates/, .git/, etc. and exceeded the artifact size budget.
-      - name: Stage publish directory
+      - name: Build MkDocs site
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p _pages_publish
-          cp index.html _pages_publish/
-          # CNAME and .nojekyll are required at site root for custom domain
-          # + raw HTML serving (no Jekyll preprocessing).
-          if [ -f CNAME ];    then cp CNAME    _pages_publish/; fi
-          if [ -f .nojekyll ]; then cp .nojekyll _pages_publish/; fi
+          python3 -m pip install --disable-pip-version-check --user \
+            "mkdocs<2" \
+            "mkdocs-material<9.6"
+          python3 -m mkdocs build --strict
+          if [ -f CNAME ]; then cp CNAME site/; fi
+          touch site/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -42,9 +40,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: _pages_publish
-          # v4.0.0 of this action excluded dotfiles by default.  .nojekyll must
-          # ship so GitHub Pages serves the raw HTML and skips Jekyll.
+          path: site
           include-hidden-files: 'true'
 
       - name: Deploy to GitHub Pages
