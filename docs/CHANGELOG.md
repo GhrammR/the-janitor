@@ -2,7 +2,6 @@
 
 Append-only log of every major directive received and the specific changes
 implemented as a result.
-
 ## 2026-05-10 — Sprint Batch 137: Secretless PR Gate Hardening, Token-Permissions Rationale, Trust-Boundary Corrections
 
 **Directive:** (1) fix the failing Janitor workflow gate path on secretless Dependabot PRs; (2) triage the open Token-Permissions workflow findings and the five blocked Dependabot PRs; (3) verify the scheduled KEV, Systems Health Signal, and Entropy Modulator feature paths are fully wired; (4) harden website trust/compliance copy for enterprise security reviews and grant diligence.
@@ -29,6 +28,18 @@ implemented as a result.
 - Confirmed scheduled KEV sync uses `--kev-manifest-only`, Systems Health Signal still deduplicates on `health-signal/<workflow-slug>` issue labels, and the LLM prompt-injection / Entropy Modulator detector remains wired into active JS/TS/Python dispatch.
 
 **Verification**: `./actionlint -color .github/workflows/*.yml` ✓ | `python3 -c "import yaml; [yaml.safe_load(open(f)) for f in ['action.yml','.github/workflows/codeql.yml','.github/workflows/dependency-review.yml','.github/workflows/health-signal.yml','.github/workflows/pages.yml','.github/workflows/scorecard.yml']]"` ✓ | `cargo test -p cli --bin janitor kev_manifest_only` ✓ | `cargo test -p forge --lib llm_prompt_injection` ✓ | `cargo run -p cli -- bounce . --patch /tmp/pr90.patch --pr-number 90 --author dependabot[bot] --format json` ✓
+
+## 2026-05-12 — Sprint Batch 137: Pages Publication Repair, Public Security Posture, P2-16 Bash URL Suppression
+
+* `.gitignore` *(modified)* — tightened artifact hygiene without blanketing tracked evidence: ignored `.janitor` runtime JSON/log/hash/license/SVG noise, generated PoC HTML files, downloaded `actionlint` tarballs/binary, `sprint*/` workdirs, and Windows `Zone.Identifier` sidecars so the publish diff stays source/docs/workflow-only.
+* `.github/dependabot.yml` *(modified)* — removed the nonexistent `github-actions` label from the GitHub Actions update policy so future Dependabot PRs stop emitting label-resolution warnings.
+* `.github/workflows/pages.yml` *(modified)* — replaced the static `index.html` staging flow with an actual MkDocs publication path: install `mkdocs<2` + `mkdocs-material<9.6>`, run `mkdocs build --strict`, copy `CNAME`, emit `.nojekyll`, then upload `site/` to GitHub Pages. This re-couples Pages deployment to the authoritative docs source instead of a hand-maintained landing page.
+* `mkdocs.yml` *(modified)* — added `Security Posture` to the public nav.
+* `docs/security.md` *(created)* — added the public trust-boundary page defining the partially public governance split: public trust boundary, security rationale, and high-level governance template remain published; thresholds, decoys, bypass heuristics, and operator playbooks remain private.
+* `SECURITY.md` *(modified)* — added a direct cross-link to `docs/security.md` so GitHub’s reporting entrypoint and the website posture page are navigable from either surface.
+* `crates/forge/src/slop_hunter.rs` *(modified)* — implemented the active P2-16 shell help-text suppression lane for Bash-family `.github.io/` `security:unpinned_asset` matches: AST-aware suppression now treats comment nodes plus `echo`, `printf`, and `cat <<EOF` stdout help text as inert while preserving live fetch sinks (`curl`, `wget`, `fetch`, `aria2c`). Added 3 deterministic tests covering heredoc suppression, printf suppression, and live fetch preservation.
+
+**Verification**: `./actionlint -color .github/workflows/*.yml` ✓; `cargo test -p forge github_io_url_inside_bash -- --test-threads=1` ✓; `cargo fmt --check` ✓; `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓.
 
 ## 2026-05-09 — Sprint Batch 136: Infrastructure Asceticism, P2-14 DOM Reflection Proof, CVP Threat Synthesis (P2-15)
 
