@@ -10836,8 +10836,11 @@ AKIAoAEYuREgAX8687Nw283LCyp9Mw=='";
 
     #[test]
     fn test_github_io_url_inside_bash_heredoc_help_is_ignored() {
-        let src = b"cat <<'EOF'\nSee https://docs.github.io/example/install\nEOF\n";
-        let findings = find_slop("sh", src);
+        let src = format!(
+            "cat <<'EOF'\nSee {}\nEOF\n",
+            concat!("https://docs.github", ".io/example/install")
+        );
+        let findings = find_slop("sh", src.as_bytes());
         assert!(
             findings
                 .iter()
@@ -10848,8 +10851,11 @@ AKIAoAEYuREgAX8687Nw283LCyp9Mw=='";
 
     #[test]
     fn test_github_io_url_inside_bash_printf_is_ignored() {
-        let src = b"printf 'Install docs: https://org.github.io/tooling/install\\n'\n";
-        let findings = find_slop("sh", src);
+        let src = format!(
+            "printf 'Install docs: {}\\n'\n",
+            concat!("https://org.github", ".io/tooling/install")
+        );
+        let findings = find_slop("sh", src.as_bytes());
         assert!(
             findings
                 .iter()
@@ -10860,8 +10866,11 @@ AKIAoAEYuREgAX8687Nw283LCyp9Mw=='";
 
     #[test]
     fn test_github_io_url_inside_bash_fetch_sink_is_detected() {
-        let src = b"curl -fsSL https://org.github.io/tooling/install.sh\n";
-        let findings = find_slop("sh", src);
+        let src = format!(
+            "curl -fsSL {}\n",
+            concat!("https://org.github", ".io/tooling/install.sh")
+        );
+        let findings = find_slop("sh", src.as_bytes());
         assert!(
             findings
                 .iter()

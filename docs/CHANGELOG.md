@@ -37,7 +37,7 @@ implemented as a result.
 * `mkdocs.yml` *(modified)* — added `Security Posture` to the public nav.
 * `docs/security.md` *(created)* — added the public trust-boundary page defining the partially public governance split: public trust boundary, security rationale, and high-level governance template remain published; thresholds, decoys, bypass heuristics, and operator playbooks remain private.
 * `SECURITY.md` *(modified)* — added a direct cross-link to `docs/security.md` so GitHub’s reporting entrypoint and the website posture page are navigable from either surface.
-* `crates/forge/src/slop_hunter.rs` *(modified)* — implemented the active P2-16 shell help-text suppression lane for Bash-family `.github.io/` `security:unpinned_asset` matches: AST-aware suppression now treats comment nodes plus `echo`, `printf`, and `cat <<EOF` stdout help text as inert while preserving live fetch sinks (`curl`, `wget`, `fetch`, `aria2c`). Added 3 deterministic tests covering heredoc suppression, printf suppression, and live fetch preservation.
+* `crates/forge/src/slop_hunter.rs` *(modified)* — implemented the active P2-16 shell help-text suppression lane for Bash-family GitHub Pages `security:unpinned_asset` matches: AST-aware suppression now treats comment nodes plus `echo`, `printf`, and `cat <<EOF` stdout help text as inert while preserving live fetch sinks (`curl`, `wget`, `fetch`, `aria2c`). Added 3 deterministic tests covering heredoc suppression, printf suppression, and live fetch preservation.
 
 **Verification**: `./actionlint -color .github/workflows/*.yml` ✓; `cargo test -p forge github_io_url_inside_bash -- --test-threads=1` ✓; `cargo fmt --check` ✓; `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓.
 

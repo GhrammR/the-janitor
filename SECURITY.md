@@ -1,8 +1,5 @@
 # Security Policy
 
-For the public trust boundary and website-facing security posture, see
-[`docs/security.md`](docs/security.md).
-
 ## Reporting a Vulnerability
 
 Report vulnerabilities to [security@thejanitor.app](mailto:security@thejanitor.app).
