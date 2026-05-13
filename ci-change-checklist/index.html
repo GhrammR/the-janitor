@@ -346,6 +346,46 @@
   
   
     <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security Posture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grant_strategy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Grant Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -378,10 +418,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -392,8 +432,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -625,7 +665,7 @@ list eliminates the most common preventable causes.</p>
 <p>Tick each item before requesting review:</p>
 <ul>
 <li>[ ] <strong>YAML parses.</strong> Run <code>python3 -c "import yaml; yaml.safe_load(open('&lt;file&gt;'))"</code> against every changed file.</li>
-<li>[ ] <strong>actionlint clean.</strong> Run <code>actionlint .github/workflows/*.yml action.yml</code> (the Workflow Lint job runs this on every PR — green = sufficient).</li>
+<li>[ ] <strong>actionlint clean.</strong> Run <code>actionlint .github/workflows/*.yml</code> (the Workflow Lint job runs this on every PR — green = sufficient). <code>action.yml</code> is YAML-validated separately because it is a composite-action schema, not a workflow schema.</li>
 <li>[ ] <strong>All <code>uses:</code> are SHA-pinned or <code>./</code>.</strong> Major-version floats (<code>@v4</code>, <code>@main</code>) are rejected by the Workflow Lint job's SHA-pin step.</li>
 <li>[ ] <strong>Dogfood path</strong> (<code>uses: ./</code>): if you reference the action in this same workflow, sanity-check that empty <code>github.action_ref</code> is handled. The fallback exists in <code>action.yml</code> — don't break it.</li>
 <li>[ ] <strong><code>set -euo pipefail</code></strong> at the top of every multi-line <code>run:</code> block. Without it, a failed <code>gh run download --pattern</code> returns 0 and tanks downstream steps silently.</li>
@@ -658,7 +698,7 @@ but running them locally catches issues before pushing.</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># actionlint (one-time install)</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>go<span class="w"> </span>install<span class="w"> </span>github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>actionlint<span class="w"> </span>.github/workflows/*.yml<span class="w"> </span>action.yml
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>actionlint<span class="w"> </span>.github/workflows/*.yml
 </code></pre></div>
 <h2 id="deliberate-exceptions">Deliberate exceptions</h2>
 <ul>

@@ -10,13 +10,9 @@
       
       
       
-        <link rel="canonical" href="https://thejanitor.app/pricing_faq/">
+        <link rel="canonical" href="https://thejanitor.app/public-governance-template/">
       
       
-        <link rel="prev" href="../discovery/">
-      
-      
-        <link rel="next" href="../terms/">
       
       
       <link rel="icon" href="../assets/logo.svg">
@@ -24,7 +20,7 @@
     
     
       
-        <title>Pricing FAQ - The Janitor</title>
+        <title>Public Governance Template - The Janitor</title>
       
     
     
@@ -107,7 +103,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pricing-faq" class="md-skip">
+        <a href="#public-governance-template" class="md-skip">
           Skip to content
         </a>
       
@@ -142,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Pricing FAQ
+              Public Governance Template
             
           </span>
         </div>
@@ -495,30 +491,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Pricing FAQ
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../pricing_faq/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -527,53 +503,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-no-per-seat-pricing" class="md-nav__link">
-    <span class="md-ellipsis">
-      Why no per-seat pricing?
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-the-sovereign-air-gap-tier" class="md-nav__link">
-    <span class="md-ellipsis">
-      What is the Sovereign / Air-Gap Tier?
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#is-open-source-use-free" class="md-nav__link">
-    <span class="md-ellipsis">
-      Is Open Source use free?
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -665,27 +594,63 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-no-per-seat-pricing" class="md-nav__link">
+  <a href="#1-governance-scope" class="md-nav__link">
     <span class="md-ellipsis">
-      Why no per-seat pricing?
+      1. Governance Scope
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-is-the-sovereign-air-gap-tier" class="md-nav__link">
+  <a href="#2-security-principles" class="md-nav__link">
     <span class="md-ellipsis">
-      What is the Sovereign / Air-Gap Tier?
+      2. Security Principles
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#is-open-source-use-free" class="md-nav__link">
+  <a href="#3-data-handling-boundary" class="md-nav__link">
     <span class="md-ellipsis">
-      Is Open Source use free?
+      3. Data Handling Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-ci-enforcement-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. CI Enforcement Controls
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-workflow-permission-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Workflow Permission Policy
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-compliance-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Compliance Boundary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-what-is-deliberately-omitted" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. What Is Deliberately Omitted
     </span>
   </a>
   
@@ -709,65 +674,88 @@
   
 
 
-<h1 id="pricing-faq">Pricing FAQ</h1>
-<hr />
-<h2 id="why-no-per-seat-pricing">Why no per-seat pricing?</h2>
-<p>Because The Janitor is not metered as a cloud code-analysis service.</p>
-<p>Every scan, bounce, and audit runs <strong>locally on your hardware</strong> or on your own
-GitHub Actions runner. Optional control-plane features exist (<code>update-wisdom</code>,
-Governor reporting, webhooks), but those are organization-level integrations,
-not per-developer usage meters. The binary sits on your machine; it reads your
-repository; core analysis stays local.</p>
-<p>Per-seat pricing makes sense for SaaS products that provision server-side
-resources per user. We do not. One token, one organization, unlimited developers
-and CI runners.</p>
-<hr />
-<h2 id="what-is-the-sovereign-air-gap-tier">What is the Sovereign / Air-Gap Tier?</h2>
-<p>The Sovereign / Air-Gap Tier is the procurement path for organizations operating
-under <strong>IL5, IL6, FedRAMP High, or equivalent classified-adjacent environments</strong>
-where code must never traverse a network boundary — including to a vendor's
-license server. The Janitor is <strong>not</strong> FedRAMP-authorized today; this tier is
-for organizations that need an offline deployment model while conducting their
-own accreditation or enclave-specific review.</p>
-<p><strong>What it includes:</strong></p>
+<h1 id="public-governance-template">Public Governance Template</h1>
+<p>Use this template when publishing a sanitized subset of internal governance.
+It is intentionally safe for public release: it describes principles and
+controls, but omits detector thresholds, campaign targets, decoy seeds, and
+internal response heuristics.</p>
+<h2 id="1-governance-scope">1. Governance Scope</h2>
 <ul>
-<li><strong>Dual-PQC CBOMs</strong> — CycloneDX v1.6 Cryptography Bills of Materials signed with
-  both ML-DSA-65 (FIPS 204) and SLH-DSA-SHAKE-192s (FIPS 205) for long-horizon
-  cryptographic assurance.</li>
-<li><strong>SLSA Level 4 Reproducible Builds</strong> — bit-for-bit deterministic release
-  binaries verified via Docker-based dual-build comparison.</li>
-<li><strong>Jira ASPM Sync</strong> — fingerprint-based deduplication with credential preflight;
-  graceful degradation to local-only mode when credentials are absent.</li>
-<li><strong>Native SCM Publishing</strong> — GitLab and Azure DevOps commit-status verdicts
-  auto-detected from CI environment variables.</li>
-<li><strong>Wasm BYOR Rule Mounting</strong> — bring your own private governance modules;
-  pin them with BLAKE3 (<code>janitor wasm-pin</code>) and enforce integrity at load time.</li>
-<li><strong>Offline Replayable Decision Capsules</strong> — tamper-evident audit capsules
-  (<code>janitor export-intel-capsule</code>) that can be replayed for incident response
-  without network access.</li>
-<li><strong>Air-Gap Intel Transfers</strong> — BLAKE3 + Ed25519 offline wisdom feed
-  verification; classified networks receive a signed capsule, not a live pull.</li>
-<li><strong>SOC 2 readiness mapping materials</strong> on request. No completed SOC 2 Type II
-  attestation is claimed today.</li>
-<li><strong>Dedicated SLA</strong> — 4-hour emergency rotation SLA for confirmed compromises.</li>
+<li>Repositories covered</li>
+<li>CI systems covered</li>
+<li>Public policy owner</li>
+<li>Security disclosure contact</li>
 </ul>
-<p><strong>Starting price</strong>: $49,900 / year.</p>
-<p>Contact: <a href="mailto:sales@thejanitor.app">sales@thejanitor.app</a></p>
-<p>Security reviews, pilot deployments, and grant diligence:
-<a href="mailto:security@thejanitor.app">security@thejanitor.app</a></p>
-<hr />
-<h2 id="is-open-source-use-free">Is Open Source use free?</h2>
-<p>Yes. Permanently.</p>
-<p>The Free tier has no time limit, no line-of-code cap, and no account requirement.
-<code>janitor scan</code>, <code>janitor clean</code>, <code>janitor dedup</code>, <code>janitor bounce</code>, <code>janitor
-dashboard</code>, and <code>janitor report</code> are fully available at zero cost — forever.</p>
-<p>What the Free tier does not include is the cryptographic chain of custody
-(PQC-signed audit logs, CI/CD compliance attestation, Janitor Sentinel GitHub
-App). Those capabilities are what regulators and auditors pay for. The enforcement
-engine itself is open.</p>
-<p>If you are a public OSS project and need Sentinel for PR gate automation, email
-<a href="mailto:sales@thejanitor.app">sales@thejanitor.app</a> — OSS sponsorship is
-evaluated case by case.</p>
+<h2 id="2-security-principles">2. Security Principles</h2>
+<ul>
+<li>Default-deny workflow permissions</li>
+<li>SHA-pinned third-party actions</li>
+<li>Runner-side analysis; no source upload</li>
+<li>Reproducible release verification</li>
+<li>Minimum-privilege automation tokens</li>
+</ul>
+<h2 id="3-data-handling-boundary">3. Data Handling Boundary</h2>
+<ul>
+<li>What data is processed locally</li>
+<li>What metadata leaves the runner</li>
+<li>What is never transmitted</li>
+<li>Optional integrations and their data classes</li>
+</ul>
+<h2 id="4-ci-enforcement-controls">4. CI Enforcement Controls</h2>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Public description</th>
+<th>Evidence link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Workflow lint</td>
+<td>YAML validation, actionlint, SHA-pin checks</td>
+<td>link</td>
+</tr>
+<tr>
+<td>Code scanning</td>
+<td>CodeQL / Scorecard / dependency review</td>
+<td>link</td>
+</tr>
+<tr>
+<td>Release provenance</td>
+<td>Signed assets and verification command</td>
+<td>link</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-workflow-permission-policy">5. Workflow Permission Policy</h2>
+<p>State the rule in public:</p>
+<ul>
+<li>Workflow-level permissions are read-only by default.</li>
+<li>Any write-scoped job must carry an inline rationale comment.</li>
+<li>Each write scope must be mapped to a concrete GitHub resource mutation.</li>
+</ul>
+<p>Do <strong>not</strong> publish:</p>
+<ul>
+<li>secret names</li>
+<li>bypass conditions</li>
+<li>internal branch naming conventions</li>
+<li>enforcement thresholds</li>
+</ul>
+<h2 id="6-compliance-boundary">6. Compliance Boundary</h2>
+<ul>
+<li>What is certified today</li>
+<li>What is monitored continuously</li>
+<li>What remains roadmap only</li>
+</ul>
+<h2 id="7-what-is-deliberately-omitted">7. What Is Deliberately Omitted</h2>
+<ul>
+<li>Detector thresholds and scoring weights</li>
+<li>Internal campaign ledgers or target lists</li>
+<li>Decoy seeds, deception content, or honeypot logic</li>
+<li>Incident-response timing heuristics beyond the public disclosure policy</li>
+<li>Any rule text that would materially help an attacker shape a bypass</li>
+</ul>
 
 
 

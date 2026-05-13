@@ -350,6 +350,46 @@
   
   
     <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security Posture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grant_strategy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Grant Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -382,10 +422,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -396,8 +436,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -923,15 +963,15 @@
 <hr />
 <h2 id="4-nature-of-the-product">4. Nature of the Product</h2>
 <p>The Janitor performs automated dead-symbol detection, structural clone analysis, shadow-tree simulation, and code cleanup operations. All analysis runs locally on your hardware. The Janitor does not receive, transmit, store, or process your source code on any remote server.</p>
-<p>Remote network calls are limited to:</p>
+<p>Optional network calls are limited to the features you enable:</p>
 <ul>
-<li><strong>Token verification</strong>: a single POST to <code>https://api.thejanitor.app/v1/verify</code> when <code>--token</code> is supplied.</li>
-<li><strong>Audit attestation</strong>: a POST to <code>https://api.thejanitor.app/v1/attest</code> when a signed audit log is requested (Lead Specialist / Industrial Core tiers).</li>
-<li><strong>Wisdom synchronisation</strong>: a GET from <code>https://api.thejanitor.app/v1/wisdom.rkyv</code> when <code>janitor update-wisdom</code> is invoked.</li>
-<li><strong>Anonymous telemetry</strong>: a minimal zero-knowledge hash submitted on rollback events (opt-out: delete <code>.janitor/telemetry.json</code>).</li>
+<li><strong>Wisdom synchronisation</strong>: <code>janitor update-wisdom</code> fetches signed threat-intelligence material.</li>
+<li><strong>Governor reporting / attestation</strong>: when <code>--governor-url</code> is configured or the Janitor Sentinel GitHub App is used, the runner POSTs score metadata and attestation material to the configured Governor endpoint.</li>
+<li><strong>Configured outbound integrations</strong>: webhooks, Jira sync, or similar operator-configured destinations.</li>
+<li><strong>Anonymous rollback telemetry</strong>: a minimal zero-knowledge hash may be submitted on rollback events (opt-out: delete <code>.janitor/telemetry.json</code>).</li>
 </ul>
 <p>No source file contents, file paths, or symbol names are transmitted in any of the above calls.</p>
-<p><strong>Janitor Sentinel (GitHub App)</strong>: When using the Janitor Sentinel GitHub App, source code submitted for analysis is processed transiently on Janitor infrastructure (Fly.io) and permanently deleted upon completion of analysis. Janitor makes no claim of ownership over customer source code. The clone is held only for the duration of the structural analysis (typically under 60 seconds) and is not written to persistent storage.</p>
+<p><strong>Janitor Sentinel (GitHub App)</strong>: The Janitor binary executes on your GitHub Actions runner. The Governor receives score metadata, fingerprints, and attestation material; it does not receive source code, file paths, or symbol names.</p>
 <hr />
 <h2 id="5-license">5. License</h2>
 <p>The Software is licensed under the <strong>Business Source License 1.1 (BUSL-1.1)</strong>, the full text of which is available at <a href="https://spdx.org/licenses/BUSL-1.1.html">https://spdx.org/licenses/BUSL-1.1.html</a> and in the <code>LICENSE</code> file distributed with the Software.</p>

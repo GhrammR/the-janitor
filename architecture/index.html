@@ -1026,6 +1026,46 @@
   
   
     <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security Posture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grant_strategy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Grant Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -1058,10 +1098,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -1072,8 +1112,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -2757,6 +2797,10 @@ License: <code>BUSL-1.1</code> (all workspace crates via <code>license.workspace
 <p>New env var: <code>GOVERNOR_INVERT_MODE=1</code> — gates all inversion behaviour in the Governor. Default: <code>0</code> (legacy clone path).
 New CLI flags: <code>janitor bounce --report-url &lt;url&gt; --analysis-token &lt;jwt&gt;</code>
 New <code>AppState</code> fields: <code>invert_mode: bool</code>, <code>token_rate_limit: DashMap</code>, <code>pending_checks: DashMap</code></p>
+<p><strong>Current deployment boundary</strong>: the public GitHub Action and Janitor Sentinel
+path use runner-side analysis plus Governor score reporting. References to the
+legacy clone path in this document are implementation-history notes, not the
+recommended deployment model.</p>
 <hr />
 <h2 id="x-sovereign-control-plane-air-gap-ready">X. SOVEREIGN CONTROL PLANE (AIR-GAP READY)</h2>
 <p>The Janitor Sovereign Governor (<code>janitor-gov</code>) is a self-contained binary that

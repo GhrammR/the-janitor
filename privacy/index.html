@@ -350,6 +350,46 @@
   
   
     <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security Posture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grant_strategy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Grant Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -382,10 +422,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -396,8 +436,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -616,9 +656,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-changes-to-this-policy" class="md-nav__link">
+  <a href="#9-minimal-rollback-telemetry" class="md-nav__link">
     <span class="md-ellipsis">
-      9. Changes to This Policy
+      9. Minimal Rollback Telemetry
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-changes-to-this-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Changes to This Policy
     </span>
   </a>
   
@@ -751,9 +800,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-changes-to-this-policy" class="md-nav__link">
+  <a href="#9-minimal-rollback-telemetry" class="md-nav__link">
     <span class="md-ellipsis">
-      9. Changes to This Policy
+      9. Minimal Rollback Telemetry
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-changes-to-this-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Changes to This Policy
     </span>
   </a>
   
@@ -783,8 +841,12 @@
 <strong>Contact:</strong> privacy@thejanitor.app</p>
 <hr />
 <h2 id="1-overview">1. Overview</h2>
-<p>The Janitor is a <strong>locally-executed software binary</strong>. It does not have a backend, a cloud service, or a telemetry system. This Privacy Policy describes what data is and is not collected when you use the Software.</p>
-<p><strong>Short version: We do not receive your source code. We do not collect telemetry. We do not know you are using the Software unless you contact us.</strong></p>
+<p>The Janitor is a <strong>locally-executed software binary</strong>. Core analysis runs on your
+machine or your GitHub Actions runner. Some optional features make network
+requests or emit minimal metadata, and those boundaries are described below.</p>
+<p><strong>Short version: We do not receive your source code. Core analysis stays local.
+Optional integrations may transmit score-only metadata or a minimal rollback
+fingerprint, but not file contents, file paths, or symbol names.</strong></p>
 <hr />
 <h2 id="2-data-we-do-not-collect">2. Data We Do NOT Collect</h2>
 <p>The Software does not transmit any of the following:</p>
@@ -818,7 +880,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">Usage telemetry (commands run, frequency, flags used)</td>
-<td style="text-align: center;">No</td>
+<td style="text-align: center;">Minimal — see §9</td>
 </tr>
 <tr>
 <td style="text-align: left;">Crash reports</td>
@@ -830,7 +892,7 @@
 </tr>
 </tbody>
 </table>
-<p>The Software operates entirely offline. All analysis — reference graph construction, heuristic classification, AhoCorasick scanning, shadow-tree simulation, and structural clone detection — is performed on your local machine using only your local files.</p>
+<p>Core analysis operates locally. All analysis — reference graph construction, heuristic classification, AhoCorasick scanning, shadow-tree simulation, and structural clone detection — is performed on your local machine or runner using only your local files.</p>
 <hr />
 <h2 id="3-data-processed-locally-not-transmitted">3. Data Processed Locally (Not Transmitted)</h2>
 <p>When you run The Janitor, the following data is processed <strong>in memory on your machine</strong> and is never transmitted:</p>
@@ -868,7 +930,7 @@
 <p><strong>privacy@thejanitor.app</strong></p>
 <hr />
 <h2 id="8-data-collection-by-deployment-model">8. Data Collection by Deployment Model</h2>
-<p>The Janitor operates in two distinct deployment modes with different data handling properties:</p>
+<p>The Janitor operates in two distinct deployment modes with identical source-code handling — neither transmits your code off-runner:</p>
 <table>
 <thead>
 <tr>
@@ -881,12 +943,12 @@
 <tr>
 <td>Source code transmitted</td>
 <td>Never</td>
-<td>Temporarily cloned to Janitor infrastructure</td>
+<td>Never — analysis runs on your GitHub Actions runner</td>
 </tr>
 <tr>
 <td>Source code retained</td>
 <td>N/A</td>
-<td>Deleted immediately after scan (duration of analysis only)</td>
+<td>N/A — no server-side clone is made</td>
 </tr>
 <tr>
 <td>Bounce log</td>
@@ -900,10 +962,11 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Sentinel mode</strong>: When you install Janitor Sentinel as a GitHub App, source code is temporarily cloned to Janitor's Fly.io infrastructure to perform the structural analysis. The clone is deleted immediately after the analysis completes — it is never written to persistent storage. Only the structural analysis result (slop score, antipattern labels, collided PR numbers) is retained in the Governor's database.</p>
-<p><strong>Post-Architecture-Inversion (v9.7.0+)</strong>: After the architecture inversion is deployed with <code>GOVERNOR_INVERT_MODE=1</code>, Sentinel mode will match the CLI/Action model — no source code will be transmitted to Janitor infrastructure.</p>
+<p><strong>Sentinel mode</strong>: Janitor Sentinel downloads the Janitor binary to your GitHub Actions runner and executes the analysis there. Source code is never transmitted to Janitor infrastructure. Only the structural analysis result (slop score, antipattern labels, fingerprints) is transmitted from the runner to the Governor via a signed token exchange. The Governor does not receive source code, file paths, or symbol names.</p>
+<h2 id="9-minimal-rollback-telemetry">9. Minimal Rollback Telemetry</h2>
+<p>The Software may emit a minimal zero-knowledge hash on rollback events. This hash is a structural fingerprint (not source code, not file paths, not symbol names). It is used to improve detection accuracy across the anonymized fleet. To opt out, delete <code>.janitor/telemetry.json</code>.</p>
 <hr />
-<h2 id="9-changes-to-this-policy">9. Changes to This Policy</h2>
+<h2 id="10-changes-to-this-policy">10. Changes to This Policy</h2>
 <p>This policy may be updated. The Effective Date at the top of this document reflects the most recent revision. Material changes will be noted in the project's release notes.</p>
 
 
