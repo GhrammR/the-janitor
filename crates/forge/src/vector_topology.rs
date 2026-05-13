@@ -16,6 +16,18 @@ const QUERY_MARKERS: &[&[u8]] = &[
     b".query(",
 ];
 
+const VECTOR_STORE_QUERY_MARKERS: &[&[u8]] = &[
+    b"chromadb.query",
+    b"pinecone.query",
+    b"weaviate.query",
+    b"milvus.search",
+    b"qdrant.search",
+    b"similaritysearch",
+    b"similarity_search",
+    b"vectorstore.query",
+    b"index.query",
+];
+
 const RESULT_MARKERS: &[&[u8]] = &[
     b"matches[0]",
     b"results[0]",
@@ -52,6 +64,52 @@ const VALIDATION_MARKERS: &[&[u8]] = &[
     b"threshold:",
 ];
 
+const FILTER_MARKERS: &[&[u8]] = &[
+    b"filter:",
+    b"filter =",
+    b"filter=",
+    b"where:",
+    b"where =",
+    b"where=",
+    b"query_filter",
+    b"metadata_filter",
+    b"metadatafilter",
+];
+
+const DYNAMIC_FILTER_MARKERS: &[&[u8]] = &[
+    b"req.query",
+    b"req.body",
+    b"request.args",
+    b"request.json",
+    b"ctx.query",
+    b"params.",
+    b"json.parse",
+    b"input.filter",
+    b"user_filter",
+    b"userfilter",
+];
+
+const POLYMORPHIC_PREDICATE_MARKERS: &[&[u8]] = &[
+    b"$or",
+    b"$ne",
+    b"$in",
+    b"operator",
+    b"where_document",
+    b"...req.",
+    b"...request.",
+    b"...params.",
+];
+
+const AUTHORITATIVE_TENANT_MARKERS: &[&[u8]] = &[
+    b"tenant_id: req.user.tenant_id",
+    b"tenant_id:req.user.tenant_id",
+    b"tenant_id: session.tenant_id",
+    b"tenant_id: auth.tenant_id",
+    b"tenantid: req.user.tenantid",
+    b"namespace: req.user.tenant_id",
+    b"namespace: session.tenant_id",
+];
+
 /// Detect vector-query results that flow into an LLM sink without visible
 /// semantic or similarity-score validation.
 pub fn detect_vector_store_poisoning(source: &[u8]) -> Vec<SlopFinding> {
@@ -59,21 +117,55 @@ pub fn detect_vector_store_poisoning(source: &[u8]) -> Vec<SlopFinding> {
     let Some(query_offset) = first_offset(&lower, QUERY_MARKERS) else {
         return Vec::new();
     };
-    if !contains_any_bytes(&lower, RESULT_MARKERS) || !contains_any_bytes(&lower, LLM_SINK_MARKERS)
-    {
-        return Vec::new();
-    }
-    if contains_any_bytes(&lower, VALIDATION_MARKERS) {
-        return Vec::new();
+    let mut findings = Vec::new();
+
+    if has_vector_filter_predicate_polymorphism(&lower) {
+        findings.push(SlopFinding {
+            start_byte: query_offset,
+            end_byte: query_offset.saturating_add(32),
+            description: "security:vector_filter_polymorphism — vector-store query accepts attacker-shaped metadata filter predicates without a server-side tenant equality guard; a crafted $or/$ne predicate can cross tenant retrieval boundaries before answer synthesis.".to_string(),
+            domain: DOMAIN_FIRST_PARTY,
+            severity: Severity::High,
+        });
     }
 
-    vec![SlopFinding {
+    if !contains_any_bytes(&lower, RESULT_MARKERS) || !contains_any_bytes(&lower, LLM_SINK_MARKERS)
+    {
+        return findings;
+    }
+    if contains_any_bytes(&lower, VALIDATION_MARKERS) {
+        return findings;
+    }
+
+    findings.push(SlopFinding {
         start_byte: query_offset,
         end_byte: query_offset.saturating_add(32),
         description: "security:vector_store_poisoning — vector-query results flow into an LLM context sink without a visible semantic rerank or similarity-score threshold; a poisoned document can become the retrieval bridge into trusted answer space.".to_string(),
         domain: DOMAIN_FIRST_PARTY,
         severity: Severity::High,
-    }]
+    });
+    findings
+}
+
+fn has_vector_filter_predicate_polymorphism(lower: &[u8]) -> bool {
+    if !contains_any_bytes(lower, VECTOR_STORE_QUERY_MARKERS)
+        || !contains_any_bytes(lower, FILTER_MARKERS)
+    {
+        return false;
+    }
+
+    let dynamic_filter = contains_any_bytes(lower, DYNAMIC_FILTER_MARKERS);
+    let polymorphic_predicate = contains_any_bytes(lower, POLYMORPHIC_PREDICATE_MARKERS);
+    if !dynamic_filter && !polymorphic_predicate {
+        return false;
+    }
+
+    let authoritative_tenant_guard = contains_any_bytes(lower, AUTHORITATIVE_TENANT_MARKERS);
+    if authoritative_tenant_guard && !polymorphic_predicate {
+        return false;
+    }
+
+    true
 }
 
 /// Returns `true` when a data-dependency chain is proven between a vector-query
@@ -244,6 +336,61 @@ async function answer(req) {
     score_threshold: 0.92
   });
   return openai.chat.completions.create({
+    messages: [{ role: "user", content: results.matches[0].metadata.page_content }]
+  });
+}
+"#;
+        assert!(detect_vector_store_poisoning(src).is_empty());
+    }
+
+    #[test]
+    fn vector_filter_polymorphism_fires_for_user_supplied_filter() {
+        let src = br#"
+async function answer(req) {
+  const filter = JSON.parse(req.query.filter);
+  const results = await pinecone.query({ vector: embed(req.body.prompt), topK: 6, filter });
+  return openai.chat.completions.create({
+    messages: [{ role: "user", content: results.matches[0].metadata.page_content }]
+  });
+}
+"#;
+        let findings = detect_vector_store_poisoning(src);
+        assert!(findings.iter().any(|finding| finding
+            .description
+            .contains("security:vector_filter_polymorphism")));
+    }
+
+    #[test]
+    fn vector_filter_polymorphism_fires_for_operator_override() {
+        let src = br#"
+async function answer(req) {
+  const results = await pinecone.query({
+    vector: embed(req.body.prompt),
+    filter: { tenant_id: req.user.tenant_id, ...req.query.filter, "$or": req.query.or },
+    topK: 6
+  });
+  return client.chat.completions.create({
+    messages: [{ role: "user", content: results.matches[0].metadata.page_content }]
+  });
+}
+"#;
+        let findings = detect_vector_store_poisoning(src);
+        assert!(findings.iter().any(|finding| finding
+            .description
+            .contains("security:vector_filter_polymorphism")));
+    }
+
+    #[test]
+    fn authoritative_tenant_filter_suppresses_polymorphism() {
+        let src = br#"
+async function answer(req) {
+  const results = await pinecone.query({
+    vector: embed(req.body.prompt),
+    filter: { tenant_id: req.user.tenant_id, document_type: "policy" },
+    topK: 6,
+    score_threshold: 0.91
+  });
+  return client.chat.completions.create({
     messages: [{ role: "user", content: results.matches[0].metadata.page_content }]
   });
 }

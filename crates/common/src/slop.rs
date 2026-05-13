@@ -198,6 +198,10 @@ pub struct ExploitWitness {
     /// from the ingress handler, e.g. `"ADMIN"` or `"Authenticated"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_requirement: Option<String>,
+    /// Two-principal authorization replay evidence proving whether an
+    /// authenticated attacker can access another principal's object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_witness: Option<AuthorizationWitness>,
     /// True when negative-taint analysis proves that at least one reachable
     /// source-to-sink path bypasses all registered sanitizers or validators.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -237,6 +241,22 @@ pub struct ExploitWitness {
     /// was not run or the witness lacked sufficient structural information.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness_artifact: Option<HarnessArtifact>,
+}
+
+/// Deterministic two-principal authorization proof for IDOR and ownership
+/// bypass findings.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorizationWitness {
+    /// Attacker principal used for the replay request.
+    pub attacker_subject: String,
+    /// Victim principal whose object is referenced by the replay request.
+    pub victim_subject: String,
+    /// Object identifier or route fragment controlled by the victim.
+    pub object_reference: String,
+    /// Expected safe control result for the replay request.
+    pub expected_control: String,
+    /// Observed or synthesized verdict for the replay.
+    pub replay_verdict: String,
 }
 
 /// A structured antipattern or dead-symbol finding for MCP tool consumption.

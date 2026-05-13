@@ -1289,6 +1289,45 @@ fn replace_host_in_curl(repro_cmd: &str, live_tenant: &str) -> String {
     repro_cmd.replacen(full_url, &new_url, 1)
 }
 
+fn bounded_curl_command(repro_cmd: &str) -> String {
+    let mut missing_opts = Vec::new();
+    if !repro_cmd.contains("--connect-timeout") {
+        missing_opts.push("--connect-timeout 5");
+    }
+    if !repro_cmd.contains("--max-time") {
+        missing_opts.push("--max-time 20");
+    }
+    if !repro_cmd.contains("--retry") {
+        missing_opts.push("--retry 0");
+    }
+    if missing_opts.is_empty() {
+        return repro_cmd.to_string();
+    }
+    repro_cmd.replacen("curl ", &format!("curl {} ", missing_opts.join(" ")), 1)
+}
+
+fn authorization_replay_verdict(live_proof: &str) -> String {
+    if live_proof.contains("HTTP/1.1 200")
+        || live_proof.contains("HTTP/2 200")
+        || live_proof.contains("HTTP/3 200")
+    {
+        return "potential_cross_tenant_read: replay returned 2xx".to_string();
+    }
+    if live_proof.contains("HTTP/1.1 401")
+        || live_proof.contains("HTTP/1.1 403")
+        || live_proof.contains("HTTP/1.1 404")
+        || live_proof.contains("HTTP/2 401")
+        || live_proof.contains("HTTP/2 403")
+        || live_proof.contains("HTTP/2 404")
+        || live_proof.contains("HTTP/3 401")
+        || live_proof.contains("HTTP/3 403")
+        || live_proof.contains("HTTP/3 404")
+    {
+        return "control_enforced: replay denied cross-principal object access".to_string();
+    }
+    "inconclusive: live replay did not expose an HTTP authorization status".to_string()
+}
+
 /// Execute `repro_cmd` against `live_tenant` for every finding that carries a
 /// synthesized curl command. Populates `ExploitWitness::live_proof` with the
 /// captured stdout+stderr of the shell invocation.
@@ -1306,7 +1345,7 @@ fn apply_live_tenant_replay(
         if !repro_cmd.trim_start().starts_with("curl ") {
             continue;
         }
-        let cmd = replace_host_in_curl(repro_cmd, live_tenant);
+        let cmd = bounded_curl_command(&replace_host_in_curl(repro_cmd, live_tenant));
         let output = std::process::Command::new("sh")
             .arg("-c")
             .arg(&cmd)
@@ -1331,6 +1370,14 @@ fn apply_live_tenant_replay(
             }
             Err(e) => Some(format!("live-tenant execution failed: {e}")),
         };
+        if finding.id == "security:missing_ownership_check" {
+            if let (Some(authz), Some(live_proof)) = (
+                witness.authorization_witness.as_mut(),
+                witness.live_proof.as_deref(),
+            ) {
+                authz.replay_verdict = authorization_replay_verdict(live_proof);
+            }
+        }
     }
     findings
 }
@@ -3518,6 +3565,22 @@ fn scan_buffer(
                     Some("vector_topology:missing_similarity_gate".to_string()),
                 );
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:vector_filter_polymorphism" {
+                let witness = forge::exploitability::vector_filter_polymorphism_witness(
+                    label, &rule_id, line, None,
+                );
+                attach_web_proof_artifact(
+                    &mut structured,
+                    &witness,
+                    Some("vector_filter:tenant_predicate_polymorphism".to_string()),
+                );
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:missing_ownership_check" {
+                let mut witness = forge::exploitability::authorization_ownership_witness(
+                    label, &rule_id, line, None, None,
+                );
+                apply_ingress_surface(&mut structured, &mut witness, ingress_surface.as_ref());
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
             }
             if matches!(
                 rule_id.as_str(),
@@ -5552,6 +5615,27 @@ class Handler {
         assert!(!is_live_tenant_replay_origin(
             "domain=tenant.example.auth0.com;client_id=test-client-123"
         ));
+    }
+
+    #[test]
+    fn live_tenant_replay_adds_curl_timeouts() {
+        let cmd = "curl -i -X GET https://example.invalid/api/resources/123";
+        let bounded = bounded_curl_command(cmd);
+        assert!(bounded.contains("--connect-timeout 5"));
+        assert!(bounded.contains("--max-time 20"));
+        assert!(bounded.contains("--retry 0"));
+    }
+
+    #[test]
+    fn authorization_replay_verdict_distinguishes_200_from_denial() {
+        assert_eq!(
+            authorization_replay_verdict("HTTP/2 200\r\n\r\n{\"id\":\"user_b\"}"),
+            "potential_cross_tenant_read: replay returned 2xx"
+        );
+        assert_eq!(
+            authorization_replay_verdict("HTTP/1.1 403 Forbidden\r\n\r\n"),
+            "control_enforced: replay denied cross-principal object access"
+        );
     }
 
     #[test]
