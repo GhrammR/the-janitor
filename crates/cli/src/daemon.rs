@@ -455,9 +455,10 @@ pub mod unix {
                             forge::pr_collider::PrDeltaSignature::from_bytes(patch.as_bytes());
                         let near_matches = state.lsh_index.query(&sig, 0.85);
                         score.logic_clones_found += near_matches.len() as u32;
-                        score.collided_pr_numbers = near_matches.clone();
+                        let collided_pr_numbers_response = near_matches.clone();
+                        let min_hashes = sig.min_hashes.to_vec();
                         // Insert for future comparisons — daemon has no PR number context.
-                        state.lsh_index.insert(sig.clone(), 0);
+                        state.lsh_index.insert(sig, 0);
 
                         // Persist to bounce_log.ndjson for `janitor report` aggregation.
                         // Daemon connections have no PR-number / author context — those
@@ -474,8 +475,6 @@ pub mod unix {
                                 state.emit_siem_event(detail);
                             }
                         }
-                        let collided_pr_numbers_response = near_matches.clone();
-
                         // fields are None.  Best-effort: I/O errors are silently dropped.
                         let ci_energy_saved_kwh = crate::report::compute_ci_energy_saved_kwh(
                             0,
@@ -496,7 +495,7 @@ pub mod unix {
                             unlinked_pr: score.unlinked_pr,
                             antipatterns: score.antipattern_details,
                             comment_violations: score.comment_violation_details,
-                            min_hashes: sig.min_hashes.to_vec(),
+                            min_hashes,
                             zombie_deps: Vec::new(),
                             state: crate::report::PrState::Open,
                             is_bot: false,

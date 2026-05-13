@@ -32,8 +32,7 @@ pub mod bayesian_taint;
 pub mod binary_recovery;
 pub mod brain;
 pub mod callgraph;
-#[allow(dead_code)]
-mod campaign;
+pub mod campaign;
 pub mod chronometric_auth;
 pub mod ci_thermodynamics;
 pub mod config_taint;
@@ -59,8 +58,7 @@ pub mod idor;
 pub mod ifds;
 pub mod intent_divergence;
 pub mod invisible_payload;
-#[allow(dead_code)]
-mod kani_bridge;
+pub mod kani_bridge;
 pub mod labyrinth;
 pub mod legacy_c_mining;
 pub mod library_identity;

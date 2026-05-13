@@ -101,12 +101,13 @@ runs:
         mkdir -p "${CURRENT_DIR}" "${BOOTSTRAP_DIR}"
         BASE_URL="https://github.com/janitor-security/the-janitor/releases/download/${ACTION_TAG}"
         BOOTSTRAP_URL="https://github.com/janitor-security/the-janitor/releases/download/${BOOTSTRAP_TAG}"
+        CURL_OPTS=(--fail --show-error --silent --location --connect-timeout 10 --max-time 120 --retry 2 --retry-delay 1)
 
         # ── Download current release artifacts.
-        curl -fsSL "${BASE_URL}/janitor" -o "${CURRENT_DIR}/janitor" &
-        curl -fsSL "${BASE_URL}/janitor.sha384" -o "${CURRENT_DIR}/janitor.sha384" &
+        curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor" -o "${CURRENT_DIR}/janitor" &
+        curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor.sha384" -o "${CURRENT_DIR}/janitor.sha384" &
         (
-          curl -fsSL "${BASE_URL}/janitor.sig" -o "${CURRENT_DIR}/janitor.sig" || true
+          curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor.sig" -o "${CURRENT_DIR}/janitor.sig" || true
         ) &
         wait
 
@@ -116,10 +117,10 @@ runs:
         # authenticate the current release artifact without relying on any asset
         # co-hosted with the binary under verification (circular trust eliminated).
         if [ ! -x "${BOOTSTRAP_DIR}/janitor" ]; then
-          curl -fsSL "${BOOTSTRAP_URL}/janitor" -o "${BOOTSTRAP_DIR}/janitor" &
-          curl -fsSL "${BOOTSTRAP_URL}/janitor.sha384" -o "${BOOTSTRAP_DIR}/janitor.sha384" &
+          curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor" -o "${BOOTSTRAP_DIR}/janitor" &
+          curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor.sha384" -o "${BOOTSTRAP_DIR}/janitor.sha384" &
           (
-            curl -fsSL "${BOOTSTRAP_URL}/janitor.sig" -o "${BOOTSTRAP_DIR}/janitor.sig" || true
+            curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor.sig" -o "${BOOTSTRAP_DIR}/janitor.sig" || true
           ) &
           wait
         fi
@@ -172,6 +173,8 @@ runs:
         set -euo pipefail
         HEAD_SHA="${{ github.event.pull_request.head.sha }}"
         GOVERNOR="${{ inputs.governor_url }}"
+        GOVERNOR_CURL_OPTS=(--fail --show-error --silent --connect-timeout 5 --max-time 30 --retry 0)
+        JANITOR_TIMEOUT_SECONDS=120
         BOUNCE_ARGS=(
           bounce .
           --patch .janitor-pr.patch
@@ -187,7 +190,7 @@ runs:
         # verdict emitted by `janitor bounce`.
         if [ -z "${GOVERNOR}" ]; then
             echo "Governor URL absent — running local-only structural gate."
-            BOUNCE_OUT=$("$JANITOR_BIN" "${BOUNCE_ARGS[@]}" --format json)
+            BOUNCE_OUT=$(timeout "${JANITOR_TIMEOUT_SECONDS}s" "$JANITOR_BIN" "${BOUNCE_ARGS[@]}" --format json)
             printf '%s\n' "${BOUNCE_OUT}"
             BOUNCE_JSON=$(printf '%s\n' "${BOUNCE_OUT}" | sed -n '/^{/,/^}/p')
             if [ -z "${BOUNCE_JSON}" ]; then
@@ -207,7 +210,7 @@ runs:
         # Governor's App token — eliminates the "Wrong ID" support overhead.
         INSTALL_ID="${{ inputs.installation_id || github.event.installation.id || '0' }}"
         if [ "${INSTALL_ID}" = "0" ] || [ -z "${INSTALL_ID}" ]; then
-            RESOLVED=$(curl -sf -X POST \
+            RESOLVED=$(curl "${GOVERNOR_CURL_OPTS[@]}" -X POST \
                 "${GOVERNOR}/v1/resolve-id" \
                 -H "Content-Type: application/json" \
                 -d "{\"repo_slug\":\"${{ github.repository }}\"}" \
@@ -224,12 +227,12 @@ runs:
           --arg  id   "${INSTALL_ID:-0}" \
           '{repo: $repo, pr: $pr, head_sha: $sha, installation_id: (if $id == "" then 0 else ($id | tonumber) end)}')
 
-        ANALYSIS_TOKEN=$(curl -sf -X POST \
+        ANALYSIS_TOKEN=$(curl "${GOVERNOR_CURL_OPTS[@]}" -X POST \
           "${GOVERNOR}/v1/analysis-token" \
           -H "Content-Type: application/json" \
           -d "$TOKEN_PAYLOAD" | jq -er '.token')
 
-        "$JANITOR_BIN" "${BOUNCE_ARGS[@]}" \
+        timeout "${JANITOR_TIMEOUT_SECONDS}s" "$JANITOR_BIN" "${BOUNCE_ARGS[@]}" \
           --governor-url  "${GOVERNOR}" \
           --analysis-token "$ANALYSIS_TOKEN"
 

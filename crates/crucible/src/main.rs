@@ -492,6 +492,20 @@ resource \"aws_s3_bucket_acl\" \"private\" {
         must_intercept: true,
         desc_fragment: Some("obfuscated_payload_execution"),
     },
+    Entry {
+        name: "TS/vector filter predicate polymorphism — INTERCEPT",
+        lang: "ts",
+        source: b"async function answer(req) { const filter = JSON.parse(req.query.filter); const results = await pinecone.query({ vector: embed(req.body.prompt), filter, topK: 6 }); return client.chat.completions.create({ messages: [{ role: 'user', content: results.matches[0].metadata.page_content }] }); }\n",
+        must_intercept: true,
+        desc_fragment: Some("vector_filter_polymorphism"),
+    },
+    Entry {
+        name: "TS/non-vector API query filter — SAFE",
+        lang: "ts",
+        source: b"async function list(req) { const filter = JSON.parse(req.query.filter); return db.query('select users', filter); }\n",
+        must_intercept: false,
+        desc_fragment: None,
+    },
 
     // ── Supply Chain Integrity ────────────────────────────────────────────
     Entry {
