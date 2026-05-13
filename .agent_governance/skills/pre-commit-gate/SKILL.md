@@ -16,12 +16,20 @@
    - Run `just audit` (or confirm it has already passed in this session)
    - Only then finalize the commit
 
+3. **If signed commit creation fails because GPG is locked**:
+   - Stop before any fallback commit attempt.
+   - Prompt the operator exactly: `Run gpg-unlock, enter the passphrase in the terminal, then reply "continue".`
+   - Keep the staged diff intact.
+   - After the operator confirms unlock, retry the same signed commit without
+     re-planning or ending the release flow.
+
 ## Abort conditions
 
 | Condition | Action |
 |-----------|--------|
 | `slop_score > 0` | Abort, report violations, request remediation |
 | `just audit` fails | Abort, report failing check, do not commit |
+| GPG signing key locked | Prompt for `gpg-unlock`, wait for operator confirmation, then resume the same signed commit |
 
 ## Notes
 

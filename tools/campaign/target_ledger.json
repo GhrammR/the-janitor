@@ -627,7 +627,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_protobuf_any_java_kotlin_reachability_gap_2026_05_13"
     },
     {
       "engagement": "block_targets",
@@ -800,7 +802,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_solidity_invariant_lane_gap_2026_05_13"
     },
     {
       "engagement": "immunefi_targets",
@@ -1088,7 +1092,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "candidate_xss_ssrf_tls_low_yield_false_positive_backlog_2026_05_13"
     },
     {
       "engagement": "mattermost_targets",

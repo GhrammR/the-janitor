@@ -3,6 +3,42 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-13 — Sprint Batch 139: Integrity Terminality, Witness Hardening, Article Review Workflow
+
+**Directive:** Fix the external integrity/Sentinel stuck-check path; decide and document the live Pages deployment strategy; harden dependency PR triage; implement P2-15 vector filter predicate polymorphism and P2-18 authenticated authorization witnesses; run three distinct-org hunts; enforce the Architectural Oracle dead-code suppressor removal; add ARTICLE_REVIEW governance; produce grant strategy deliverables; validate and publish.
+
+### Phase 1 — Integrity and Deployment
+
+- `action.yml` *(modified)* — bounded all release artifact downloads and Governor calls with explicit curl connect/wall-clock timeouts; wrapped local and Governor `janitor bounce` execution with a 120-second timeout so check runs cannot spin indefinitely without a terminal verdict.
+- `docs/security.md`, `SECURITY.md`, and `mkdocs.yml` *(modified)* — documented MkDocs as the canonical live deployment path, kept `docs/security.md` in the public nav, and cross-linked the GitHub security policy with the live security page.
+- External proof: `curl -fsSI https://thejanitor.app/security/` returned `HTTP/2 200`, `server: cloudflare`, `cache-control: max-age=600`, and GitHub Pages request id `E512:2B263:16E2852:175E11D:6A040279` at `Wed, 13 May 2026 04:47:53 GMT`.
+
+### Phase 2 — Witness Engines
+
+- `crates/forge/src/vector_topology.rs` and `crates/crucible/src/main.rs` *(modified)* — added `security:vector_filter_polymorphism` detection for attacker-shaped metadata predicates in vector-store filters, including authoritative tenant-guard suppression and a non-vector `.query(` TN gallery fixture.
+- `crates/forge/src/exploitability.rs` and `crates/common/src/slop.rs` *(modified)* — added vector-filter witness synthesis and `AuthorizationWitness` evidence for `security:missing_ownership_check`.
+- `crates/cli/src/hunt.rs` *(modified)* — live tenant replay now injects bounded curl options and records two-principal replay verdicts before ledger promotion.
+- `crates/cli/src/daemon.rs` *(modified)* — reduced clone-heavy bounce response assembly by eliminating redundant collision/signature clones before log and response emission.
+- `crates/forge/src/lib.rs` *(modified)* — removed dead-code suppressors and exposed formerly private modules that the compiler proved as externally reachable public API.
+
+### Phase 3 — Ledgers, Governance, and Strategy
+
+- `tools/campaign/CANDIDATE_LEDGER.md`, `tools/campaign/LOW_YIELD_LEDGER.md`, and `tools/campaign/target_ledger.json` *(modified)* — routed the `cashapp/misk`, `Uniswap/v3-core`, and `mattermost/mattermost` hunt outcomes into Tri-Ledger records with explicit proof gaps and machine-readable 2026-05-13 target outcomes.
+- `.INNOVATION_LOG.md` *(modified)* — appended frontier blueprints for cryptographic terminality, formal proof-obligation translation, cross-language memory-safety witnesses, and AI-agent deception witnesses.
+- `.agent_governance/rules/article-review.md`, `.agent_governance/commands/article-review.md`, and `.agent_governance/skills/article-review/SKILL.md` *(created)* — added the reusable ARTICLE_REVIEW workflow with URL access verification, corroborating searches, disposition mapping, source-quality scoring, confidence scoring, ledger updates, and follow-up search concepts.
+- `.agent_governance/rules/integrity.md` and `.agent_governance/skills/pre-commit-gate/SKILL.md` *(modified)* — added the signed-commit handoff rule: when GPG is locked, ask the operator to run `gpg-unlock`, preserve the staged diff, and resume the same signed commit after the operator replies `continue`.
+- `docs/grant_strategy.md` *(created)* — added the Anthropic/OpenAI/Google grant strategy: positioning narrative, 30/60/90 milestones, evidence-pack checklist, one-page brief, technical appendix, and demo script.
+
+### Verification
+
+- `cargo test -p forge vector_ -- --test-threads=1` ✓ — 12 vector tests passed, including P2-15 TP/TN fixtures.
+- `cargo test -p forge missing_ownership_witness_records_authorization_fixture -- --test-threads=1` ✓.
+- `cargo test -p cli replay -- --test-threads=1` ✓ — 5 replay tests passed, including bounded curl and authorization verdict tests.
+- `cargo test -p cli daemon -- --test-threads=1` ✓ — 7 daemon tests passed.
+- `cargo run -p crucible` ✓ — 181/181 threat gallery and 6/6 blast-radius gallery passed.
+- `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓.
+- `just audit` ✓ — full workspace check/test/doc-test suite passed; Kani harnesses skipped because Kani is not installed in this environment.
+
 ## 2026-05-12 — Sprint Batch 138: Publication Closure, Backlog Merge Wave, Hunt Ledger Reconciliation
 
 **Directive:** (1) publish the Pages/security remediation and finish the blocked backlog PR wave; (2) rebase, validate, and merge Dependabot PRs `#70`, `#85`, `#90`, and `#92`; (3) run `janitor hunt` against three distinct-org local clones and route results through Tri-Ledger with deterministic proof-gap notes; (4) reconcile the public website security posture page with the repository-level `SECURITY.md` policy entrypoint; (5) keep local artifacts out of the git index.

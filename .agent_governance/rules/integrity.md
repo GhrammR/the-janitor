@@ -29,8 +29,21 @@ test validates the specific change.**  Passing audit without a new test is
 a partial completion — the change has no regression coverage and will be
 treated as incomplete by the pre-commit gate.
 
+## Step 4 — Signed Commit Handoff
+
+If `git commit` fails because GPG cannot access the signing key or passphrase:
+
+- Do not retry with `--no-gpg-sign`.
+- Do not end the release flow as blocked without asking the operator for the
+  unlock handoff.
+- Ask exactly: `Run gpg-unlock, enter the passphrase in the terminal, then reply "continue".`
+- Preserve the staged index.
+- After the operator confirms unlock, retry the same signed commit and continue
+  the push/PR/merge sequence.
+
 ## Hard rules
 
 - Never use `--no-verify` to skip hooks.
+- Never use `--no-gpg-sign` to bypass provenance.
 - Never amend a published commit.
 - Never append `Co-authored-by:` trailers. Sole author: Riley Ghramm.

@@ -26,6 +26,17 @@ researchers need to reason about deployment risk:
 - Release and documentation publication are separate from scan execution so the
   public website does not become part of the analysis trust boundary.
 
+## Website Deployment Canonical Path
+
+The canonical public website path is MkDocs, not hand-maintained static HTML.
+`mkdocs.yml` includes this page as `Security Posture: security.md`, and
+`.github/workflows/pages.yml` builds the site with `python3 -m mkdocs build
+--strict` before deploying the generated `site/` artifact to GitHub Pages.
+
+Static HTML under `site/` is treated as generated output only. Source-of-truth
+security copy lives in this file plus the repository intake policy in
+[`SECURITY.md`](https://github.com/janitor-security/the-janitor/blob/main/SECURITY.md).
+
 ## Evidence Links
 
 | Control | Evidence |
