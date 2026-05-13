@@ -10,7 +10,6 @@ implemented as a result.
 ### Phase 1 — Integrity and Deployment
 
 - `action.yml` *(modified)* — bounded all release artifact downloads and Governor calls with explicit curl connect/wall-clock timeouts; wrapped local and Governor `janitor bounce` execution with a 120-second timeout so check runs cannot spin indefinitely without a terminal verdict.
-- `crates/gov/src/main.rs` and `crates/gov/Cargo.toml` *(modified)* — closed the documented Sentinel terminality gap by letting `/v1/report` complete the app-owned `Janitor Integrity Check` through a bounded GitHub Checks API update when `JANITOR_GITHUB_CHECKS_TOKEN` is present; deterministic tests cover success and failure verdict synthesis.
 - `docs/security.md`, `SECURITY.md`, and `mkdocs.yml` *(modified)* — documented MkDocs as the canonical live deployment path, kept `docs/security.md` in the public nav, and cross-linked the GitHub security policy with the live security page.
 - External proof: `curl -fsSI https://thejanitor.app/security/` returned `HTTP/2 200`, `server: cloudflare`, `cache-control: max-age=600`, and GitHub Pages request id `E512:2B263:16E2852:175E11D:6A040279` at `Wed, 13 May 2026 04:47:53 GMT`.
 
@@ -36,7 +35,6 @@ implemented as a result.
 - `cargo test -p forge missing_ownership_witness_records_authorization_fixture -- --test-threads=1` ✓.
 - `cargo test -p cli replay -- --test-threads=1` ✓ — 5 replay tests passed, including bounded curl and authorization verdict tests.
 - `cargo test -p cli daemon -- --test-threads=1` ✓ — 7 daemon tests passed.
-- `cargo test -p janitor-gov github_check_ -- --test-threads=1` ✓ — Sentinel terminal verdict success/failure tests passed.
 - `cargo run -p crucible` ✓ — 181/181 threat gallery and 6/6 blast-radius gallery passed.
 - `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓.
 - `just audit` ✓ — full workspace check/test/doc-test suite passed; Kani harnesses skipped because Kani is not installed in this environment.
