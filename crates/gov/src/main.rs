@@ -30,6 +30,7 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str;
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::server::TlsStream;
 use tower::Layer;
@@ -148,6 +149,7 @@ struct ReportResponse {
     mode: String,
     inclusion_proof: InclusionProof,
     decision_receipt: SignedDecisionReceipt,
+    github_check_status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -315,6 +317,44 @@ struct GithubInstallation {
 struct GithubWebhookResponse {
     status: String,
     installation_id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubCheckRunsResponse {
+    check_runs: Vec<GithubCheckRun>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubCheckRun {
+    id: u64,
+    name: String,
+    status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GithubCheckVerdict {
+    conclusion: &'static str,
+    title: String,
+    summary: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GithubCheckUpdateStatus {
+    Disabled,
+    Completed,
+    Missing,
+    Failed,
+}
+
+impl GithubCheckUpdateStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Disabled => "disabled",
+            Self::Completed => "completed",
+            Self::Missing => "missing",
+            Self::Failed => "failed",
+        }
+    }
 }
 
 /// FIPS 140-3 compliant transparency log hash chain.
@@ -684,18 +724,149 @@ async fn report_handler(
         }
     }
 
+    let check_entry = entry.clone();
+    let check_proof = proof.clone();
     emit_event(&GovLogEvent::Report {
         entry: Box::new(entry),
         inclusion_proof: proof.clone(),
         source_ip: extract_source_ip(&headers),
     });
+    let github_check_status = match tokio::task::spawn_blocking(move || {
+        maybe_complete_github_check(&check_entry, &check_proof)
+    })
+    .await
+    {
+        Ok(status) => status,
+        Err(_) => GithubCheckUpdateStatus::Failed,
+    };
 
     Ok(Json(ReportResponse {
         status: "accepted".to_string(),
-        mode: "stub".to_string(),
+        mode: if github_check_status == GithubCheckUpdateStatus::Completed {
+            "github_check_completed".to_string()
+        } else {
+            "accepted".to_string()
+        },
         inclusion_proof: proof,
         decision_receipt,
+        github_check_status: github_check_status.as_str().to_string(),
     }))
+}
+
+fn maybe_complete_github_check(
+    entry: &BounceLogEntry,
+    proof: &InclusionProof,
+) -> GithubCheckUpdateStatus {
+    let Ok(token) = std::env::var("JANITOR_GITHUB_CHECKS_TOKEN") else {
+        return GithubCheckUpdateStatus::Disabled;
+    };
+    let token = token.trim();
+    if token.is_empty() {
+        return GithubCheckUpdateStatus::Disabled;
+    }
+    if entry.repo_slug.trim().is_empty() || entry.commit_sha.trim().is_empty() {
+        return GithubCheckUpdateStatus::Missing;
+    }
+    complete_github_check_with_token(entry, proof, token).unwrap_or(GithubCheckUpdateStatus::Failed)
+}
+
+fn complete_github_check_with_token(
+    entry: &BounceLogEntry,
+    proof: &InclusionProof,
+    token: &str,
+) -> anyhow::Result<GithubCheckUpdateStatus> {
+    let api_base = std::env::var("JANITOR_GITHUB_API_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "https://api.github.com".to_string());
+    let check_name = std::env::var("JANITOR_GITHUB_CHECK_NAME")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "Janitor Integrity Check".to_string());
+    let api_base = api_base.trim_end_matches('/');
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .build()
+        .new_agent();
+    let list_url = format!(
+        "{api_base}/repos/{}/commits/{}/check-runs?check_name={}",
+        entry.repo_slug,
+        entry.commit_sha,
+        percent_encode_query(&check_name)
+    );
+    let mut response = agent
+        .get(&list_url)
+        .header("Accept", "application/vnd.github+json")
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .call()
+        .context("listing GitHub check runs")?;
+    let payload: GithubCheckRunsResponse = response
+        .body_mut()
+        .read_json()
+        .context("decoding GitHub check runs")?;
+    let Some(check_run) = payload
+        .check_runs
+        .into_iter()
+        .find(|run| run.name == check_name && run.status != "completed")
+    else {
+        return Ok(GithubCheckUpdateStatus::Missing);
+    };
+    let verdict = github_check_verdict(entry, proof);
+    let patch_url = format!(
+        "{api_base}/repos/{}/check-runs/{}",
+        entry.repo_slug, check_run.id
+    );
+    let body = serde_json::json!({
+        "status": "completed",
+        "conclusion": verdict.conclusion,
+        "output": {
+            "title": verdict.title,
+            "summary": verdict.summary,
+        }
+    });
+    agent
+        .patch(&patch_url)
+        .header("Accept", "application/vnd.github+json")
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("Content-Type", "application/json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send(serde_json::to_string(&body)?.as_str())
+        .context("completing GitHub check run")?;
+    Ok(GithubCheckUpdateStatus::Completed)
+}
+
+fn github_check_verdict(entry: &BounceLogEntry, proof: &InclusionProof) -> GithubCheckVerdict {
+    let conclusion = if entry.slop_score <= 10 {
+        "success"
+    } else {
+        "failure"
+    };
+    GithubCheckVerdict {
+        conclusion,
+        title: format!("Janitor Sentinel {conclusion}"),
+        summary: format!(
+            "Governor accepted report for `{}` at `{}` with slop_score={} and transparency anchor {}:{}.",
+            entry.repo_slug,
+            entry.commit_sha,
+            entry.slop_score,
+            proof.sequence_index,
+            proof.chained_hash
+        ),
+    }
+}
+
+fn percent_encode_query(input: &str) -> String {
+    let mut encoded = String::with_capacity(input.len());
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(char::from(byte));
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 async fn analysis_token_handler(
@@ -1745,6 +1916,7 @@ mod tests {
     #[serial_test::serial]
     async fn report_route_returns_inclusion_proof() {
         set_test_signing_key();
+        std::env::remove_var("JANITOR_GITHUB_CHECKS_TOKEN");
         let request = Request::builder()
             .method("POST")
             .uri("/v1/report")
@@ -1760,6 +1932,44 @@ mod tests {
         assert!(!payload.inclusion_proof.chained_hash.is_empty());
         payload.decision_receipt.verify().unwrap();
         assert_eq!(payload.decision_receipt.receipt.repo_slug, "owner/repo");
+        assert_eq!(payload.github_check_status, "disabled");
+    }
+
+    #[test]
+    fn github_check_verdict_success_for_clean_gate() {
+        let mut entry = sample_entry();
+        entry.slop_score = 0;
+        let proof = InclusionProof {
+            sequence_index: 7,
+            chained_hash: "abcd".repeat(24),
+        };
+        let verdict = github_check_verdict(&entry, &proof);
+        assert_eq!(verdict.conclusion, "success");
+        assert!(verdict.summary.contains("slop_score=0"));
+        assert!(verdict.summary.contains("7:"));
+    }
+
+    #[test]
+    fn github_check_verdict_failure_for_rejected_gate() {
+        let mut entry = sample_entry();
+        entry.slop_score = 50;
+        let proof = InclusionProof {
+            sequence_index: 8,
+            chained_hash: "1234".repeat(24),
+        };
+        let verdict = github_check_verdict(&entry, &proof);
+        assert_eq!(verdict.conclusion, "failure");
+        assert!(verdict.title.contains("failure"));
+        assert!(verdict.summary.contains("slop_score=50"));
+    }
+
+    #[test]
+    fn percent_encode_query_encodes_check_name_spaces() {
+        assert_eq!(
+            percent_encode_query("Janitor Integrity Check"),
+            "Janitor%20Integrity%20Check"
+        );
+        assert_eq!(percent_encode_query("safe-_.~AZ09"), "safe-_.~AZ09");
     }
 
     #[test]
@@ -1811,6 +2021,7 @@ mod tests {
     #[serial_test::serial]
     async fn ci_writer_token_can_post_report_returns_200() {
         set_test_signing_key();
+        std::env::remove_var("JANITOR_GITHUB_CHECKS_TOKEN");
         let mut entry = sample_entry();
         entry.analysis_token = Some("stub-token:role=ci-writer;installation_id=0".to_string());
         let request = Request::builder()
