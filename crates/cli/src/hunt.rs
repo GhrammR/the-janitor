@@ -3289,6 +3289,76 @@ fn attach_web_proof_artifact(
     ));
 }
 
+fn attach_memory_safety_witness_if_needed(finding: StructuredFinding) -> StructuredFinding {
+    if !is_memory_safety_witness_id(&finding.id) || finding.exploit_witness.is_some() {
+        return finding;
+    }
+    let file = finding.file.as_deref().unwrap_or("unknown");
+    let line = finding.line.unwrap_or(1);
+    let boundary = memory_boundary_from_id(&finding.id);
+    let witness =
+        forge::exploitability::cross_language_memory_witness(file, &finding.id, line, boundary);
+    forge::exploitability::attach_exploit_witness(finding, witness)
+}
+
+fn is_memory_safety_witness_id(id: &str) -> bool {
+    id.contains("lcm_")
+        || id == "security:c_double_free"
+        || id == "security:public_ffi_unsafe_deref"
+        || id == "security:protobuf_any_unguarded_decode"
+}
+
+fn memory_boundary_from_id(id: &str) -> Option<String> {
+    if id.contains("protobuf_any") {
+        Some("google.protobuf.Any".to_string())
+    } else if id.contains("public_ffi") {
+        Some("extern_C_raw_pointer".to_string())
+    } else if id.contains("double_free") {
+        Some("heap_lifetime:free/free".to_string())
+    } else {
+        None
+    }
+}
+
+fn attach_agent_deception_witness_if_needed(finding: StructuredFinding) -> StructuredFinding {
+    if !is_agent_deception_witness_id(&finding.id) || finding.exploit_witness.is_some() {
+        return finding;
+    }
+    let file = finding.file.as_deref().unwrap_or("unknown");
+    let line = finding.line.unwrap_or(1);
+    let (declared, observed) = agent_intent_labels_from_id(&finding.id);
+    let witness =
+        forge::exploitability::agent_deception_witness(file, &finding.id, line, declared, observed);
+    forge::exploitability::attach_exploit_witness(finding, witness)
+}
+
+fn is_agent_deception_witness_id(id: &str) -> bool {
+    matches!(
+        id,
+        "security:intent_divergence"
+            | "security:swarm_context_exfiltration"
+            | "security:agent_intent_misalignment"
+    )
+}
+
+fn agent_intent_labels_from_id(id: &str) -> (Option<String>, Option<String>) {
+    match id {
+        "security:intent_divergence" => (
+            Some("security_claim".to_string()),
+            Some("vacuous_allow".to_string()),
+        ),
+        "security:swarm_context_exfiltration" => (
+            Some("developer_context".to_string()),
+            Some("context_exfiltration_marker".to_string()),
+        ),
+        "security:agent_intent_misalignment" => (
+            Some("declared_tool_policy".to_string()),
+            Some("tool_capability_escape".to_string()),
+        ),
+        _ => (None, None),
+    }
+}
+
 fn ssrf_evidence_marker(text: &str) -> Option<String> {
     const INTERNAL_TARGETS: &[&str] = &[
         "169.254.169.254",
@@ -3581,6 +3651,10 @@ fn scan_buffer(
                 );
                 apply_ingress_surface(&mut structured, &mut witness, ingress_surface.as_ref());
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if is_memory_safety_witness_id(&rule_id) {
+                structured = attach_memory_safety_witness_if_needed(structured);
+            } else if is_agent_deception_witness_id(&rule_id) {
+                structured = attach_agent_deception_witness_if_needed(structured);
             }
             if matches!(
                 rule_id.as_str(),
@@ -3604,9 +3678,11 @@ fn scan_buffer(
     findings.extend(forge::stego_binary::detect_embedded_executable_blob(
         source, label,
     ));
-    findings.extend(forge::llm_decompile::detect_agent_intent_misalignment(
-        ext, source, label,
-    ));
+    findings.extend(
+        forge::llm_decompile::detect_agent_intent_misalignment(ext, source, label)
+            .into_iter()
+            .map(attach_agent_deception_witness_if_needed),
+    );
     findings.extend(forge::dataset_poisoning::detect_training_data_trojan(
         ext, source, label,
     ));
@@ -3699,7 +3775,11 @@ fn scan_buffer(
     // Applied to all text files — agentic IPC markers can appear in any
     // source language, commit-message templates, or CI YAML artifacts.
     if !is_compiled_artifact_extension(ext) {
-        findings.extend(forge::swarm_exfil::detect_context_exfil(source, label));
+        findings.extend(
+            forge::swarm_exfil::detect_context_exfil(source, label)
+                .into_iter()
+                .map(attach_agent_deception_witness_if_needed),
+        );
     }
 
     // P2-16: Go AST dominance — unguarded Protobuf Any decode call sites.
@@ -3710,7 +3790,7 @@ fn scan_buffer(
                 if f.file.is_none() {
                     f.file = Some(label.to_string());
                 }
-                f
+                attach_memory_safety_witness_if_needed(f)
             }),
     );
 
@@ -3722,7 +3802,7 @@ fn scan_buffer(
                 if f.file.is_none() {
                     f.file = Some(label.to_string());
                 }
-                f
+                attach_memory_safety_witness_if_needed(f)
             }),
     );
 
@@ -3734,7 +3814,7 @@ fn scan_buffer(
                 if f.file.is_none() {
                     f.file = Some(label.to_string());
                 }
-                f
+                attach_memory_safety_witness_if_needed(f)
             }),
     );
 
@@ -4548,6 +4628,64 @@ async function answer(req) {
         assert_eq!(artifact.source_label, "rag_chunk:vector_retrieval");
         assert_eq!(artifact.sink_label, "sink:llm.invoke");
         assert!(artifact.has_marker("vector_topology:missing_similarity_gate"));
+    }
+
+    #[test]
+    fn scan_buffer_attaches_memory_witness_for_protobuf_any_decode() {
+        let source = br#"
+package handler
+import "google.golang.org/protobuf/types/known/anypb"
+func Handle(msg *anypb.Any) {
+    _, _ = anypb.UnmarshalNew(msg, nil)
+}
+"#;
+        let findings = scan_buffer("go", source, "handler/handler.go", &[], &[], false);
+        let finding = findings
+            .iter()
+            .find(|finding| finding.id == "security:protobuf_any_unguarded_decode")
+            .expect("protobuf Any decode finding must be emitted");
+        let witness = finding
+            .exploit_witness
+            .as_ref()
+            .expect("protobuf Any finding must carry an exploit witness");
+        assert!(
+            witness.memory_safety_witness.is_some(),
+            "protobuf Any finding must carry cross-language memory evidence"
+        );
+        assert!(
+            witness
+                .repro_cmd
+                .as_deref()
+                .is_some_and(|cmd| cmd.contains("CrossLanguageMemoryWitness/v1")),
+            "repro_cmd must encode the memory witness schema"
+        );
+    }
+
+    #[test]
+    fn scan_buffer_attaches_agent_deception_witness_for_intent_divergence() {
+        let source = br#"
+fn verify_signature() -> bool { true }
+"#;
+        let findings = scan_buffer("rs", source, "src/auth.rs", &[], &[], false);
+        let finding = findings
+            .iter()
+            .find(|finding| finding.id == "security:intent_divergence")
+            .expect("intent divergence finding must be emitted");
+        let witness = finding
+            .exploit_witness
+            .as_ref()
+            .expect("intent divergence finding must carry an exploit witness");
+        assert!(
+            witness.agent_deception_witness.is_some(),
+            "intent divergence must carry agent deception evidence"
+        );
+        assert!(
+            witness
+                .repro_cmd
+                .as_deref()
+                .is_some_and(|cmd| cmd.contains("AgentDeceptionWitness/v1")),
+            "repro_cmd must encode the agent deception schema"
+        );
     }
 
     #[test]

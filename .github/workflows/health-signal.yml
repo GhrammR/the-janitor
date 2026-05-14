@@ -210,7 +210,12 @@ jobs:
 
           if ! command -v z3 >/dev/null 2>&1; then
             add_issue "P2" "Z3 CLI is unavailable in the runner; formal proof translation has reduced assurance." \
-              "python3 -m venv /tmp/janitor-z3-venv && /tmp/janitor-z3-venv/bin/python -m pip install z3-solver"
+              "python3 -m venv ${HOME}/.local/share/janitor-tools/z3-venv && ${HOME}/.local/share/janitor-tools/z3-venv/bin/python -m pip install --upgrade pip z3-solver && ln -sf ${HOME}/.local/share/janitor-tools/z3-venv/bin/z3 ${HOME}/.local/bin/z3"
+          fi
+
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            add_issue "P2" "ShellCheck is unavailable; workflow lint assurance is reduced." \
+              "install ShellCheck 0.10.0 or newer into ${HOME}/.local/bin/shellcheck"
           fi
 
           if ! curl -fsSI https://thejanitor.app/security/ >/dev/null; then

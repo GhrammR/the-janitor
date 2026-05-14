@@ -47,22 +47,26 @@ audit:
 	cargo test --workspace -j2 -- --test-threads=4
 	bash ./tools/tests/test_release_parity.sh
 	./tools/verify_doc_parity.sh
+	just toolchain-preflight
 	just verify-harnesses
 	# Persist audit fingerprint so fast-release can skip redundant re-audit.
 	mkdir -p .janitor
 	find crates/ -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}' > .janitor/.audit_hash
 	echo "✅ System Clean. Audit fingerprint saved."
 
+# Formal toolchain preflight — fail fast on missing proof/lint tools.
+toolchain-preflight:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	./tools/toolchain-preflight.sh
+
 # P4-11: Formal verification gate — runs Kani proof harnesses.
-# Fails open when Kani is not installed so developers without the toolchain
-# can still run `just audit` locally; CI installs Kani explicitly.
 verify-harnesses:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	if ! cargo kani --version &>/dev/null 2>&1; then
-	    echo "⚠  Kani not installed — skipping formal verification harnesses."
-	    echo "   To install: cargo install --locked kani-verifier && cargo kani setup"
-	    exit 0
+	    echo "Kani not installed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
+	    exit 1
 	fi
 	echo "→ Running Kani formal verification harnesses..."
 	(cd crates/forge && cargo kani --harness severity_points_no_panic_and_bounded)

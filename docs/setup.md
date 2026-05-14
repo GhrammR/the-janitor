@@ -52,6 +52,29 @@ Select the repositories you want Sentinel to guard.
 | **Janitor: Code Quality Gate Failed** | score > 1.0, zombie veto, or policy block |
 | **Janitor: Zombie Veto Cleared** | neutral result, false positive cleared |
 
+### Formal Toolchain Preflight
+
+Janitor proof lanes require durable local tools. Temporary `/tmp` installs are
+rejected because they disappear between agent sessions and silently reduce
+assurance.
+
+Run:
+
+```sh
+just toolchain-preflight
+```
+
+Required tools and durable remediation:
+
+| Tool | Stable path | Remediation |
+|---|---|---|
+| Kani | `~/.cargo/bin/cargo-kani` | `cargo install --locked kani-verifier && cargo kani setup` |
+| Z3 | `~/.local/share/janitor-tools/z3-venv/bin/z3` via `~/.local/bin/z3` | `python3 -m venv ~/.local/share/janitor-tools/z3-venv && ~/.local/share/janitor-tools/z3-venv/bin/python -m pip install --upgrade pip z3-solver && ln -sf ~/.local/share/janitor-tools/z3-venv/bin/z3 ~/.local/bin/z3` |
+| ShellCheck | `~/.local/bin/shellcheck` or system package path | install ShellCheck 0.10.0 or newer into a non-`/tmp` executable path |
+
+`just audit` runs this preflight before Kani harnesses. Missing tools fail fast
+with the exact remediation command instead of silently skipping formal checks.
+
 If findings exist, a SARIF report is uploaded to GitHub Code Scanning with inline
 annotations in the PR diff. For clean PRs, a CycloneDX v1.5 Integrity Bond signed
 with ML-DSA-65 is issued automatically — no token flag or manual step.

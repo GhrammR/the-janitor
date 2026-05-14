@@ -104,6 +104,7 @@ cannot push code, modify protected branches, or alter CI configuration.
 | Issue opened with empty title | The triggering workflow has no `name:` field | Add a `name:` to the upstream workflow |
 | Multiple issues for the same workflow | Manually-edited label on a tracker breaks the dedup query | Re-apply the canonical `health-signal/<slug>` label |
 | Issue never auto-closes after recovery | The recovering run was a `cancelled` or `skipped`, not `success` | Issue must be closed manually; cancellations don't count as recovery |
+| Toolchain outage issue opened | Kani, Z3, or ShellCheck is missing from a durable path | Run `just toolchain-preflight`; install Z3 under `~/.local/share/janitor-tools/z3-venv`, not `/tmp` |
 
 ## Verification
 

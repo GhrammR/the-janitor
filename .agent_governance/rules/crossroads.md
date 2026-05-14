@@ -16,6 +16,12 @@ If no interactive choice UI is available, emit exactly one multiple-choice
 question and no final report; resume immediately when the operator replies with
 the selected letter.
 
+When the blocker is a permission, signing-key, or external-login handoff, the
+preferred implementation is the same mid-prompt waiting phase as a permissions
+popup: request the enabling action, leave the command/session pending, and
+resume the directive when the operator completes it. Do not skip release,
+deploy, or signing steps merely because the key or session is currently locked.
+
 ## Choice Contract
 
 Ask exactly one question with these choices unless a narrower governance rule
@@ -33,7 +39,9 @@ Do not silently choose a reduced-assurance path.
 - Preserve staged files, branch name, command context, and proof artifacts.
 - Record the chosen path in `docs/CHANGELOG.md` before final reporting.
 - If the block involves GPG signing, follow
-  `.agent_governance/rules/integrity.md` and ask for the unlock handoff before
-  retrying the signed commit.
+  `.agent_governance/rules/integrity.md` and ask one concrete unlock question
+  before retrying the signed commit: `Is the GPG signing key unlocked for the
+  next 8 hours?` Resume immediately after the operator confirms the cache is
+  valid.
 - If the block involves a deploy workspace with unrelated dirty files, do not
   clean or revert them without operator choice.

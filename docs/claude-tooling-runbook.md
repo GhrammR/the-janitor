@@ -151,6 +151,30 @@ standalone but the Claude Code integration still fails, file an issue at
   These tools are interactive-session conveniences, not load-bearing CI
   components.
 
+## Janitor formal toolchain preflight
+
+Kani, Z3, and ShellCheck are load-bearing Janitor tooling, not interactive
+Claude conveniences. They must live in durable paths and pass:
+
+```bash
+just toolchain-preflight
+```
+
+Expected stable paths:
+
+- `cargo-kani`: `~/.cargo/bin/cargo-kani`.
+- `z3`: `~/.local/share/janitor-tools/z3-venv/bin/z3`, exposed through
+  `~/.local/bin/z3`.
+- `shellcheck`: `~/.local/bin/shellcheck` or a system package path.
+
+Temporary `/tmp` paths are rejected. Install Z3 with:
+
+```bash
+python3 -m venv ~/.local/share/janitor-tools/z3-venv
+~/.local/share/janitor-tools/z3-venv/bin/python -m pip install --upgrade pip z3-solver
+ln -sf ~/.local/share/janitor-tools/z3-venv/bin/z3 ~/.local/bin/z3
+```
+
 ## Adding new checks
 
 The diagnostic script is intentionally short and grep-friendly. To add a check:

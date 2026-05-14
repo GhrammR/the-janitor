@@ -145,8 +145,9 @@ and explicitly answer:
 A human-directed operator brief that is NOT fed back into the next agent.
 It must contain one **Entropy Modulator Tip** derived from the last 3 sprint
 entries in `docs/CHANGELOG.md`, one **Systems Health Signal** covering
-holistic operational awareness beyond pure revenue, AND one **Platform
-Expansion Tip** covering the next best GitHub capability upgrade.
+holistic operational awareness beyond pure revenue, one **ARTICLE_REVIEW
+Summary**, AND one **Platform Expansion Tip** covering the next best GitHub
+capability upgrade.
 
 Entropy Modulator protocol:
 1. Inspect the last 3 completed sprints in `docs/CHANGELOG.md`.
@@ -169,7 +170,18 @@ Systems Health Signal protocol:
      used to fingerprint attacker reconnaissance tools.
    - **Hardware constraint alert**: any new P-tier item in `.INNOVATION_LOG.md`
      that violates the 8GB Law (JVM, Ghidra, fat LTO, local LLM inference)
-     and must be flagged before the operator queues it.
+   and must be flagged before the operator queues it.
+
+ARTICLE_REVIEW Summary protocol:
+1. State how many URLs were processed from `ARTICLE_REVIEW.md` this session and
+   how many remain queued.
+2. Name each processed disposition bucket used this session:
+   `already_defended`, `mapped_innovation_item`, `new_innovation_item`, or
+   `attack_ledger_update`.
+3. Include the highest-confidence integration action and the weakest source
+   quality score observed.
+4. If ARTICLE_REVIEW was requested but blocked, state the exact blocker and the
+   preserved queue state.
 
 Platform Expansion Tip protocol:
 1. Tie the tip to one measurable GitHub capability upgrade: Integrity check

@@ -3,6 +3,55 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-14 — Sprint Batch 141: Terminality Root Cause, Durable Toolchain, and Witness Schemas
+
+**Directive:** Fix the app-owned Janitor Integrity Check terminality defect, make Kani/Z3/ShellCheck permanent instead of temporary fallbacks, keep structural gate strict with a PR slicing policy, resolve dependency backlog evidence, keep MkDocs canonical, implement P2-21/P2-22 witness upgrades, activate ARTICLE_REVIEW, update final-report governance, and publish required changes where credentials permit.
+
+### Incident Response and Publication
+
+- `/home/ghrammr/dev/the-governor/src/main.rs` *(modified in separate Governor workspace)* — root cause patch prepared: `Janitor Integrity Check` details URLs now target the Governor report route, `/report/{owner}/{repo}/{head_sha}` renders status from GitHub Checks, and a 10-minute timeout guard mirrors terminal `Structural Firewall` verdicts or closes stale checks as `timed_out`.
+- Governor deploy status: blocked by missing Fly authentication. `flyctl` is permanently installed at `/home/ghrammr/.fly/bin/flyctl`, but `flyctl auth whoami` returned `no access token available`; browser login URL expired before completion.
+- External evidence: PR #108 check-run remains `status=in_progress`, `conclusion=null`, `details_url=https://thejanitor.app/report/88f7b695b3104406e3ef0a3902f1e63b3450e24c`; external HEAD for that URL returns `HTTP/2 404`. Live Governor `/health` returns `HTTP/2 200`, but the new `/report/...` route returns `HTTP/2 404` until deployment.
+- `just deploy-docs` *(run)* — deployed MkDocs to `gh-pages` commit `88547e331e1ddf6db5ab67c4180454f68dd1c1e9`; local/remote gh-pages tree contains `security/index.html` and no `grant_strategy` or `bugcrowd_payout_strategy` files. External CDN still returned cached `HTTP/2 200` for `/grant_strategy/` during the validation window.
+
+### Toolchain and Governance
+
+- `tools/toolchain-preflight.sh` *(created)* and `justfile` *(modified)* — added a durable formal-toolchain preflight and made `just audit` fail fast when Kani, Z3, or ShellCheck is missing or resolves to `/tmp`.
+- `.github/workflows/janitor.yml`, `.github/workflows/janitor-pr-gate.yml`, and `.github/workflows/health-signal.yml` *(modified)* — replaced fail-open Kani and `/tmp` Z3 fallback behavior with durable install/preflight steps and ShellCheck health reporting.
+- `docs/setup.md`, `docs/claude-tooling-runbook.md`, and `docs/health-signal-monitor.md` *(modified)* — documented permanent install paths and exact remediation commands for Kani, Z3, and ShellCheck.
+- `.agent_governance/rules/crossroads.md` *(modified)* — clarified non-terminal permission/signing/login waits, including the required GPG unlock question before retrying signed commits.
+- `.agent_governance/rules/response-format.md` *(modified)* — made ARTICLE_REVIEW Summary a required recurring section in final reports.
+- `docs/ci-change-checklist.md` *(modified)* — codified the strict structural-gate PR slicing protocol; broad diffs are split, thresholds tune only after narrow false-positive proof.
+
+### Witness Engines and Monetization
+
+- `crates/common/src/slop.rs` *(modified)* — added typed `MemorySafetyWitness` and `AgentDeceptionWitness` fields to `ExploitWitness`.
+- `crates/forge/src/exploitability.rs` *(modified)* — added deterministic `CrossLanguageMemoryWitness/v1` and `AgentDeceptionWitness/v1` repro synthesis, plus a visible pickle canary for Z3-backed deserialization proof tests.
+- `crates/cli/src/hunt.rs` *(modified)* — routed protobuf Any, public FFI unsafe deref, C double-free, LCM, intent-divergence, swarm-exfiltration, and agent-intent findings through typed witnesses before ledger promotion.
+- `docs/bugcrowd_payout_strategy.md` *(modified)* — tied P2-18, P2-15, P2-20, P2-21, and P2-22 to acceptance-rate and payout-probability levers with weekly KPIs.
+
+### ARTICLE_REVIEW
+
+- `ARTICLE_REVIEW.md` *(modified)* and `ARTICLE_REVIEW_ARCHIVE.md` *(created)* — processed and archived seven priority URLs covering Echo prompting, Claude Dreams, scientific workflow construction, Mythos/curl false-positive claims, LLM workflow construction, and Pipelock.
+- `.INNOVATION_LOG.md` *(modified)* — appended AR-2026-05-14-001 through AR-2026-05-14-007 and new frontier `P2-23 — Scientific Workflow Construction Guard` with invariant/proof gap, Rust module, Z3/Kani/IFDS model, deterministic TP/TN fixtures, and commercial unlock.
+
+### Backlog Evidence
+
+- Open dependency PRs #95, #96, #97, #98, and #100 have Workflow Lint/Dependency Review/MSRV/CodeQL/Structural Firewall green where present, but every one remains blocked by pending app-owned `Janitor Integrity Check`.
+- PR #99 remains the explicit MSRV blocker: MSRV failed while other native checks passed; this is consistent with `sysinfo 0.39.1` requiring a newer Rust than the repository's Rust 1.92 lane.
+
+### Verification
+
+- `cargo test -p forge exploitability -- --test-threads=1` ✓ — 71/71 tests passed with permanent Z3 active.
+- `cargo test -p cli scan_buffer_attaches -- --test-threads=1` ✓ — 4/4 hunt witness-routing tests passed.
+- `cargo test -p forge proof_obligation -- --test-threads=1` ✓ — 7/7 proof-obligation tests passed.
+- `cargo test -p forge intent_divergence -- --test-threads=1` ✓ — 4/4 intent-divergence tests passed.
+- `cargo test -p forge swarm_exfil -- --test-threads=1` ✓ — 8/8 swarm-exfil tests passed.
+- `just toolchain-preflight` ✓ — Kani `/home/ghrammr/.cargo/bin/cargo-kani`, Z3 `/home/ghrammr/.local/bin/z3`, ShellCheck `/home/ghrammr/.local/bin/shellcheck`.
+- `shellcheck tools/toolchain-preflight.sh` ✓.
+- `python3 -c "import yaml; ..."` ✓ — parsed changed workflow and MkDocs files.
+- `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓ — `site/security/index.html` present; internal grant and payout pages absent.
+
 ## 2026-05-13 — Sprint Batch 140: Crossroads Waiting, Site Hygiene, and Health Signals
 
 **Directive:** Continue the Max Compute sprint after the operator selected dependency installation, revise the A/B/C crossroads workflow so choice prompts become non-terminal waiting checkpoints, harden Systems Health Signal coverage, remove the public grant-strategy page from MkDocs output, preserve hunt artifacts as ignored local evidence, and document the MSRV compatibility blocker for `sysinfo`.

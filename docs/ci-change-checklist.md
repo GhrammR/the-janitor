@@ -9,6 +9,11 @@ list eliminates the most common preventable causes.
 
 Tick each item before requesting review:
 
+- [ ] **Structural slice is narrow.** If a PR touches governance, workflows,
+  detector code, docs, and ledgers at once, split it before review. The
+  Structural Firewall intentionally rejects broad diffs because high blast
+  radius hides proof loss and makes check-run terminality harder to reason
+  about.
 - [ ] **YAML parses.** Run `python3 -c "import yaml; yaml.safe_load(open('<file>'))"` against every changed file.
 - [ ] **actionlint clean.** Run `actionlint .github/workflows/*.yml` (the Workflow Lint job runs this on every PR — green = sufficient). `action.yml` is YAML-validated separately because it is a composite-action schema, not a workflow schema.
 - [ ] **All `uses:` are SHA-pinned or `./`.** Major-version floats (`@v4`, `@main`) are rejected by the Workflow Lint job's SHA-pin step.
@@ -32,6 +37,23 @@ workflow files:
 
 You do **not** need to run these locally — the PR check is authoritative —
 but running them locally catches issues before pushing.
+
+## Structural Gate Slicing Protocol
+
+Keep the structural gate strict. Tune thresholds only after a detector produces
+a reproducible false positive on a narrow PR. Split instead when a change spans
+two or more of these surfaces:
+
+- GitHub workflow or action behavior.
+- Governance rules or response-format law.
+- Rust detector, witness, or ledger-routing code.
+- Public website content or MkDocs navigation.
+- Campaign ledgers or target selection state.
+
+Evidence from the 2026-05-13 incident: broad all-at-once branches triggered
+`architecture:blast_radius_violation` while staged, single-purpose slices passed
+with stable Merkle roots. The standard operating method is PR slicing, not
+weakening the firewall.
 
 ## Local validation script
 

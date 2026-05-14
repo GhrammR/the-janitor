@@ -53,17 +53,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sccache-janitor-pr-
 
-      # P4-11: Install Kani formal verifier (fail-open — does not block the gate).
-      - name: Install Kani Verifier (fail-open)
+      # P4-11: Install Kani formal verifier. Missing proof tooling is a hard
+      # preflight failure; agents must not silently downgrade assurance.
+      - name: Install Kani Verifier
         shell: bash
         run: |
+          set -euo pipefail
           if cargo install --locked kani-verifier 2>/dev/null && cargo kani setup 2>/dev/null; then
             echo "✅ Kani verifier installed."
           else
-            echo "⚠  Kani installation failed — formal verification harnesses skipped."
+            echo "Kani installation failed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
+            exit 1
           fi
-        continue-on-error: true
         timeout-minutes: 5
+
+      - name: Install durable Z3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "${HOME}/.local/share/janitor-tools/z3-venv"
+          "${HOME}/.local/share/janitor-tools/z3-venv/bin/python" -m pip install --upgrade pip z3-solver
+          mkdir -p "${HOME}/.local/bin"
+          ln -sf "${HOME}/.local/share/janitor-tools/z3-venv/bin/z3" "${HOME}/.local/bin/z3"
+
+      - name: Formal toolchain preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./tools/toolchain-preflight.sh
 
       # Dogfooding: run the composite action from the current branch so every
       # PR to this repo is itself gated by the version of the action it carries.

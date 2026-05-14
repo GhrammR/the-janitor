@@ -202,6 +202,14 @@ pub struct ExploitWitness {
     /// authenticated attacker can access another principal's object.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_witness: Option<AuthorizationWitness>,
+    /// Cross-language memory-safety proof tying an ingress language boundary to
+    /// an unsafe sink through a stable ABI or serialization adapter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_safety_witness: Option<MemorySafetyWitness>,
+    /// Agent/tool-intent proof tying an operator-approved intent to the actual
+    /// tool capability reached by untrusted agent output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_deception_witness: Option<AgentDeceptionWitness>,
     /// True when negative-taint analysis proves that at least one reachable
     /// source-to-sink path bypasses all registered sanitizers or validators.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -257,6 +265,38 @@ pub struct AuthorizationWitness {
     pub expected_control: String,
     /// Observed or synthesized verdict for the replay.
     pub replay_verdict: String,
+}
+
+/// Cross-language memory-safety witness for FFI and serialization boundaries.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemorySafetyWitness {
+    /// Language or serialization surface where attacker-controlled data enters.
+    pub source_language: String,
+    /// Language/runtime containing the unsafe sink.
+    pub sink_language: String,
+    /// Stable ABI, FFI, or serialization bridge that must preserve ownership.
+    pub boundary: String,
+    /// Required dominance invariant before the sink is considered exploitable.
+    pub required_dominance: String,
+    /// Formal model used by the witness builder.
+    pub model: String,
+    /// Deterministic replay verdict for the fixture or live proof.
+    pub replay_verdict: String,
+}
+
+/// Agent deception witness for prompt/tool-intent divergence.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentDeceptionWitness {
+    /// Operator-approved or prompt-declared tool intent.
+    pub declared_intent: String,
+    /// Actual capability reached by the tool or agent transcript.
+    pub observed_tool_capability: String,
+    /// Deterministic policy predicate that must remain false for safe output.
+    pub policy_predicate: String,
+    /// Expected safe control result.
+    pub expected_control: String,
+    /// Version marker for downstream SARIF, ledger, and ARTICLE_REVIEW parsers.
+    pub evidence_schema_version: String,
 }
 
 /// A structured antipattern or dead-symbol finding for MCP tool consumption.

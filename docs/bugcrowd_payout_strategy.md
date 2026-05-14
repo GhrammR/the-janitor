@@ -79,9 +79,19 @@ Remediation:
 
 | Window | Weekly KPI | Engineering Output |
 |--------|------------|--------------------|
-| 30 days | 3 authenticated SaaS targets scanned weekly; 1 candidate promoted weekly if proof reaches 85%. | Stabilize `AuthorizationWitness`, vector-filter polymorphism, and proof-summary routing; close any pending app-owned integrity checks before dependency merges. |
-| 60 days | 2 submission-ready packages produced; 1 external triage response received. | Add target-specific suppressions from triager feedback; require proof summaries in every Critical report. |
-| 90 days | 1 accepted or paid report; 3 reusable proof fixtures added from real triage outcomes. | Convert the winning class into a repeatable detector lane and add it to the grant evidence pack. |
+| 30 days | 3 authenticated SaaS targets scanned weekly; 1 candidate promoted weekly if proof reaches 85%; 0 app-owned checks left non-terminal past 10 minutes. | Stabilize `AuthorizationWitness`, vector-filter polymorphism, cross-language memory witnesses, and proof-summary routing. |
+| 60 days | 2 submission-ready packages produced; 1 external triage response received; 4 deterministic TP/TN fixtures added from rejected candidates. | Add target-specific suppressions from triager feedback; require proof summaries in every Critical report. |
+| 90 days | 1 accepted or paid report; 3 reusable proof fixtures added from real triage outcomes; 1 repeatable detector lane promoted into PR-gate demo evidence. | Convert the winning class into a repeatable detector lane and add it to the grant evidence pack. |
+
+## Roadmap Items Tied to Payout Probability
+
+| Roadmap item | Approval lever | Payout probability improvement |
+|---|---|---|
+| P2-18 `AuthorizationWitness` | Proves two-user replay rather than static IDOR suspicion. | Moves authenticated ownership findings from candidate to submission-ready when live replay denies or exposes cross-principal access. |
+| P2-15 vector-filter polymorphism | Proves tenant predicate rewrite failure with deterministic metadata payloads. | Targets AI/RAG SaaS surfaces where tenant isolation is a high-severity accepted impact. |
+| P2-20 proof-obligation translation | Blocks unproven Critical findings before analyst review. | Raises acceptance rate by preventing speculative reports from entering the bounty queue. |
+| P2-21 cross-language memory witness | Binds serialization/FFI ingress to unsafe native sinks. | Converts Misk/protobuf and wallet/native-extension findings into evidence-backed submissions. |
+| P2-22 agent deception witness | Captures declared intent versus observed tool capability. | Opens AI-agent firewall submissions where programs accept supply-chain or copilot impact. |
 
 Fastest conversion lane: authenticated authorization and tenant-isolation
 witnesses for SaaS/admin APIs, followed by AI-agent tool-intent deception where
