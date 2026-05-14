@@ -13,6 +13,12 @@ to understand operating constraints.
 | `commands/` | Slash-command definitions (`/release`, `/audit`, `/scan`, etc.) |
 | `skills/` | Auto-invoked skill protocols (pre-commit gate, crucible enforcement, etc.) |
 
+`rules/crossroads.md`, `commands/crossroads.md`, and
+`skills/crossroads-waiting/SKILL.md` define the reusable non-terminal
+multiple-choice waiting phase. Use it for missing tools, locked signing keys,
+dirty deploy workspaces, and policy decisions so execution resumes after the
+operator selects A/B/C.
+
 ## Agent Bootstrap Instructions
 
 **For all agents (Claude Code, Codex, GPT-4o, etc.):**

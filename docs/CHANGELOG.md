@@ -3,6 +3,30 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-13 — Sprint Batch 140: Crossroads Waiting, Site Hygiene, and Health Signals
+
+**Directive:** Continue the Max Compute sprint after the operator selected dependency installation, revise the A/B/C crossroads workflow so choice prompts become non-terminal waiting checkpoints, harden Systems Health Signal coverage, remove the public grant-strategy page from MkDocs output, preserve hunt artifacts as ignored local evidence, and document the MSRV compatibility blocker for `sysinfo`.
+
+### Governance and CI
+
+- `.agent_governance/rules/crossroads.md`, `.agent_governance/commands/crossroads.md`, and `.agent_governance/skills/crossroads-waiting/SKILL.md` *(created)* — codified the non-terminal waiting workflow: preserve branch/index/proof state, prefer host choice UI, resume the same directive after the operator chooses, and record the selected path before final reporting.
+- `.agent_governance/rules/max_compute.md` and `.agent_governance/rules/response-format.md` *(modified)* — bound Max Compute blockers to the Crossroads Waiting workflow and added the recurring Platform Expansion Tip to governed final reports.
+- `.github/workflows/health-signal.yml` *(modified)* — expanded Systems Health Signal into a ranked operational queue covering stuck checks, stale PRs, missing Kani/Z3, docs drift, and recent workflow failures with exact remediation commands.
+- `.github/dependabot.yml` *(modified)* — documented the `sysinfo >=0.39` ignore path because `sysinfo 0.39.1` requires Rust 1.95 while the repository MSRV remains Rust 1.92.
+
+### Website and Artifact Hygiene
+
+- `mkdocs.yml` *(modified)* — kept MkDocs canonical and excluded internal `grant_strategy.md` and `bugcrowd_payout_strategy.md` from public site output.
+- `docs/security.md`, `docs/architecture.md`, `docs/discovery.md`, and `docs/pricing_faq.md` *(modified)* — embedded grant-relevant enterprise signals inside existing public pages instead of publishing a standalone grant page.
+- `docs/grant_strategy.md` and `docs/bugcrowd_payout_strategy.md` *(modified/created)* — retained internal grant and payout execution plans as source-only guides.
+- `.gitignore` *(modified)* — kept `.janitor/audit_reports/*` and `.janitor/hunt_reports/*` untracked by default.
+
+### Verification
+
+- `python3 -c "import yaml; ..."` ✓ — parsed `.github/workflows/health-signal.yml`, `.github/dependabot.yml`, and `mkdocs.yml`.
+- `./actionlint -color .github/workflows/*.yml` ✓.
+- `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓ — `grant_strategy.md` and `bugcrowd_payout_strategy.md` are excluded from the generated site.
+
 ## 2026-05-13 — Sprint Batch 139: Integrity Terminality, Witness Hardening, Article Review Workflow
 
 **Directive:** Fix the external integrity/Sentinel stuck-check path; decide and document the live Pages deployment strategy; harden dependency PR triage; implement P2-15 vector filter predicate polymorphism and P2-18 authenticated authorization witnesses; run three distinct-org hunts; enforce the Architectural Oracle dead-code suppressor removal; add ARTICLE_REVIEW governance; produce grant strategy deliverables; validate and publish.

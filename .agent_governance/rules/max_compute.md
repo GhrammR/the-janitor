@@ -20,8 +20,8 @@ are respected. Releases remain prohibited while the protocol is active.
 ## Output Contract
 
 The agent MUST produce detailed Rust/Z3 mathematical blueprints for the four
-domains above and overwrite `.INNOVATION_LOG.md` with the resulting frontier
-architecture.
+domains above and append the resulting frontier architecture to
+`.INNOVATION_LOG.md`. Never overwrite roadmap history.
 
 Each blueprint must name:
 
@@ -37,3 +37,28 @@ Each blueprint must name:
 The 8GB Law remains active. Max Compute is a reasoning mode, not a license to
 introduce heavyweight runtimes, JVM tooling, local LLM hosting, or memory-bloated
 analysis passes.
+
+## Crossroads Waiting Phase
+
+When a Max Compute sprint is blocked by a missing tool, missing secret,
+environment policy, or release/deploy ambiguity, the agent MUST enter a
+non-terminal waiting phase instead of ending the directive.
+
+This phase is governed by `.agent_governance/rules/crossroads.md` and
+`.agent_governance/skills/crossroads-waiting/SKILL.md`.
+
+The waiting phase protocol is:
+
+1. Ask exactly one multiple-choice crossroads question with choices:
+   `A) install/enable dependency now`,
+   `B) proceed with bounded fallback and clearly mark reduced assurance`, and
+   `C) pause and wait for operator intervention`.
+2. Treat the crossroads as an interim execution checkpoint, not the final
+   governed response.
+3. Preserve all local state, staged changes, and command context.
+4. After the operator selects A, B, or C, resume the same directive from the
+   blocked phase and record the selected path in `docs/CHANGELOG.md`.
+5. If the host environment exposes an interactive permission or choice UI, use
+   that UI so the prompt continues automatically after selection. If no such UI
+   is available, emit the question as the only response and resume immediately
+   when the operator replies with the selected option.

@@ -8,6 +8,9 @@ name: Systems Health Signal Monitor
 # Tuning / disabling: docs/health-signal-monitor.md
 
 on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
   workflow_run:
     # Subset of workflows whose continued failure is operationally significant.
     # Add a workflow's display name (the `name:` field, NOT the file path) to
@@ -45,10 +48,10 @@ jobs:
           # Open a tracking issue when this many recent runs in a row fail.
           THRESHOLD: '2'
           REPO: ${{ github.repository }}
-          WORKFLOW_NAME: ${{ github.event.workflow.name }}
-          WORKFLOW_PATH: ${{ github.event.workflow.path }}
-          LATEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
-          LATEST_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_NAME: ${{ github.event.workflow.name || 'Scheduled Systems Health Sweep' }}
+          WORKFLOW_PATH: ${{ github.event.workflow.path || '.github/workflows/health-signal.yml' }}
+          LATEST_RUN_URL: ${{ github.event.workflow_run.html_url || github.server_url }}
+          LATEST_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion || 'scheduled' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -147,5 +150,99 @@ jobs:
               --title "[health-signal] ${WORKFLOW_NAME} failing for ${CONSEC} consecutive runs" \
               --body "${BODY}" \
               --label "${LABEL}"
-            echo "[health-signal] opened new tracker for ${WORKFLOW_NAME}"
+          echo "[health-signal] opened new tracker for ${WORKFLOW_NAME}"
+          fi
+
+      - name: Build ranked operational issue queue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          STUCK_MINUTES: "45"
+          STALE_DAYS: "7"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          QUEUE="$(mktemp)"
+          printf '| Rank | Issue | Remediation command |\n| --- | --- | --- |\n' > "${QUEUE}"
+
+          add_issue() {
+            printf "| %s | %s | \`%s\` |\n" "$1" "$2" "$3" >> "${QUEUE}"
+          }
+
+          now_epoch="$(date -u +%s)"
+          stuck_cutoff=$((now_epoch - STUCK_MINUTES * 60))
+          stale_cutoff=$((now_epoch - STALE_DAYS * 86400))
+
+          pr_json="$(gh pr list --repo "${REPO}" --state open --limit 50 \
+            --json number,title,updatedAt,statusCheckRollup,url)"
+
+          # shellcheck disable=SC2016 # jq variables are intentionally evaluated by jq, not Bash.
+          printf '%s' "${pr_json}" \
+            | jq -r '.[] as $pr
+              | $pr.statusCheckRollup[]?
+              | select(.__typename == "CheckRun" and .status == "IN_PROGRESS")
+              | [$pr.number, .name, .startedAt, .detailsUrl] | @tsv' \
+            | while IFS=$'\t' read -r pr_number check_name started_at details_url; do
+                [ -n "${started_at}" ] || continue
+                started_epoch="$(date -u -d "${started_at}" +%s 2>/dev/null || echo "${now_epoch}")"
+                if [ "${started_epoch}" -lt "${stuck_cutoff}" ]; then
+                  add_issue "P0" "Stuck check '${check_name}' on PR #${pr_number}: ${details_url}" \
+                    "gh pr checks ${pr_number} --repo ${REPO}"
+                fi
+              done
+
+          # shellcheck disable=SC2016 # jq filter is single-quoted to protect jq syntax from Bash.
+          printf '%s' "${pr_json}" \
+            | jq -r '.[] | [.number, .updatedAt, .url] | @tsv' \
+            | while IFS=$'\t' read -r pr_number updated_at pr_url; do
+                updated_epoch="$(date -u -d "${updated_at}" +%s 2>/dev/null || echo "${now_epoch}")"
+                if [ "${updated_epoch}" -lt "${stale_cutoff}" ]; then
+                  add_issue "P2" "Stale open PR #${pr_number}: ${pr_url}" \
+                    "gh pr view ${pr_number} --repo ${REPO} --json statusCheckRollup,mergeStateStatus"
+                fi
+              done
+
+          if ! cargo kani --version >/dev/null 2>&1; then
+            add_issue "P1" "Kani verifier is unavailable in the runner." \
+              "cargo install --locked kani-verifier && cargo kani setup"
+          fi
+
+          if ! command -v z3 >/dev/null 2>&1; then
+            add_issue "P2" "Z3 CLI is unavailable in the runner; formal proof translation has reduced assurance." \
+              "python3 -m venv /tmp/janitor-z3-venv && /tmp/janitor-z3-venv/bin/python -m pip install z3-solver"
+          fi
+
+          if ! curl -fsSI https://thejanitor.app/security/ >/dev/null; then
+            add_issue "P0" "Docs deployment drift: /security/ is not externally reachable." \
+              "just deploy-docs"
+          fi
+
+          if curl -fsSI https://thejanitor.app/grant_strategy/ >/dev/null; then
+            add_issue "P1" "Internal grant strategy page is still publicly reachable." \
+              "mkdocs build --strict && just deploy-docs"
+          fi
+
+          # shellcheck disable=SC2016 # jq interpolation belongs to gh --jq, not Bash.
+          failures="$(gh run list --repo "${REPO}" --status failure --limit 10 \
+            --json workflowName,url,createdAt \
+            --jq '.[] | "\(.workflowName)\t\(.url)\t\(.createdAt)"' || true)"
+          if [ -n "${failures}" ]; then
+            printf '%s\n' "${failures}" \
+              | while IFS=$'\t' read -r workflow url created_at; do
+                  add_issue "P2" "Recent workflow failure in ${workflow} at ${created_at}: ${url}" \
+                    "gh run view ${url##*/} --repo ${REPO} --log-failed"
+                done
+          fi
+
+          if [ "$(wc -l < "${QUEUE}")" -le 2 ]; then
+            printf 'No active health anomaly detected.\n' >> "${GITHUB_STEP_SUMMARY}"
+            echo "[health-signal] no ranked operational issues"
+          else
+            {
+              printf '## Ranked Systems Health Issue Queue\n\n'
+              cat "${QUEUE}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            echo "[health-signal] ranked operational issues detected"
+            cat "${QUEUE}"
           fi

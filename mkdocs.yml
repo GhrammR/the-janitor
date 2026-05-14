@@ -4,6 +4,10 @@ site_url: https://thejanitor.app
 repo_url: https://github.com/janitor-security/the-janitor
 repo_name: janitor-security/the-janitor
 
+exclude_docs: |
+  grant_strategy.md
+  bugcrowd_payout_strategy.md
+
 theme:
   name: material
   custom_dir: overrides
@@ -27,7 +31,6 @@ nav:
   - Architecture: architecture.md
   - Setup: setup.md
   - Security Posture: security.md
-  - Grant Strategy: grant_strategy.md
   - Intelligence: intelligence.md
   - Intelligence Reports:
     - Energy & ESG Audit: energy_conservation_audit.md

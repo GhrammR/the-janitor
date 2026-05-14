@@ -95,6 +95,18 @@ counter-adversarial mechanics that would weaken the platform.
 - **Not certified today**: SOC 2 Type II, FedRAMP authorization.
 - **Roadmap**: SOC 2 Type II preparation and FedRAMP Moderate pursuit remain roadmap items, not completed certifications.
 
+## Evaluation Signals
+
+Enterprise and grant reviewers should evaluate Janitor against measurable
+security signals rather than a standalone proposal page:
+
+- Zero-upload PR gate evidence from the composite action and Governor Check Run.
+- Deterministic proof witnesses for authenticated authorization, vector-store
+  tenant isolation, and AI-agent tool-intent violations.
+- Reproducible release artifacts, signed CBOMs, and workflow-permission rationale.
+- Air-gap posture: local analysis, bounded outbound metadata, and offline audit
+  evidence paths.
+
 ## Reporting and Navigation
 
 - Repository reporting policy:

@@ -53,6 +53,8 @@
 .janitor/*.lic
 .janitor/*.hash
 .janitor/**/*.html
+.janitor/audit_reports/*
+.janitor/hunt_reports/*
 .janitor/bounce_log.ndjson
 .janitor/cargo_lock.hash
 .janitor/diag.log

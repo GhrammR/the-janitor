@@ -144,8 +144,9 @@ and explicitly answer:
 [OPERATOR INTELLIGENCE]
 A human-directed operator brief that is NOT fed back into the next agent.
 It must contain one **Entropy Modulator Tip** derived from the last 3 sprint
-entries in `docs/CHANGELOG.md`, AND one **Systems Health Signal** covering
-holistic operational awareness beyond pure revenue.
+entries in `docs/CHANGELOG.md`, one **Systems Health Signal** covering
+holistic operational awareness beyond pure revenue, AND one **Platform
+Expansion Tip** covering the next best GitHub capability upgrade.
 
 Entropy Modulator protocol:
 1. Inspect the last 3 completed sprints in `docs/CHANGELOG.md`.
@@ -169,6 +170,16 @@ Systems Health Signal protocol:
    - **Hardware constraint alert**: any new P-tier item in `.INNOVATION_LOG.md`
      that violates the 8GB Law (JVM, Ghidra, fat LTO, local LLM inference)
      and must be flagged before the operator queues it.
+
+Platform Expansion Tip protocol:
+1. Tie the tip to one measurable GitHub capability upgrade: Integrity check
+   quality, PR gate hardening, marketplace action adoption, multi-repo rollout
+   readiness, Atlassian track, or GitLab track.
+2. Include the exact next-step command, workflow file, or GitHub API operation.
+3. State the measurable success condition, e.g. "all app-owned checks terminal
+   within 10 minutes", "dependency PRs auto-merge after CodeQL + integrity
+   green", or "same PR gate deployed to one external pilot repository".
+4. Do not use vague capability-roadmap language.
 ```
 
 ## Enforcement

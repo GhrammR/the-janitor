@@ -41,6 +41,10 @@ deception controls, and CI gates that prevent ambiguous AI changes from merging.
 - Demo repository and replay script for authenticated cross-tenant witness.
 - Roadmap entries tied to formal models: Z3, Kani, IFDS, and deterministic
   fixtures.
+- ARTICLE_REVIEW evidence that maps external AI workflow claims into concrete
+  defended/mapped/new innovation states with source quality and confidence.
+- Systems Health Signal queue showing stuck checks, stale PRs, missing
+  toolchains, and docs drift with exact remediation commands.
 
 ## Outreach Package
 
@@ -80,3 +84,5 @@ air-gap packaging, and external evaluation against real multi-tenant codebases.
    of inflated claims.
 6. Run an authenticated two-user fixture and show `AuthorizationWitness` replay
    verdict updates.
+7. Show an AI-agent tool-intent finding that carries `ToolIntentWitness`,
+   `ProofSummary`, and a safe local reproduction command.

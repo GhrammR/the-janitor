@@ -46,6 +46,11 @@ AST walk), and TSX/JSX (dangerouslySetInnerHTML attribute walk).
 GraphQL/AsyncAPI Trust Boundary Extraction, and Web3 EVM Invariant Checking are
 first-class enforcement surfaces, not roadmap placeholders.
 
+**Pilot evaluation surface**: security reviews should measure the architecture by
+source-retention guarantees, deterministic proof summaries, CI terminality, and
+bounded memory behavior. The enterprise/FedRAMP path is therefore an evidence
+pack generated from existing controls, not a separate public grant workflow.
+
 Grammar library: `tree-sitter 0.26` (workspace pinned).
 
 ### Foundational Crates & Mathematical Models

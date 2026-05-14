@@ -56,6 +56,14 @@ Contact: [sales@thejanitor.app](mailto:sales@thejanitor.app)
 Security reviews, pilot deployments, and grant diligence:
 [security@thejanitor.app](mailto:security@thejanitor.app)
 
+Pilot evaluation package:
+
+- 30-day proof-backed PR gate trial on one representative repository.
+- Authenticated authorization and AI-agent deception witness report.
+- Signed CBOM and release verification artifact bundle.
+- Weekly KPI review: blocked unsafe PRs, false-positive rate, proof-complete
+  findings, and time-to-triage.
+
 ---
 
 ## Is Open Source use free?
