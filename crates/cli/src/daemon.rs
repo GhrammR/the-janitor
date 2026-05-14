@@ -453,9 +453,8 @@ pub mod unix {
                         // Cross-PR collision detection via LSH MinHash index.
                         let sig =
                             forge::pr_collider::PrDeltaSignature::from_bytes(patch.as_bytes());
-                        let near_matches = state.lsh_index.query(&sig, 0.85);
-                        score.logic_clones_found += near_matches.len() as u32;
-                        let collided_pr_numbers_response = near_matches.clone();
+                        let collided_pr_numbers = state.lsh_index.query(&sig, 0.85);
+                        score.logic_clones_found += collided_pr_numbers.len() as u32;
                         let min_hashes = sig.min_hashes.to_vec();
                         // Insert for future comparisons — daemon has no PR number context.
                         state.lsh_index.insert(sig, 0);
@@ -481,7 +480,7 @@ pub mod unix {
                             slop_score,
                             score.necrotic_flag.as_deref(),
                             &score.antipattern_details,
-                            &near_matches,
+                            &collided_pr_numbers,
                         );
                         let log_entry = crate::report::BounceLogEntry {
                             execution_tier: "Community".to_string(),
@@ -501,7 +500,7 @@ pub mod unix {
                             is_bot: false,
                             repo_slug: String::new(),
                             suppressed_by_domain: score.suppressed_by_domain,
-                            collided_pr_numbers: near_matches,
+                            collided_pr_numbers: collided_pr_numbers.clone(),
                             necrotic_flag: score.necrotic_flag,
                             commit_sha: String::new(),
                             policy_hash: String::new(),
@@ -539,7 +538,7 @@ pub mod unix {
                             zombies: zombie_symbols_added,
                             antipatterns: antipatterns_count,
                             antipattern_details,
-                            collided_pr_numbers: collided_pr_numbers_response,
+                            collided_pr_numbers,
                             is_vouched,
                         }
                     }

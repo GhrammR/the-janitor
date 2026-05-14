@@ -462,17 +462,34 @@ fn candidate_ledger_gap_section(findings: &[&StructuredFinding]) -> String {
                 .as_ref()
                 .map(|artifact| artifact.to_markdown())
                 .unwrap_or_default();
+            let proof_summary = finding
+                .proof_summary
+                .as_ref()
+                .map(|summary| {
+                    format!(
+                        "ProofSummary: proof=`{:?}` model=`{}` invariant=`{}` fixture=`{}`.",
+                        summary.proof_class, summary.model, summary.invariant, summary.fixture
+                    )
+                })
+                .unwrap_or_default();
             if oracle.is_empty() {
                 if web_artifact.is_empty() {
-                    "Acceptance Oracle: proof-complete.".to_string()
+                    if proof_summary.is_empty() {
+                        "Acceptance Oracle: proof-complete.".to_string()
+                    } else {
+                        proof_summary
+                    }
                 } else {
-                    web_artifact
+                    format!("{proof_summary} {web_artifact}")
                 }
             } else if web_artifact.is_empty() {
-                format!("Acceptance Oracle: {}", oracle.ledger_gap_summary())
+                format!(
+                    "{proof_summary} Acceptance Oracle: {}",
+                    oracle.ledger_gap_summary()
+                )
             } else {
                 format!(
-                    "{web_artifact} Acceptance Oracle: {}",
+                    "{proof_summary} {web_artifact} Acceptance Oracle: {}",
                     oracle.ledger_gap_summary()
                 )
             }
@@ -3519,6 +3536,20 @@ fn scan_buffer(
                     label, &rule_id, line, model_api,
                 );
                 structured = forge::exploitability::attach_exploit_witness(structured, witness);
+            } else if rule_id == "security:intent_divergence" {
+                let declared = extract_backtick_after(&finding.description, "function ")
+                    .unwrap_or_else(|| "security-signaling implementation".to_string());
+                let observed = source_snippet(source, finding.start_byte, finding.end_byte)
+                    .unwrap_or_else(|| "vacuous implementation".to_string());
+                structured.proof_class = Some(ProofClass::InvariantViolationProof);
+                structured.tool_intent_witness =
+                    Some(forge::exploitability::tool_intent_guard_witness(
+                        label, &rule_id, line, &declared, &observed,
+                    ));
+                let witness = forge::exploitability::tool_intent_exploit_witness(
+                    label, &rule_id, line, &declared, &observed,
+                );
+                structured = forge::exploitability::attach_exploit_witness(structured, witness);
             } else if rule_id == "security:embedding_trust_transposition" {
                 let witness = ExploitWitness {
                     source_function: label.to_string(),
@@ -4548,6 +4579,35 @@ async function answer(req) {
         assert_eq!(artifact.source_label, "rag_chunk:vector_retrieval");
         assert_eq!(artifact.sink_label, "sink:llm.invoke");
         assert!(artifact.has_marker("vector_topology:missing_similarity_gate"));
+    }
+
+    #[test]
+    fn scan_buffer_attaches_tool_intent_witness_for_intent_divergence() {
+        let source = b"fn verify_signature() -> bool { return true; }\n";
+        let findings = scan_buffer("rs", source, "src/auth.rs", &[], &[], false);
+        let finding = findings
+            .iter()
+            .find(|finding| finding.id == "security:intent_divergence")
+            .expect("intent divergence finding must be emitted");
+
+        assert_eq!(
+            finding.proof_class,
+            Some(common::slop::ProofClass::InvariantViolationProof)
+        );
+        let witness = finding
+            .tool_intent_witness
+            .as_ref()
+            .expect("intent divergence must carry tool-intent witness");
+        assert!(witness.declared_intent.contains("verify_signature"));
+        assert!(witness.observed_tool.contains("return true"));
+        assert!(
+            finding
+                .exploit_witness
+                .as_ref()
+                .and_then(|w| w.repro_cmd.as_deref())
+                .is_some_and(|cmd| cmd.contains("ToolIntentWitness")),
+            "intent divergence must synthesize safe witness command"
+        );
     }
 
     #[test]

@@ -3,6 +3,59 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-13 — Sprint Batch 140: Formal Proof Routing, Agent Deception Witnesses, Crossroads Governance
+
+**Directive:** Continue the Max Compute sprint with dependency installation enabled, revise the A/B/C crossroads workflow so operator choices become non-terminal waiting phases, stabilize external integrity-check governance, keep MkDocs canonical while removing public grant-strategy navigation, implement P2-20 formal proof-summary routing and P2-22 AI-agent deception witnesses, activate ARTICLE_REVIEW, expand Systems Health Signal, produce monetization strategy, validate, and publish.
+
+### Phase 1 — Crossroads and Toolchain Enablement
+
+- `.agent_governance/rules/crossroads.md`, `.agent_governance/commands/crossroads.md`, and `.agent_governance/skills/crossroads-waiting/SKILL.md` *(created)* — added a reusable non-terminal A/B/C waiting phase for missing tools, locked signing keys, dirty deploy workspaces, and policy blockers. Host choice UI is preferred when available; otherwise the agent asks exactly one A/B/C question and resumes when the operator replies.
+- `.agent_governance/rules/max_compute.md` *(modified)* — fixed the output contract to append, never overwrite, `.INNOVATION_LOG.md`, and delegated missing-tool / deploy ambiguity handling to the new Crossroads Waiting workflow.
+- Toolchain outcome: operator selected `A) install/enable dependency now`; Kani 0.67.0 was installed and set up successfully; Z3 4.16.0 was enabled through `/tmp/janitor-z3-venv/bin/z3`.
+
+### Phase 2 — Proof and Deception Witness Routing
+
+- `crates/common/src/slop.rs` *(modified)* — added `ProofSummary` and `ToolIntentWitness` schemas to `StructuredFinding` with deterministic serialization coverage.
+- `crates/forge/src/proof_obligation.rs` *(modified)* — added compact proof-summary attachment for reachability, invariant, and lattice-gap proof classes before CLI, SARIF, or ledger routing.
+- `crates/forge/src/exploitability.rs`, `crates/forge/src/intent_divergence.rs`, `crates/forge/src/swarm_exfil.rs`, and `crates/cli/src/hunt.rs` *(modified)* — added `ToolIntentGuard` witness synthesis and safe local reproduction for `security:intent_divergence` and `security:swarm_context_exfiltration`; hunt output now records tool-intent evidence before candidate ledger promotion.
+- `crates/forge/src/reflexive_assurance.rs` *(modified)* — updated existing Kani harnesses for Kani 0.67 API compatibility while preserving the proof intent.
+- `crates/cli/src/daemon.rs` *(modified)* — removed a redundant collision-vector clone in bounce response assembly.
+
+### Phase 3 — Website, Dependency, and Systems Health Hardening
+
+- `.github/dependabot.yml` *(modified)* — documented the PR `#99` MSRV root cause by ignoring `sysinfo >= 0.39` until the workspace MSRV advances beyond Rust 1.92; `sysinfo 0.39.1` requires Rust 1.95.
+- `.github/workflows/health-signal.yml` *(modified)* — expanded Systems Health Signal into a ranked operational issue queue that detects stuck checks, stale PRs, missing Kani/Z3, docs deployment drift, and recent workflow failures with exact remediation commands.
+- `.github/workflows/health-signal.yml` verification context: open dependency PRs `#95` through `#100` had green GitHub Actions where applicable, but all retained app-owned `Janitor Integrity Check` runs in `IN_PROGRESS`; PR `#99` also retained the documented MSRV failure.
+- `mkdocs.yml`, `docs/security.md`, `docs/architecture.md`, `docs/discovery.md`, and `docs/pricing_faq.md` *(modified)* — kept MkDocs as the canonical public site, removed `Grant Strategy` from the public nav, excluded internal strategy pages from the build, and embedded grant-relevant trust signals into public Security/Architecture/Discovery/Pricing surfaces.
+- `docs/grant_strategy.md` *(modified)* and `docs/bugcrowd_payout_strategy.md` *(created)* — expanded the internal grant evidence pack and added a Bugcrowd payout strategy with target rubric, witness threshold, reproducibility checklist, submission template, and 30/60/90 KPIs.
+- `.gitignore` *(modified)* — kept `.janitor/audit_reports/*` and `.janitor/hunt_reports/*` untracked by default while preserving intentional tracked ledger files.
+
+### Phase 4 — ARTICLE_REVIEW and Hunt Routing
+
+- `.INNOVATION_LOG.md` *(modified)* — appended ARTICLE_REVIEW findings for constrained LLM security workflows, Echo prompting, Claude Dreams, scientific vibe-coding methods, IDE-catchable AI errors, and token-efficient evidence encoding; each entry records external access evidence, corroboration, disposition, source quality, confidence, and follow-up search concept.
+- `.INNOVATION_LOG.md` *(modified)* — appended Max Compute frontier blueprints for cryptographic provenance boundary invariants, proof-summary exclusivity typestate, cross-language ownership witnesses, dream-memory provenance quarantine, and compact evidence encoding.
+- `janitor hunt` reruns completed for `https://github.com/cashapp/misk`, `https://github.com/Uniswap/v3-core`, and `https://github.com/mattermost/mattermost`; generated reports stayed under ignored `.janitor/hunt_reports/`. Existing 2026-05-13 Tri-Ledger rows and `target_ledger.json` machine-readable stamps already captured the same outcomes: Misk candidate protobuf `Any` JVM reachability gap, Uniswap v3-core no findings / Solidity lane gap, and Mattermost candidate plus low-yield proof-gap classes.
+
+### Verification
+
+- `cargo test -p forge proof_obligation -- --test-threads=1` ✓.
+- `cargo test -p forge tool_intent -- --test-threads=1` ✓.
+- `cargo test -p forge swarm_exfil -- --test-threads=1` ✓.
+- `cargo test -p forge intent_divergence -- --test-threads=1` ✓.
+- `cargo test -p forge vector_ -- --test-threads=1` ✓.
+- `cargo test -p common proof_summary -- --test-threads=1` ✓.
+- `cargo test -p common tool_intent -- --test-threads=1` ✓.
+- `cargo test -p cli tool_intent -- --test-threads=1` ✓.
+- `cargo test -p cli daemon -- --test-threads=1` ✓.
+- `cargo test -p forge reflexive_assurance -- --test-threads=1` ✓.
+- `cargo kani -p forge --harness otlp_time_nanosecond_conversion_no_overflow` ✓.
+- `/tmp/janitor-z3-venv/bin/z3 --version` ✓ — Z3 4.16.0.
+- `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓; local `site/` contained no `grant_strategy` or `bugcrowd_payout_strategy` pages.
+- `./actionlint -color .github/workflows/*.yml` ✓.
+- `curl -fsSI https://thejanitor.app/security/` ✓ — `HTTP/2 200`, `server: cloudflare`, `cache-control: max-age=600`, GitHub Pages request id `3414:7C809:60B115:62F577:6A053C9B` at `Thu, 14 May 2026 03:08:11 GMT`.
+- `curl -fsSI https://thejanitor.app/grant_strategy/` currently returns `HTTP/2 200` from the previously deployed site; local MkDocs build excludes the page, so removal becomes externally visible after this branch reaches `main` and Pages redeploys.
+- `just audit` ✓ — full workspace check, clippy/audit gate, tests, doc-tests, release/doc parity, and Kani harnesses passed.
+
 ## 2026-05-13 — Sprint Batch 139: Integrity Terminality, Witness Hardening, Article Review Workflow
 
 **Directive:** Fix the external integrity/Sentinel stuck-check path; decide and document the live Pages deployment strategy; harden dependency PR triage; implement P2-15 vector filter predicate polymorphism and P2-18 authenticated authorization witnesses; run three distinct-org hunts; enforce the Architectural Oracle dead-code suppressor removal; add ARTICLE_REVIEW governance; produce grant strategy deliverables; validate and publish.

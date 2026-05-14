@@ -10,6 +10,7 @@ use crate::metadata::DOMAIN_FIRST_PARTY;
 use crate::slop_hunter::{Severity, SlopFinding};
 
 const SECURITY_VERBS: &[&str] = &["verify", "authenticate", "sanitize", "check"];
+const TOOL_INTENT_INVARIANT: &str = "tool_intent:security_name_requires_non_vacuous_body";
 
 /// Detect Rust functions whose security-signaling name or doc comment
 /// contradicts a vacuous implementation body.
@@ -34,7 +35,7 @@ fn find_rust_functions(node: Node<'_>, source: &[u8], findings: &mut Vec<SlopFin
                     start_byte: node.start_byte(),
                     end_byte: node.end_byte(),
                     description: format!(
-                        "security:intent_divergence — function `{name_text}` claims a security responsibility but its AST body is vacuous (`return true`, `return obj`, or empty block); this matches LLM-assisted supply-chain backdoor structure"
+                        "security:intent_divergence — function `{name_text}` claims a security responsibility but its AST body is vacuous (`return true`, `return obj`, or empty block); invariant `{TOOL_INTENT_INVARIANT}` failed; this matches LLM-assisted supply-chain backdoor structure"
                     ),
                     domain: DOMAIN_FIRST_PARTY,
                     severity: Severity::Critical,
@@ -98,6 +99,12 @@ mod tests {
                 .iter()
                 .any(|f| f.description.contains("security:intent_divergence")),
             "security-named vacuous verifier must fire"
+        );
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains(TOOL_INTENT_INVARIANT)),
+            "intent divergence must expose the tool-intent invariant"
         );
     }
 

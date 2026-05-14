@@ -236,6 +236,8 @@ mod tests {
             auth_requirement: None,
             proof_class: None,
             web_proof_artifact: None,
+            proof_summary: None,
+            tool_intent_witness: None,
             upstream_validation_absent: false,
             regulatory_regimes: None,
             estimated_fine_floor_usd: None,

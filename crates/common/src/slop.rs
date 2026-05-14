@@ -259,6 +259,34 @@ pub struct AuthorizationWitness {
     pub replay_verdict: String,
 }
 
+/// Compact proof summary routed with findings after the proof-obligation gate.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProofSummary {
+    /// Proof class that justifies keeping the finding in triage.
+    pub proof_class: ProofClass,
+    /// Formal model family used or required for the proof.
+    pub model: String,
+    /// Invariant or reachability claim established by the proof.
+    pub invariant: String,
+    /// Deterministic fixture class proving the positive or negative path.
+    pub fixture: String,
+}
+
+/// Evidence that an agent/tool surface violates its declared intent boundary.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolIntentWitness {
+    /// Declared purpose or security intent extracted from name, docs, or context.
+    pub declared_intent: String,
+    /// Observed tool/action/marker that contradicts the declared boundary.
+    pub observed_tool: String,
+    /// File, function, or serialized tool surface where the contradiction appears.
+    pub mutation_surface: String,
+    /// Boundary the tool or implementation was expected to preserve.
+    pub expected_boundary: String,
+    /// Deterministic verdict emitted by the guard.
+    pub verdict: String,
+}
+
 /// A structured antipattern or dead-symbol finding for MCP tool consumption.
 ///
 /// Fields map to the `{ "id": "security:...", "file": "src/main.rs", "line": 42 }`
@@ -325,6 +353,14 @@ pub struct StructuredFinding {
     /// Unified web proof artifact for DOM XSS, SSRF, and RAG trust findings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web_proof_artifact: Option<WebProofArtifact>,
+
+    /// Compact proof summary routed into CLI, SARIF, and ledger output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_summary: Option<ProofSummary>,
+
+    /// AI-agent tool/intent contradiction witness.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_intent_witness: Option<ToolIntentWitness>,
 
     /// True when the engine proved that at least one reachable source-to-sink
     /// path bypasses all registered sanitizers or validators.
@@ -573,5 +609,42 @@ mod tests {
             markdown.contains("internal_metadata:169.254.169.254"),
             "compact evidence marker must be rendered"
         );
+    }
+
+    #[test]
+    fn proof_summary_serializes_with_finding() {
+        let finding = StructuredFinding {
+            id: "security:ssrf_dynamic_url".to_string(),
+            proof_summary: Some(ProofSummary {
+                proof_class: ProofClass::ReachabilityProof,
+                model: "ifds".to_string(),
+                invariant: "source reaches sink".to_string(),
+                fixture: "tp:ssrf_with_repro_cmd".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&finding).expect("serialization must not fail");
+        assert!(json.contains("proof_summary"));
+        assert!(json.contains("source reaches sink"));
+    }
+
+    #[test]
+    fn tool_intent_witness_serializes_with_finding() {
+        let finding = StructuredFinding {
+            id: "security:intent_divergence".to_string(),
+            tool_intent_witness: Some(ToolIntentWitness {
+                declared_intent: "verify signature".to_string(),
+                observed_tool: "return true".to_string(),
+                mutation_surface: "src/auth.rs:verify_signature".to_string(),
+                expected_boundary: "authenticator must reject invalid signatures".to_string(),
+                verdict: "intent_boundary_violation".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&finding).expect("serialization must not fail");
+        assert!(json.contains("tool_intent_witness"));
+        assert!(json.contains("verify signature"));
     }
 }

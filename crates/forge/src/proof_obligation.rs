@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use common::slop::{finding_has_required_proof_class, ProofClass, StructuredFinding};
+use common::slop::{finding_has_required_proof_class, ProofClass, ProofSummary, StructuredFinding};
 
 const INNOVATION_LOG_PATH: &str = ".INNOVATION_LOG.md";
 
@@ -17,18 +17,18 @@ pub fn enforce_false_positive_proof_obligation(
 
     for finding in findings {
         if !requires_proof_obligation(finding) {
-            kept.push(finding.clone());
+            kept.push(attach_proof_summary(finding.clone()));
             continue;
         }
         if let Some(upgraded) = upgrade_implicit_reachability_proof(finding) {
-            kept.push(upgraded);
+            kept.push(attach_proof_summary(upgraded));
             continue;
         }
         if proof_obligation_missing(true, finding_has_required_proof_class(finding)) {
             proposals.push(proposal_block_for(finding));
             continue;
         }
-        kept.push(finding.clone());
+        kept.push(attach_proof_summary(finding.clone()));
     }
 
     if !proposals.is_empty() {
@@ -41,6 +41,67 @@ pub fn enforce_false_positive_proof_obligation(
 /// Pure helper for tests and formal assurance.
 pub fn proof_obligation_missing(requires_proof: bool, has_proof_class: bool) -> bool {
     requires_proof && !has_proof_class
+}
+
+/// Attach a compact proof summary when a finding already carries a required
+/// proof class.
+pub fn attach_proof_summary(mut finding: StructuredFinding) -> StructuredFinding {
+    if finding.proof_summary.is_none() {
+        finding.proof_summary = proof_summary_for(&finding);
+    }
+    finding
+}
+
+fn proof_summary_for(finding: &StructuredFinding) -> Option<ProofSummary> {
+    let proof_class = finding.proof_class?;
+    let (model, invariant, fixture) = match proof_class {
+        ProofClass::ReachabilityProof => {
+            if let Some(artifact) = finding.web_proof_artifact.as_ref() {
+                (
+                    "IFDS web source-to-sink trace".to_string(),
+                    artifact.ifds_trace_output(),
+                    "tp:reachable_source_sink_with_artifact".to_string(),
+                )
+            } else if let Some(witness) = finding.exploit_witness.as_ref() {
+                let trace = if witness.call_chain.is_empty() {
+                    witness
+                        .path_proof
+                        .as_deref()
+                        .unwrap_or("reachability:witness_present")
+                        .to_string()
+                } else {
+                    witness.call_chain.join(" -> ")
+                };
+                (
+                    "IFDS/Z3 reachability witness".to_string(),
+                    trace,
+                    "tp:exploit_witness_preserved".to_string(),
+                )
+            } else {
+                (
+                    "IFDS reachability proof".to_string(),
+                    "reachability proof class present".to_string(),
+                    "tp:explicit_reachability_proof_class".to_string(),
+                )
+            }
+        }
+        ProofClass::InvariantViolationProof => (
+            "Z3/Kani invariant witness".to_string(),
+            format!("{} violates a detector invariant", finding.id),
+            "tp:self_proving_invariant_violation".to_string(),
+        ),
+        ProofClass::LatticeGapProposal => (
+            "IFDS lattice gap".to_string(),
+            format!("{} requires a detector lattice extension", finding.id),
+            "tn:lattice_gap_blocks_unproven_critical".to_string(),
+        ),
+    };
+    Some(ProofSummary {
+        proof_class,
+        model,
+        invariant,
+        fixture,
+    })
 }
 
 fn requires_proof_obligation(finding: &StructuredFinding) -> bool {
@@ -136,7 +197,8 @@ fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result
 #[cfg(test)]
 mod tests {
     use super::{
-        append_gap_proposals_to, enforce_false_positive_proof_obligation, proof_obligation_missing,
+        append_gap_proposals_to, attach_proof_summary, enforce_false_positive_proof_obligation,
+        proof_obligation_missing,
     };
     use common::slop::{ExploitWitness, ProofClass, StructuredFinding};
     use tempfile::NamedTempFile;
@@ -164,6 +226,10 @@ mod tests {
 
         let filtered = enforce_false_positive_proof_obligation(&findings);
         assert_eq!(filtered.len(), 1);
+        assert!(
+            filtered[0].proof_summary.is_some(),
+            "kept critical finding must carry proof summary"
+        );
     }
 
     #[test]
@@ -218,5 +284,45 @@ mod tests {
         assert!(proof_obligation_missing(true, false));
         assert!(!proof_obligation_missing(true, true));
         assert!(!proof_obligation_missing(false, false));
+    }
+
+    #[test]
+    fn attaches_ifds_summary_for_reachability_proof() {
+        let finding = StructuredFinding {
+            id: "security:vector_filter_polymorphism".to_string(),
+            severity: Some("Critical".to_string()),
+            proof_class: Some(ProofClass::ReachabilityProof),
+            exploit_witness: Some(ExploitWitness {
+                call_chain: vec![
+                    "tenant_filter".to_string(),
+                    "vector_query".to_string(),
+                    "llm_answer".to_string(),
+                ],
+                ..ExploitWitness::default()
+            }),
+            ..Default::default()
+        };
+
+        let routed = attach_proof_summary(finding);
+        let summary = routed
+            .proof_summary
+            .expect("reachability proof must route a summary");
+        assert_eq!(summary.proof_class, ProofClass::ReachabilityProof);
+        assert!(summary.invariant.contains("tenant_filter -> vector_query"));
+    }
+
+    #[test]
+    fn no_summary_for_unproven_informational_finding() {
+        let finding = StructuredFinding {
+            id: "security:low_yield_hint".to_string(),
+            severity: Some("Informational".to_string()),
+            ..Default::default()
+        };
+
+        let routed = attach_proof_summary(finding);
+        assert!(
+            routed.proof_summary.is_none(),
+            "non-proof finding must not receive synthetic proof summary"
+        );
     }
 }

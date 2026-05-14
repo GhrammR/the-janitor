@@ -16,7 +16,7 @@
 //! Emits `security:swarm_context_exfiltration` at `KevCritical`.
 
 use aho_corasick::AhoCorasick;
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding, ToolIntentWitness};
 use std::sync::OnceLock;
 
 // ---------------------------------------------------------------------------
@@ -110,6 +110,16 @@ pub fn detect_context_exfil(source: &[u8], file_path: &str) -> Vec<StructuredFin
             file: Some(file_path.to_string()),
             line: Some(line as u32),
             severity: Some("KevCritical".to_string()),
+            proof_class: Some(ProofClass::InvariantViolationProof),
+            tool_intent_witness: Some(ToolIntentWitness {
+                declared_intent: "committed source code or developer prose".to_string(),
+                observed_tool: pattern_str.to_string(),
+                mutation_surface: format!("{file_path}:{line}"),
+                expected_boundary:
+                    "agent IPC and tool-call serialization markers must not appear in source"
+                        .to_string(),
+                verdict: "swarm_context_exfiltration:tool_intent_boundary_violation".to_string(),
+            }),
             fingerprint: format!("swarm_exfil:{}:{}", file_path, pattern_id),
             remediation: Some(format!(
                 "Swarm IPC exfiltration marker `{pattern_str}` found in committed \
@@ -165,6 +175,14 @@ mod tests {
         assert!(
             !findings.is_empty(),
             "tool_result must trigger in source comment"
+        );
+        assert_eq!(
+            findings[0].proof_class,
+            Some(ProofClass::InvariantViolationProof)
+        );
+        assert!(
+            findings[0].tool_intent_witness.is_some(),
+            "tool IPC markers must carry tool-intent evidence"
         );
     }
 
