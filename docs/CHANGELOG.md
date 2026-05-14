@@ -54,6 +54,12 @@ implemented as a result.
 - `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓ — `site/security/index.html` present; internal grant and payout pages absent.
 - `just audit` ✓ — full workspace fmt/clippy/check/tests/doc-tests/release parity/doc parity/toolchain preflight/Kani harness gate passed with Kani 0.67, Z3 4.16, and ShellCheck 0.10.0.
 
+### Follow-up Oracle Drift Patch
+
+- `crates/cli/src/daemon.rs` *(modified)* — made `HotRegistry::reload` live by reloading the daemon registry on push-event scans, removed dead-code suppressors around the reload path, and eliminated the avoidable `author.clone()` during bounce-log response assembly.
+
+**Verification**: `cargo fmt --all -- --check` ✓; `cargo test -p cli daemon -- --test-threads=1` ✓; `cargo clippy -p cli -- -D warnings` ✓.
+
 ## 2026-05-13 — Sprint Batch 140: Crossroads Waiting, Site Hygiene, and Health Signals
 
 **Directive:** Continue the Max Compute sprint after the operator selected dependency installation, revise the A/B/C crossroads workflow so choice prompts become non-terminal waiting checkpoints, harden Systems Health Signal coverage, remove the public grant-strategy page from MkDocs output, preserve hunt artifacts as ignored local evidence, and document the MSRV compatibility blocker for `sysinfo`.

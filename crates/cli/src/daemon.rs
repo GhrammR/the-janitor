@@ -152,8 +152,7 @@ pub mod unix {
     /// zero-copy deserialization on load.
     pub struct HotRegistry {
         inner: ArcSwap<SymbolRegistry>,
-        // Retained for `reload()` — hot-swap API wired up in a future release.
-        #[allow(dead_code)]
+        // Retained for push-event reloads.
         path: std::path::PathBuf,
     }
 
@@ -190,7 +189,6 @@ pub mod unix {
         ///
         /// # Errors
         /// Returns `Err` if the file cannot be re-opened or deserialization fails.
-        #[allow(dead_code)]
         pub fn reload(&self) -> Result<()> {
             let registry = load_registry(&self.path)?;
             self.inner.store(Arc::new(registry));
@@ -460,9 +458,19 @@ pub mod unix {
                         // Insert for future comparisons — daemon has no PR number context.
                         state.lsh_index.insert(sig, 0);
 
+                        // Vouch identity check: requires both the author handle and the
+                        // repository root path supplied in the request.  Falls back to
+                        // `false` when either is absent (e.g. MCP or direct CLI callers).
+                        let is_vouched = match (&author, &repo_path) {
+                            (Some(a), Some(r)) => {
+                                forge::metadata::is_author_vouched(std::path::Path::new(r), a)
+                            }
+                            _ => false,
+                        };
+
                         // Persist to bounce_log.ndjson for `janitor report` aggregation.
-                        // Daemon connections have no PR-number / author context — those
-                        // Cache computed values before consuming Vec fields via move.
+                        // Daemon connections have no PR-number context. Cache computed
+                        // values before consuming Vec fields via move.
                         let slop_score = score.score();
                         let antipatterns_count = score.antipatterns_found;
                         let zombie_symbols_added = score.zombie_symbols_added;
@@ -486,7 +494,7 @@ pub mod unix {
                         let log_entry = crate::report::BounceLogEntry {
                             execution_tier: "Community".to_string(),
                             pr_number: None,
-                            author: author.clone(),
+                            author,
                             timestamp: crate::utc_now_iso8601(),
                             slop_score,
                             dead_symbols_added: score.dead_symbols_added,
@@ -523,16 +531,6 @@ pub mod unix {
                             git_signature_status: None,
                         };
                         crate::report::append_bounce_log(&state.janitor_dir, &log_entry);
-
-                        // Vouch identity check: requires both the author handle and the
-                        // repository root path supplied in the request.  Falls back to
-                        // `false` when either is absent (e.g. MCP or direct CLI callers).
-                        let is_vouched = match (&author, &repo_path) {
-                            (Some(a), Some(r)) => {
-                                forge::metadata::is_author_vouched(std::path::Path::new(r), a)
-                            }
-                            _ => false,
-                        };
 
                         DaemonResponse::Report {
                             slop_score: slop_score as f64,
@@ -572,6 +570,12 @@ pub mod unix {
         if !repo.is_dir() {
             return DaemonResponse::Error {
                 message: format!("PushEvent repo_path is not a directory: {repo_path}"),
+            };
+        }
+
+        if let Err(e) = state.registry.reload() {
+            return DaemonResponse::Error {
+                message: format!("PushEvent registry reload failed: {e}"),
             };
         }
 
