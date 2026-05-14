@@ -58,7 +58,9 @@ The waiting phase protocol is:
 3. Preserve all local state, staged changes, and command context.
 4. After the operator selects A, B, or C, resume the same directive from the
    blocked phase and record the selected path in `docs/CHANGELOG.md`.
-5. If the host environment exposes an interactive permission or choice UI, use
-   that UI so the prompt continues automatically after selection. If no such UI
-   is available, emit the question as the only response and resume immediately
-   when the operator replies with the selected option.
+5. If the host environment exposes a native interactive permission or choice
+   popup, use that popup so the prompt continues automatically after selection.
+   Include any external-app recovery commands in the popup body. If no such UI
+   is available in the current mode, log that fact and emit the question as a
+   non-terminal plain-text fallback; resume immediately when the operator
+   replies with the selected option.

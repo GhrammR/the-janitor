@@ -5,6 +5,7 @@ repo_url: https://github.com/janitor-security/the-janitor
 repo_name: janitor-security/the-janitor
 
 exclude_docs: |
+  CHANGELOG.md
   grant_strategy.md
   bugcrowd_payout_strategy.md
 
@@ -38,7 +39,6 @@ nav:
   - Pricing FAQ: pricing_faq.md
   - Terms: terms.md
   - Privacy: privacy.md
-  - Release Changelog: CHANGELOG.md
 
 markdown_extensions:
   - admonition

@@ -11,7 +11,7 @@ Deploy the Governor service to Fly.io production.
 ## Mapped command
 
 ```bash
-cd ~/dev/the-governor && fly deploy -a the-governor --config fly.toml --dockerfile Dockerfile .
+cd ~/dev/the-governor && /home/ghrammr/.fly/bin/flyctl auth whoami && /home/ghrammr/.fly/bin/flyctl deploy -a the-governor --config fly.toml --dockerfile Dockerfile .
 ```
 
 ## What this does
@@ -23,7 +23,11 @@ deploys it to the `the-governor` Fly.io application using the project's
 ## Preconditions
 
 - `~/dev/the-governor/` must exist and be on the correct commit.
-- `fly` CLI must be authenticated (`fly auth whoami`).
+- Fly CLI must be authenticated:
+  `/home/ghrammr/.fly/bin/flyctl auth whoami` must print the operator account
+  email. If it prints `no access token available` or exits non-zero, trigger
+  Crossroads Waiting through the native popup and place
+  `/home/ghrammr/.fly/bin/flyctl auth login` in Option A.
 - Any schema migrations required by the new Governor version must be staged
   in the migration files — the deploy does NOT run ad-hoc SQL.
 

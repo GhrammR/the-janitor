@@ -175,6 +175,28 @@ python3 -m venv ~/.local/share/janitor-tools/z3-venv
 ln -sf ~/.local/share/janitor-tools/z3-venv/bin/z3 ~/.local/bin/z3
 ```
 
+## Fly deployment preflight
+
+Governor deploys are blocked until Fly authentication is visible to the agent:
+
+```bash
+/home/ghrammr/.fly/bin/flyctl auth whoami
+```
+
+Expected healthy output is the authenticated Fly account email. If it fails or
+prints `no access token available`, invoke Crossroads Waiting with Option A as
+the recommended default and include this external recovery command inside the
+native popup:
+
+```bash
+/home/ghrammr/.fly/bin/flyctl auth login
+```
+
+If the host does not expose the native popup in the current mode, record that
+the popup was unavailable, emit the same A/B/C checkpoint as a non-terminal
+fallback, and resume the deploy immediately after the operator confirms the
+login is complete.
+
 ## Adding new checks
 
 The diagnostic script is intentionally short and grep-friendly. To add a check:

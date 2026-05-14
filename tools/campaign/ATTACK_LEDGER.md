@@ -1216,3 +1216,47 @@ tenant-scoping invariant. Pairs with `.INNOVATION_LOG.md` P2-15.
 3. **Crucible regression gate:** each campaign requires a true-positive AND a true-negative fixture in `crates/crucible/`. No detector ships without both.
 4. **Wasm policy export:** detectors emit Wasm-deployable policies so customer-private extensions can layer additional rules without modifying the core engine.
 5. **Zero-upload preserved:** every detector here operates on local source. Provider-taxonomy and KEV correlation are offline lookups against rkyv-baked snapshots refreshed via `janitor update-wisdom`.
+
+\---
+
+## ARTICLE_REVIEW Threat Patterns — 2026-05-14
+
+### AI-Orchestrated IT-to-OT Boundary Pressure
+
+**Source mapping:** AR-2026-05-14-011.
+
+**Pattern:** An agentic attack operator uses an LLM to enumerate IT assets,
+write exploitation scaffolding, and recommend OT gateway attack steps. The
+commercially relevant invariant is that mature segmentation, secure remote
+access, asset visibility, and authentication boundaries stop the attack even
+when the agent accelerates discovery and tooling.
+
+**Detector implication:** P2-22 witnesses must record tool intent, attempted
+privilege/domain transition, and the control that blocked the transition rather
+than treating every failed AI-assisted step as noise.
+
+### Destructive AI Agent Production-Control Access
+
+**Source mapping:** AR-2026-05-14-012.
+
+**Pattern:** A coding agent with broad cloud/database credentials can execute
+irreversible production actions despite natural-language freezes or policy
+prompts. The missing invariant is a machine-enforced separation between
+development automation, production destructive verbs, and backup control
+planes.
+
+**Detector implication:** P2-22 witnesses should flag tool-intent divergence
+when an AI-controlled path reaches deletion, volume wipe, database drop, or
+backup mutation APIs without a typed human-approval gate.
+
+### Active CMS Code-Injection CVE Routing
+
+**Source mapping:** AR-2026-05-14-013.
+
+**Pattern:** Actively exploited unauthenticated code-injection CVEs provide
+high-confidence seeds for proof-obligation translation because exploitability
+is externally validated and sink semantics are concrete.
+
+**Detector implication:** P2-20 proof summaries should attach CVE/CWE metadata,
+affected-version predicates, and deterministic TP/TN fixtures to code-generation
+sink models without making the verdict network-dependent.

@@ -75,6 +75,27 @@ Required tools and durable remediation:
 `just audit` runs this preflight before Kani harnesses. Missing tools fail fast
 with the exact remediation command instead of silently skipping formal checks.
 
+### Governor Deployment Preflight
+
+Before any Governor deploy, verify the Fly.io session is live:
+
+```sh
+/home/ghrammr/.fly/bin/flyctl auth whoami
+```
+
+Healthy output is the authenticated operator email. If the command exits
+non-zero or prints `no access token available`, enter the Crossroads Waiting
+checkpoint and use Option A with:
+
+```sh
+/home/ghrammr/.fly/bin/flyctl auth login
+```
+
+The Crossroads prompt must use the host-native popup when available and include
+the external login command in the popup body. If no popup exists in the current
+mode, the agent records that fallback and resumes the same deploy phase after
+the operator authenticates.
+
 If findings exist, a SARIF report is uploaded to GitHub Code Scanning with inline
 annotations in the PR diff. For clean PRs, a CycloneDX v1.5 Integrity Bond signed
 with ML-DSA-65 is issued automatically — no token flag or manual step.

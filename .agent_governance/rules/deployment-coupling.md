@@ -28,6 +28,13 @@ Failure to deploy the Governor after an API contract change leaves the live
 Check Run system operating on a stale binary — a silent divergence that
 manifests only under real PR traffic.
 
+Before any Governor deployment, run `flyctl auth whoami` (or the durable
+absolute path `/home/ghrammr/.fly/bin/flyctl auth whoami`). If it fails, enter
+Crossroads Waiting immediately with the native popup when available. Option A
+must instruct the operator to run `flyctl auth login` and verify the expected
+healthy output is the authenticated Fly account email. Record whether the
+native popup was shown or whether the plain-text fallback was used.
+
 ### Law III — Docs Deployment
 If you modify any `.md` file in `docs/`, you **MUST** execute `/deploy-docs`
 before concluding the session.
@@ -71,7 +78,8 @@ leave docs temporarily wrong are not.
 Before ending any session, verify:
 
 - [ ] Did any commit in this session bump `Cargo.toml` version? → `/release` proposed
-- [ ] Did any commit touch Governor API contracts? → `/deploy-gov` queued
+- [ ] Did any commit touch Governor API contracts? → Fly auth preflight passed,
+      then `/deploy-gov` queued
 - [ ] Did any commit modify `docs/*.md`? → `/deploy-docs` executed
 - [ ] Did any commit add/modify/remove a feature? → `rg <feature_name> docs/` run, stale claims resolved
 
