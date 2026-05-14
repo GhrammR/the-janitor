@@ -27,6 +27,7 @@ implemented as a result.
 
 - `crates/common/src/slop.rs` *(modified)* — added typed `MemorySafetyWitness` and `AgentDeceptionWitness` fields to `ExploitWitness`.
 - `crates/forge/src/exploitability.rs` *(modified)* — added deterministic `CrossLanguageMemoryWitness/v1` and `AgentDeceptionWitness/v1` repro synthesis, plus a visible pickle canary for Z3-backed deserialization proof tests.
+- `crates/forge/src/reflexive_assurance.rs` *(modified)* — updated Kani harnesses for Kani 0.67: symbolic `Severity` generation now uses a bounded discriminant, and all `kani::assert` calls include mandatory messages.
 - `crates/cli/src/hunt.rs` *(modified)* — routed protobuf Any, public FFI unsafe deref, C double-free, LCM, intent-divergence, swarm-exfiltration, and agent-intent findings through typed witnesses before ledger promotion.
 - `docs/bugcrowd_payout_strategy.md` *(modified)* — tied P2-18, P2-15, P2-20, P2-21, and P2-22 to acceptance-rate and payout-probability levers with weekly KPIs.
 
@@ -51,6 +52,7 @@ implemented as a result.
 - `shellcheck tools/toolchain-preflight.sh` ✓.
 - `python3 -c "import yaml; ..."` ✓ — parsed changed workflow and MkDocs files.
 - `/tmp/janitor-mkdocs-venv/bin/python -m mkdocs build --strict` ✓ — `site/security/index.html` present; internal grant and payout pages absent.
+- `just audit` ✓ — full workspace fmt/clippy/check/tests/doc-tests/release parity/doc parity/toolchain preflight/Kani harness gate passed with Kani 0.67, Z3 4.16, and ShellCheck 0.10.0.
 
 ## 2026-05-13 — Sprint Batch 140: Crossroads Waiting, Site Hygiene, and Health Signals
 

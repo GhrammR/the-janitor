@@ -36,8 +36,16 @@ mod kani_proofs {
     /// integer overflow is possible because all arms are constant literals.
     #[kani::proof]
     fn severity_points_no_panic_and_bounded() {
-        // kani::any::<Severity>() generates all enum discriminants symbolically.
-        let sev: Severity = kani::any();
+        let idx: u8 = kani::any();
+        kani::assume(idx < 6);
+        let sev = match idx {
+            0 => Severity::KevCritical,
+            1 => Severity::Exhaustion,
+            2 => Severity::Critical,
+            3 => Severity::High,
+            4 => Severity::Warning,
+            _ => Severity::Lint,
+        };
         let pts = sev.points();
         // Verify the output is within the known bounded range.
         kani::assert(pts <= 150, "points() must not exceed 150 (KevCritical cap)");
@@ -75,7 +83,10 @@ mod kani_proofs {
         let has_untrusted_input: bool = kani::any();
         let has_guard: bool = kani::any();
         let fired = trust_prioritization_missing(has_query, has_untrusted_input, has_guard);
-        kani::assert(fired == (has_query && has_untrusted_input && !has_guard));
+        kani::assert(
+            fired == (has_query && has_untrusted_input && !has_guard),
+            "embedding trust gate must be exact",
+        );
     }
 
     /// Prove the non-interference gate never fires when a declassification
@@ -101,6 +112,7 @@ mod kani_proofs {
                     && has_privileged_tool
                     && tool_after_extraction
                     && !has_gate),
+            "prompt-tool noninterference gate must be exact",
         );
     }
 
@@ -111,7 +123,10 @@ mod kani_proofs {
         let requires_proof: bool = kani::any();
         let has_proof_class: bool = kani::any();
         let fired = proof_obligation_missing(requires_proof, has_proof_class);
-        kani::assert(fired == (requires_proof && !has_proof_class));
+        kani::assert(
+            fired == (requires_proof && !has_proof_class),
+            "proof obligation gate must be exact",
+        );
     }
 
     /// Prove the DMA revocation detector fires only when revoke occurs after
@@ -137,6 +152,7 @@ mod kani_proofs {
                     && has_revoke
                     && revoke_after_activity
                     && !unmap_after_revoke),
+            "DMA revocation gate must be exact",
         );
     }
 }
