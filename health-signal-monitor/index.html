@@ -366,26 +366,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../grant_strategy/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grant Strategy
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -418,10 +398,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -432,8 +412,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -810,6 +790,11 @@ cannot push code, modify protected branches, or alter CI configuration.</p>
 <td>Issue never auto-closes after recovery</td>
 <td>The recovering run was a <code>cancelled</code> or <code>skipped</code>, not <code>success</code></td>
 <td>Issue must be closed manually; cancellations don't count as recovery</td>
+</tr>
+<tr>
+<td>Toolchain outage issue opened</td>
+<td>Kani, Z3, or ShellCheck is missing from a durable path</td>
+<td>Run <code>just toolchain-preflight</code>; install Z3 under <code>~/.local/share/janitor-tools/z3-venv</code>, not <code>/tmp</code></td>
 </tr>
 </tbody>
 </table>

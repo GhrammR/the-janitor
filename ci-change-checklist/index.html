@@ -366,26 +366,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../grant_strategy/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grant Strategy
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -418,10 +398,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -432,8 +412,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -612,6 +592,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#structural-gate-slicing-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      Structural Gate Slicing Protocol
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#local-validation-script" class="md-nav__link">
     <span class="md-ellipsis">
       Local validation script
@@ -664,6 +653,11 @@ list eliminates the most common preventable causes.</p>
 <h2 id="pre-merge-checklist">Pre-merge checklist</h2>
 <p>Tick each item before requesting review:</p>
 <ul>
+<li>[ ] <strong>Structural slice is narrow.</strong> If a PR touches governance, workflows,
+  detector code, docs, and ledgers at once, split it before review. The
+  Structural Firewall intentionally rejects broad diffs because high blast
+  radius hides proof loss and makes check-run terminality harder to reason
+  about.</li>
 <li>[ ] <strong>YAML parses.</strong> Run <code>python3 -c "import yaml; yaml.safe_load(open('&lt;file&gt;'))"</code> against every changed file.</li>
 <li>[ ] <strong>actionlint clean.</strong> Run <code>actionlint .github/workflows/*.yml</code> (the Workflow Lint job runs this on every PR — green = sufficient). <code>action.yml</code> is YAML-validated separately because it is a composite-action schema, not a workflow schema.</li>
 <li>[ ] <strong>All <code>uses:</code> are SHA-pinned or <code>./</code>.</strong> Major-version floats (<code>@v4</code>, <code>@main</code>) are rejected by the Workflow Lint job's SHA-pin step.</li>
@@ -686,6 +680,21 @@ workflow files:</p>
 </ol>
 <p>You do <strong>not</strong> need to run these locally — the PR check is authoritative —
 but running them locally catches issues before pushing.</p>
+<h2 id="structural-gate-slicing-protocol">Structural Gate Slicing Protocol</h2>
+<p>Keep the structural gate strict. Tune thresholds only after a detector produces
+a reproducible false positive on a narrow PR. Split instead when a change spans
+two or more of these surfaces:</p>
+<ul>
+<li>GitHub workflow or action behavior.</li>
+<li>Governance rules or response-format law.</li>
+<li>Rust detector, witness, or ledger-routing code.</li>
+<li>Public website content or MkDocs navigation.</li>
+<li>Campaign ledgers or target selection state.</li>
+</ul>
+<p>Evidence from the 2026-05-13 incident: broad all-at-once branches triggered
+<code>architecture:blast_radius_violation</code> while staged, single-purpose slices passed
+with stable Merkle roots. The standard operating method is PR slicing, not
+weakening the firewall.</p>
 <h2 id="local-validation-script">Local validation script</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># YAML syntax</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>.github/workflows/*.yml<span class="w"> </span>action.yml<span class="p">;</span><span class="w"> </span><span class="k">do</span>

@@ -370,26 +370,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../grant_strategy/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Grant Strategy
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../intelligence/" class="md-nav__link">
         
   
@@ -422,10 +402,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -436,8 +416,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Intelligence Reports
           </label>
@@ -918,6 +898,10 @@
 <p><em>Keywords: MCP registry, Model Context Protocol, enterprise AI tooling, LangGraph, Azure MCP Center, internal AI agent, autonomous code governance.</em></p>
 <p>Janitor Sentinel ships a machine-readable <code>mcp-manifest.json</code> at the repository root. Platform engineers can ingest this manifest directly into any enterprise MCP registry — Azure MCP Center, a LangGraph tool router, a custom OpenAI function registry, or any orchestrator that speaks the Model Context Protocol — to grant internal AI agents autonomous access to the structural firewall.</p>
 <p><strong>Why this matters</strong>: once registered, any internal AI agent (Copilot Workspace, a LangGraph orchestrator, a Claude-powered code review bot) can call <code>janitor_bounce</code> before proposing a merge, <code>janitor_silo_audit</code> after updating dependencies, or <code>janitor_visualize_ledger</code> when generating an executive security report — without any human in the loop and without any code leaving the environment.</p>
+<p><strong>Evaluation signal</strong>: grant and pilot reviewers can reproduce the integration by
+registering the manifest, running <code>janitor_bounce</code> against a controlled PR diff,
+and verifying that the tool returns a deterministic pass/fail verdict without
+uploading source code.</p>
 <h3 id="manifest-location">Manifest location</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://raw.githubusercontent.com/janitor-security/the-janitor/main/mcp-manifest.json
 </code></pre></div>
