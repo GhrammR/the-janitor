@@ -76,10 +76,7 @@
 //! memory observer from the scanning hot-path: a rayon pool processing 100
 //! PRs/sec issues ≤ 10 sysinfo reads/sec instead of 100.
 
-use std::sync::{
-    atomic::{AtomicU8, Ordering},
-    OnceLock,
-};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::time::{Duration, Instant};
 
 use sysinfo::System;
@@ -589,7 +586,7 @@ static GLOBAL_PULSE: AtomicU8 = AtomicU8::new(0);
 
 /// One-time sentinel that ensures the background heart thread is started
 /// at most once regardless of how many callers invoke [`start_background_heart`].
-static HEART_STARTED: OnceLock<()> = OnceLock::new();
+static HEART_STARTED: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 fn pulse_to_u8(p: Pulse) -> u8 {
@@ -630,19 +627,27 @@ pub fn global_pulse() -> Pulse {
 ///
 /// The thread is named `physarum-heart` and runs until process exit.
 pub fn start_background_heart() {
-    HEART_STARTED.get_or_init(|| {
-        std::thread::Builder::new()
-            .name("physarum-heart".to_owned())
-            .spawn(|| {
-                let heart = SystemHeart::new();
-                loop {
-                    let pulse = heart.beat();
-                    GLOBAL_PULSE.store(pulse_to_u8(pulse), Ordering::Relaxed);
-                    std::thread::sleep(Duration::from_millis(MELANIN_REFRESH_MS));
-                }
-            })
-            .expect("physarum: failed to spawn background heart thread");
-    });
+    if HEART_STARTED
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return;
+    }
+
+    if let Err(err) = std::thread::Builder::new()
+        .name("physarum-heart".to_owned())
+        .spawn(|| {
+            let heart = SystemHeart::new();
+            loop {
+                let pulse = heart.beat();
+                GLOBAL_PULSE.store(pulse_to_u8(pulse), Ordering::Relaxed);
+                std::thread::sleep(Duration::from_millis(MELANIN_REFRESH_MS));
+            }
+        })
+    {
+        HEART_STARTED.store(false, Ordering::Release);
+        eprintln!("physarum: failed to spawn background heart thread: {err}");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,7 +1027,7 @@ mod tests {
     #[test]
     fn test_start_background_heart_idempotent() {
         // Calling start_background_heart multiple times must not panic or
-        // spawn extra threads — the OnceLock guarantees single execution.
+        // spawn extra threads.
         start_background_heart();
         start_background_heart();
         start_background_heart();

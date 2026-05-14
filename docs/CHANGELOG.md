@@ -57,8 +57,9 @@ implemented as a result.
 ### Follow-up Oracle Drift Patch
 
 - `crates/cli/src/daemon.rs` *(modified)* — made `HotRegistry::reload` live by reloading the daemon registry on push-event scans, removed dead-code suppressors around the reload path, and eliminated the avoidable `author.clone()` during bounce-log response assembly.
+- `crates/common/src/physarum.rs` *(modified)* — replaced the non-test background-heart `expect` with a fallible spawn path that resets the idempotence guard on failure and reports the startup error without panicking.
 
-**Verification**: `cargo fmt --all -- --check` ✓; `cargo test -p cli daemon -- --test-threads=1` ✓; `cargo clippy -p cli -- -D warnings` ✓.
+**Verification**: `cargo fmt --all -- --check` ✓; `cargo test -p cli daemon -- --test-threads=1` ✓; `cargo clippy -p cli -- -D warnings` ✓; `cargo test -p common physarum -- --test-threads=1` ✓; `cargo clippy -p common -- -D warnings` ✓.
 
 ## 2026-05-13 — Sprint Batch 140: Crossroads Waiting, Site Hygiene, and Health Signals
 
