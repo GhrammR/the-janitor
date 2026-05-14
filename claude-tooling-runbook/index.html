@@ -721,6 +721,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fly-deployment-preflight" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fly deployment preflight
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adding-new-checks" class="md-nav__link">
     <span class="md-ellipsis">
       Adding new checks
@@ -944,6 +953,20 @@ Claude conveniences. They must live in durable paths and pass:</p>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>~/.local/share/janitor-tools/z3-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip<span class="w"> </span>z3-solver
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>ln<span class="w"> </span>-sf<span class="w"> </span>~/.local/share/janitor-tools/z3-venv/bin/z3<span class="w"> </span>~/.local/bin/z3
 </code></pre></div>
+<h2 id="fly-deployment-preflight">Fly deployment preflight</h2>
+<p>Governor deploys are blocked until Fly authentication is visible to the agent:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>/home/ghrammr/.fly/bin/flyctl<span class="w"> </span>auth<span class="w"> </span>whoami
+</code></pre></div>
+<p>Expected healthy output is the authenticated Fly account email. If it fails or
+prints <code>no access token available</code>, invoke Crossroads Waiting with Option A as
+the recommended default and include this external recovery command inside the
+native popup:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>/home/ghrammr/.fly/bin/flyctl<span class="w"> </span>auth<span class="w"> </span>login
+</code></pre></div>
+<p>If the host does not expose the native popup in the current mode, record that
+the popup was unavailable, emit the same A/B/C checkpoint as a non-terminal
+fallback, and resume the deploy immediately after the operator confirms the
+login is complete.</p>
 <h2 id="adding-new-checks">Adding new checks</h2>
 <p>The diagnostic script is intentionally short and grep-friendly. To add a check:</p>
 <ol>
