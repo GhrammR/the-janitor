@@ -59,6 +59,7 @@ pub mod idor;
 pub mod ifds;
 pub mod intent_divergence;
 pub mod invisible_payload;
+pub mod java_deser_guard;
 pub mod kani_bridge;
 pub mod labyrinth;
 pub mod legacy_c_mining;

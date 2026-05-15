@@ -26,6 +26,7 @@ mod kani_proofs {
     use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
+    use crate::java_deser_guard::deser_missing_allowlist;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
     use crate::noninterference::declassification_gate_missing;
@@ -185,6 +186,19 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
+    /// fires iff a decoder is present AND an allowlist suppressor is absent.
+    #[kani::proof]
+    fn deser_gate_is_exact() {
+        let has_decoder: bool = kani::any();
+        let has_allowlist: bool = kani::any();
+        let fired = deser_missing_allowlist(has_decoder, has_allowlist);
+        kani::assert(
+            fired == (has_decoder && !has_allowlist),
+            "java deser allowlist-bypass gate must be exact conjunction",
+        );
+    }
+
     /// Prove the MCP confused-deputy predicate is an exact conjunction:
     /// fires iff dispatch is present AND secret verification is absent.
     ///
@@ -212,6 +226,7 @@ mod tests {
     use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
+    use crate::java_deser_guard::deser_missing_allowlist;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::noninterference::declassification_gate_missing;
     use crate::proof_obligation::proof_obligation_missing;
@@ -298,5 +313,13 @@ mod tests {
         assert!(!dma_shadow_access_missing_revocation_dominance(
             true, true, true, true, true
         ));
+    }
+
+    #[test]
+    fn deser_gate_requires_decoder_and_missing_allowlist() {
+        assert!(deser_missing_allowlist(true, false));
+        assert!(!deser_missing_allowlist(true, true));
+        assert!(!deser_missing_allowlist(false, false));
+        assert!(!deser_missing_allowlist(false, true));
     }
 }

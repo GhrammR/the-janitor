@@ -3747,6 +3747,12 @@ fn scan_buffer(
         Some(label),
         source_str,
     ));
+    findings.extend(forge::ffi_taint::detect_ffi_boundary_violations(
+        source_str, label,
+    ));
+    findings.extend(forge::java_deser_guard::emit_java_deser_findings(
+        source_str, label,
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
