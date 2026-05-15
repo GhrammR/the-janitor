@@ -3,6 +3,18 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-14 — Sprint Batch 128: Dead-Module Resurrection & Linker/Debug Guards
+
+* `crates/cli/src/hunt.rs` *(modified)* — wired four previously dead detector modules into `scan_buffer`: `mcp_dispatch_guard`, `workflow_evidence`, `debug_endpoint_guard`, and `linker_hijack` (5-line insertion after `idor::scan_source`). All four were registered in `forge/src/lib.rs` but had zero callers in production scanning.
+* `crates/forge/src/debug_endpoint_guard.rs` *(created)* — P2-27: AhoCorasick on 10 debug/actuator/diagnostic route sink patterns; ±15-line auth-suppressor check (`@login_required`, `@Secured`, `@PreAuthorize`, `authenticate(`); emits `security:unauthenticated_debug_endpoint` at KevCritical; 9 TP/TN tests (Flask, Spring Actuator, auth-outside-window fixtures); Kani harness `debug_endpoint_gate_is_exact()` + regression in `reflexive_assurance.rs`.
+* `crates/forge/src/linker_hijack.rs` *(created)* — P2-26: AhoCorasick on `LD_PRELOAD=`, `/etc/ld.so.conf`, `systemctl enable`, `echo >> .bashrc`; ±5-line `sha256sum`/`cosign verify`/`openssl dgst` attestation suppressor; dual finding emission `security:ld_preload_injection` (KevCritical) + `security:ci_persistence_vector` (Critical); 9 tests; Kani harness `linker_hijack_gate_is_exact()` + regression in `reflexive_assurance.rs`.
+* `crates/forge/src/lib.rs` *(modified)* — registered `debug_endpoint_guard` and `linker_hijack` modules.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added `linker_hijack_gate_is_exact` and `debug_endpoint_gate_is_exact` Kani harnesses; added corresponding regression tests; now has 9 Kani harnesses + 9 regression tests total.
+* `.INNOVATION_LOG.md` *(modified)* — P2-26 and P2-27 blocks hard-deleted (shipped).
+* `docs/CHANGELOG.md` *(modified)* — this entry.
+
+**Verification**: `cargo test -p forge debug_endpoint_guard -- --test-threads=1` ✓ (9/9); `cargo test -p forge linker_hijack -- --test-threads=1` ✓ (9/9); `cargo test -p forge reflexive_assurance -- --test-threads=1` ✓ (9/9); `cargo check -p cli` ✓; `just audit` ✓; commit `679c328` pushed to `codex/crossroads-site-health`.
+
 ## 2026-05-14 — Sprint Batch 141: Terminality Root Cause, Durable Toolchain, and Witness Schemas
 
 **Directive:** Fix the app-owned Janitor Integrity Check terminality defect, make Kani/Z3/ShellCheck permanent instead of temporary fallbacks, keep structural gate strict with a PR slicing policy, resolve dependency backlog evidence, keep MkDocs canonical, implement P2-21/P2-22 witness upgrades, activate ARTICLE_REVIEW, update final-report governance, and publish required changes where credentials permit.
