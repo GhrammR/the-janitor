@@ -197,6 +197,9 @@ fast-release version:
 	    echo "error: GPG signing key is locked; run gpg-unlock or export JANITOR_GPG_PASSPHRASE before just fast-release {{version}}" >&2
 	    exit 1
 	fi
+	# Bump workspace version in Cargo.toml to the release target BEFORE sync-versions reads it.
+	sed -i "s/^version = \".*\"/version = \"{{version}}\"/" Cargo.toml
+	echo "→ Cargo.toml version set to {{version}}"
 	just sync-versions
 	# Idempotent audit gate: skip test suite if crates/ is unchanged since last audit.
 	CURRENT_HASH="$(find crates/ -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
@@ -246,7 +249,7 @@ fast-release version:
 	git tag -s v{{version}} -m "release v{{version}}" || { echo "FATAL: Tag failed."; exit 1; }
 	MAJOR="$(echo "{{version}}" | cut -d. -f1)"
 	git tag -fa "v${MAJOR}" -m "v${MAJOR} → v{{version}}"
-	git checkout -b "release/v{{version}}"
+	git checkout -B "release/v{{version}}"
 	git push origin "release/v{{version}}" "v{{version}}"
 	git push origin "v${MAJOR}" --force
 	RELEASE_PR_URL="$(gh pr create \

@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:2103782f-0397-4f6d-8cd1-ca0039ba20e4",
+  "serialNumber": "urn:uuid:d32d6e42-8dd4-4d4c-b12d-a5fac4c4904c",
   "metadata": {
-    "timestamp": "2026-05-15T07:51:48.389008310Z",
+    "timestamp": "2026-05-15T19:17:49.276608269Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.0-rc.4",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.2",
       "name": "reaper",
-      "version": "10.2.0-rc.4",
+      "version": "10.2.2",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/reaper@10.2.0-rc.4?download_url=file://.",
+      "purl": "pkg:cargo/reaper@10.2.2?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.0-rc.4 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.2 bin-target-0",
           "name": "reaper",
-          "version": "10.2.0-rc.4",
-          "purl": "pkg:cargo/reaper@10.2.0-rc.4?download_url=file://.#src/lib.rs"
+          "version": "10.2.2",
+          "purl": "pkg:cargo/reaper@10.2.2?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -50,16 +50,16 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.0-rc.4",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.2",
       "name": "vault",
-      "version": "10.2.0-rc.4",
+      "version": "10.2.2",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/vault@10.2.0-rc.4?download_url=file://../vault",
+      "purl": "pkg:cargo/vault@10.2.2?download_url=file://../vault",
       "externalReferences": [
         {
           "type": "vcs",
@@ -3773,7 +3773,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.0-rc.4",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/reaper#10.2.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#aho-corasick@1.1.4",
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
@@ -3785,11 +3785,11 @@
         "registry+https://github.com/rust-lang/crates.io-index#sha2@0.11.0",
         "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18",
         "registry+https://github.com/rust-lang/crates.io-index#ureq@3.3.0",
-        "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.0-rc.4"
+        "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.2"
       ]
     },
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.0-rc.4",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/vault#10.2.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
         "registry+https://github.com/rust-lang/crates.io-index#ed25519-dalek@2.2.0",
