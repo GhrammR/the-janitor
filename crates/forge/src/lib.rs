@@ -107,6 +107,7 @@ pub mod taint_propagate;
 pub mod toctou;
 pub mod toolchain_degradation;
 pub mod vector_topology;
+pub mod mcp_dispatch_guard;
 pub mod wasm_host;
 pub mod workflow_evidence;
 

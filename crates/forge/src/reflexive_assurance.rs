@@ -25,6 +25,7 @@
 mod kani_proofs {
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
+    use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
     use crate::noninterference::declassification_gate_missing;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
@@ -153,6 +154,23 @@ mod kani_proofs {
                     && revoke_after_activity
                     && !unmap_after_revoke),
             "DMA revocation gate must be exact",
+        );
+    }
+
+    /// Prove the MCP confused-deputy predicate is an exact conjunction:
+    /// fires iff dispatch is present AND secret verification is absent.
+    ///
+    /// Safety property: no aliased session resolution is possible under
+    /// a correct guard — the predicate never fires when `has_secret_verify`
+    /// is true, regardless of `has_dispatch`.
+    #[kani::proof]
+    fn mcp_confused_deputy_gate_is_exact() {
+        let has_dispatch: bool = kani::any();
+        let has_secret_verify: bool = kani::any();
+        let fired = session_dispatch_missing_secret_check(has_dispatch, has_secret_verify);
+        kani::assert(
+            fired == (has_dispatch && !has_secret_verify),
+            "MCP confused-deputy gate must be exact conjunction",
         );
     }
 }
