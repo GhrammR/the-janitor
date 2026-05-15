@@ -3743,6 +3743,10 @@ fn scan_buffer(
     findings.extend(forge::linker_hijack::emit_linker_hijack_findings(
         source_str, label,
     ));
+    findings.extend(forge::financial_pii::emit_financial_pii_to_llm_findings(
+        Some(label),
+        source_str,
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
