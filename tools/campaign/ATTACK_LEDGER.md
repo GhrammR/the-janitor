@@ -1260,3 +1260,63 @@ is externally validated and sink semantics are concrete.
 **Detector implication:** P2-20 proof summaries should attach CVE/CWE metadata,
 affected-version predicates, and deterministic TP/TN fixtures to code-generation
 sink models without making the verdict network-dependent.
+
+---
+
+## MCP Confused-Deputy Tool-Dispatch Attack
+
+**Source mapping:** CVP_RED_TEAM-2026-05-14 (Sovereign Directive Phase 7).
+
+**Class:** AI Transport Confused Deputy / Cross-Tenant Session Poisoning
+
+**Threat profile:** A multi-tenant MCP (Model Context Protocol) server that
+multiplexes multiple agent sessions over a single stdio or Unix-socket channel
+is vulnerable to a confused-deputy attack. An attacker agent floods the
+tool-dispatch queue with high-frequency innocuous calls that establish a
+predictable per-slot timing pattern. Because MCP's JSON-RPC 2.0 framing
+mandates no per-call session-token binding at the transport layer, the server's
+in-flight context window (including the victim session's tool-grant list and
+privilege scope) is accessible to a crafted call that arrives when the
+victim-session router slot is active. The attacker reads or mutates tool
+grants belonging to a victim tenant without possessing that tenant's API key.
+
+**Attack vector (bounded — pure Rust, zero cloud dependency):**
+1. Attacker agent sends N calls/sec via its own valid session, saturating the
+   dispatcher's round-robin slot budget.
+2. At tick T, the attacker injects a `tools/call` JSON-RPC frame with
+   `id: <victim_session_id>` rather than its own session ID.
+3. The dispatcher's stateless routing map (`HashMap<id, session_handle>`) may
+   resolve the victim's context if the victim submitted a long-running call at
+   T-1 and the response slot is still live.
+4. The attacker receives the victim session's tool-execution result —
+   exfiltrating read-only data or triggering a state-mutating tool call with
+   the victim's elevated grant.
+
+**Structural AST / IFDS defense:**
+- Taint: `JsonRpc::id` field extraction → dispatcher lookup → session context
+  resolution. If the lookup function does not perform `session_secret(call) ==
+  session_secret(stored_context)` before dispatch, emit
+  `security:mcp_confused_deputy_dispatch`.
+- Detect: MCP server implementations (`mcp-server`, `modelcontextprotocol`)
+  that share a single Tokio `select!` loop across multiple sessions without
+  per-call credential re-verification. Flag via AhoCorasick pattern on
+  `handle_request`, `route_tool_call`, `dispatch`, or `invoke_tool` in
+  Rust/TypeScript/Python MCP server source.
+- Kani proof: for all symbolic `(call_id, session_map)`, prove that
+  `resolve_session(call_id, &session_map)` always returns the session whose
+  stored ID equals `call_id` — no aliased resolution allowed.
+- Emit: `security:mcp_confused_deputy_dispatch` at `KevCritical` severity
+  when: (a) the server multiplexes sessions, (b) session lookup is by
+  caller-supplied ID, and (c) no session secret / HMAC re-check precedes
+  the dispatch.
+
+**Bounty TAM:** Any platform exposing a multi-tenant MCP endpoint (Cursor,
+Claude.ai Teams, Sourcegraph Cody, GitHub Copilot MCP extensions). Each
+confirmed confused-deputy escalation in a multi-tenant LLM platform is a
+$10k–$50k Critical bounty. 50+ platforms in scope.
+
+**P-tier proposal:** P2-24 — MCP Confused-Deputy Dispatch Detector. Rust
+module: `crates/forge/src/mcp_dispatch_guard.rs`. Kani harness:
+`crates/forge/src/reflexive_assurance.rs`. TP fixture: mock MCP server with
+aliased session dispatch. TN fixture: MCP server with per-call HMAC
+re-verification.

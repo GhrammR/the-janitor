@@ -108,6 +108,7 @@ pub mod toctou;
 pub mod toolchain_degradation;
 pub mod vector_topology;
 pub mod wasm_host;
+pub mod workflow_evidence;
 
 use tree_sitter::Node;
 

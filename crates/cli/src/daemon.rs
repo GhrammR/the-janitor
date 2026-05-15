@@ -453,7 +453,6 @@ pub mod unix {
                             forge::pr_collider::PrDeltaSignature::from_bytes(patch.as_bytes());
                         let near_matches = state.lsh_index.query(&sig, 0.85);
                         score.logic_clones_found += near_matches.len() as u32;
-                        let collided_pr_numbers_response = near_matches.clone();
                         let min_hashes = sig.min_hashes.to_vec();
                         // Insert for future comparisons — daemon has no PR number context.
                         state.lsh_index.insert(sig, 0);
@@ -474,11 +473,8 @@ pub mod unix {
                         let slop_score = score.score();
                         let antipatterns_count = score.antipatterns_found;
                         let zombie_symbols_added = score.zombie_symbols_added;
-                        // Clone detail strings before move into BounceLogEntry so
-                        // the same Vec can be forwarded in DaemonResponse::Report.
-                        let antipattern_details = score.antipattern_details.clone();
                         // P3-4 Phase A: emit SIEM events for every security finding.
-                        for detail in &antipattern_details {
+                        for detail in &score.antipattern_details {
                             if detail.starts_with("security:") {
                                 state.emit_siem_event(detail);
                             }
@@ -491,7 +487,7 @@ pub mod unix {
                             &score.antipattern_details,
                             &near_matches,
                         );
-                        let log_entry = crate::report::BounceLogEntry {
+                        let mut log_entry = crate::report::BounceLogEntry {
                             execution_tier: "Community".to_string(),
                             pr_number: None,
                             author,
@@ -536,8 +532,10 @@ pub mod unix {
                             slop_score: slop_score as f64,
                             zombies: zombie_symbols_added,
                             antipatterns: antipatterns_count,
-                            antipattern_details,
-                            collided_pr_numbers: collided_pr_numbers_response,
+                            antipattern_details: std::mem::take(&mut log_entry.antipatterns),
+                            collided_pr_numbers: std::mem::take(
+                                &mut log_entry.collided_pr_numbers,
+                            ),
                             is_vouched,
                         }
                     }
