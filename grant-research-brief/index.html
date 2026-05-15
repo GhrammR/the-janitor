@@ -1,0 +1,921 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Structural Firewall for AI-Generated Code. Dual-PQC Attestation. SLSA Level 4. Zero-Upload. On-Device.">
+      
+      
+      
+        <link rel="canonical" href="https://thejanitor.app/grant-research-brief/">
+      
+      
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.50">
+    
+    
+      
+        <title>The Janitor — Research Contributions & Grant Brief - The Janitor</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.a40c8224.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto Mono";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  
+  <!--
+    Content Security Policy — defence-in-depth for a static documentation site.
+
+    Threat model: prevent injected <script> payloads from loading external code
+    or exfiltrating data, should any content-injection path reach the rendered HTML.
+
+    Directives:
+      script-src 'self' 'unsafe-inline'  — mkdocs-material 9.x uses inline scripts
+                                           for search configuration; 'self' blocks all
+                                           external script sources.
+      connect-src 'self'                 — blocks XHR/fetch data-exfiltration to
+                                           foreign origins.
+      frame-ancestors 'none'             — clickjacking prevention.
+      base-uri 'self'                    — blocks <base href="…"> injection attacks.
+      form-action 'none'                 — static docs site has no forms.
+      worker-src blob:                   — mkdocs-material search uses blob: workers.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src  'self' 'unsafe-inline';
+    style-src   'self' 'unsafe-inline';
+    img-src     'self' data:;
+    font-src    'self' data:;
+    connect-src 'self';
+    worker-src  blob:;
+    frame-ancestors 'none';
+    base-uri    'self';
+    form-action 'none';
+  ">
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-janitor-research-contributions-grant-brief" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="The Janitor" class="md-header__button md-logo" aria-label="The Janitor" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            The Janitor
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              The Janitor — Research Contributions &amp; Grant Brief
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/janitor-security/the-janitor" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    janitor-security/the-janitor
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="The Janitor" class="md-nav__button md-logo" aria-label="The Janitor" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    The Janitor
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/janitor-security/the-janitor" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    janitor-security/the-janitor
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../manifesto/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Manifesto
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Security Posture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../intelligence/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intelligence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Intelligence Reports
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Intelligence Reports
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../energy_conservation_audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Energy & ESG Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Discovery
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pricing_faq/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Pricing FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Terms
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../privacy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Privacy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#research-contribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      Research Contribution
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Research Contribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-ifds-backed-taint-analysis-across-23-language-grammars" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. IFDS-Backed Taint Analysis Across 23 Language Grammars
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-kani-proven-boolean-predicates-for-security-gate-correctness" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Kani-Proven Boolean Predicates for Security Gate Correctness
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-z3-smt-constraint-solving-for-exploit-witness-synthesis" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Z3 SMT Constraint Solving for Exploit Witness Synthesis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alignment-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alignment Surface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alignment Surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ai-agent-tool-intent-firewall-p2-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      AI-Agent Tool-Intent Firewall (P2-22)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bayesian-llm-hijack-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bayesian LLM Hijack Detection
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formal-proof-that-tool-grant-escalation-requires-operator-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Formal Proof That Tool-Grant Escalation Requires Operator Authorization
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#societal-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      Societal Impact
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Societal Impact">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#false-positive-elimination-at-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      False-Positive Elimination at Scale
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zero-upload-on-device-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      Zero-Upload, On-Device Execution
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-source-formal-methods-for-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Open-Source Formal Methods for Security
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fairness" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fairness
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grant-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Grant Metrics
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="the-janitor-research-contributions-grant-brief">The Janitor — Research Contributions &amp; Grant Brief</h1>
+<p>This document bridges The Janitor's production security capabilities to the research
+dimensions required for grant evaluation by OpenAI Researcher Access, Google AI Futures
+Fund, and Anthropic alignment programs.</p>
+<h2 id="research-contribution">Research Contribution</h2>
+<h3 id="1-ifds-backed-taint-analysis-across-23-language-grammars">1. IFDS-Backed Taint Analysis Across 23 Language Grammars</h3>
+<p>The Janitor implements a custom Interprocedural Finite Distributive Subset (IFDS) solver
+over tree-sitter abstract syntax trees. The analysis spans 23 grammars simultaneously —
+including Rust, Go, Python, TypeScript, Solidity, Swift, Kotlin, Zig, Lua, GDScript,
+Objective-C, GLSL, Bash, Nix, HCL/Terraform, and Java — to prove source-to-sink taint
+reachability across language and serialization boundaries.</p>
+<p><strong>Research contribution</strong>: IFDS over polyglot ASTs with cross-language ABI edge semantics.
+The cross-language memory safety witness (<code>crates/forge/src/lcm.rs</code>) is the first
+open-source IFDS-backed detector that traces raw-pointer ownership across C/Rust FFI
+boundaries using AhoCorasick multi-pattern matching in a ±20-line sliding window without
+a full program graph — enabling sub-second detection at PR-gate latency.</p>
+<h3 id="2-kani-proven-boolean-predicates-for-security-gate-correctness">2. Kani-Proven Boolean Predicates for Security Gate Correctness</h3>
+<p>Every critical detection predicate in The Janitor is verified under Kani bounded model
+checking (<code>crates/forge/src/reflexive_assurance.rs</code>). Each predicate (e.g.,
+<code>ffi_deref_unguarded</code>, <code>session_tool_intent_drift</code>, <code>proof_obligation_missing</code>,
+<code>oidc_scope_missing_audience</code>) is proven panic-free and overflow-absent across all
+possible boolean input states.</p>
+<p><strong>Research contribution</strong>: Security detection logic expressed as formally verified pure
+Boolean functions with Kani symbolic execution proofs. This is a reproducible,
+machine-checkable form of detection correctness that eliminates the false-positive
+variance inherent in confidence-scored ML approaches.</p>
+<h3 id="3-z3-smt-constraint-solving-for-exploit-witness-synthesis">3. Z3 SMT Constraint Solving for Exploit Witness Synthesis</h3>
+<p>The Janitor's exploitability layer (<code>crates/forge/src/exploitability.rs</code>) uses an rsmt2
+Z3 interface to generate symbolic path constraints from IFDS taint traces, refining
+candidate findings into concrete <code>curl</code> reproduction commands only when the Z3 model is
+SATISFIABLE. Unsatisfiable paths are suppressed before reaching the bounty ledger.</p>
+<p><strong>Research contribution</strong>: Automated exploit witness generation (AEG) from IFDS taint
+evidence using SMT constraint refinement — a formal bridge between static analysis and
+practical reproduction payloads. This directly implements the principle of
+"no proof, no submission" enforced by the proof obligation gate
+(<code>crates/forge/src/proof_obligation.rs</code>).</p>
+<h2 id="alignment-surface">Alignment Surface</h2>
+<h3 id="ai-agent-tool-intent-firewall-p2-22">AI-Agent Tool-Intent Firewall (P2-22)</h3>
+<p><code>crates/forge/src/agent_intent.rs</code> implements an AI-agent deception detector that fires
+when a tool dispatch expression appears within ±15 lines of a privilege-escalating
+operation without an explicit read-only/sandbox intent suppressor. The Kani-proven
+predicate <code>session_tool_intent_drift(has_tool_sink, has_escalation, has_suppressor)</code> is
+the first formally verified gate against autonomous agent privilege escalation in
+open-source static analysis.</p>
+<p>The alignment claim: <strong>an AI agent cannot escalate from observer to mutator without the
+escalation being structurally visible in the code and formally flagged</strong>. This is a
+deterministic enforcement of the "minimal capability" principle without relying on
+runtime RLHF or model self-reporting.</p>
+<h3 id="bayesian-llm-hijack-detection">Bayesian LLM Hijack Detection</h3>
+<p><code>crates/forge/src/bayesian_taint.rs</code> applies Bayesian conditional probability over
+AhoCorasick pattern matches to detect unbounded prompt concatenation and LLM context
+hijacking at the source level — before deployment. This is an interpretable,
+auditable alternative to behavioral runtime monitoring that cannot be
+jailbroken at inference time.</p>
+<h3 id="formal-proof-that-tool-grant-escalation-requires-operator-authorization">Formal Proof That Tool-Grant Escalation Requires Operator Authorization</h3>
+<p>The proof obligation gate (<code>crates/forge/src/proof_obligation.rs</code>) enforces that no
+KevCritical finding reaches the bounty ledger without carrying a <code>ProofClass</code> variant
+(<code>ReachabilityProof</code>, <code>InvariantViolationProof</code>, or <code>LatticeGapProposal</code>). This is a
+mechanically enforced "constitutional" constraint: the system cannot emit a
+high-severity claim without a cryptographically-adjacent proof artifact.</p>
+<h2 id="societal-impact">Societal Impact</h2>
+<h3 id="false-positive-elimination-at-scale">False-Positive Elimination at Scale</h3>
+<p>The Structural Eradication Law prohibits suppressing commercial false positives with
+prose annotations — they must be eliminated by writing a deterministic AST guard in the
+engine. This produces quantifiable false-positive reduction: detectors are provably
+correct on the test corpus or they are not shipped.</p>
+<p><strong>Quantified</strong>: 33,000 pull requests audited across 22 enterprise repositories on an 8GB
+laptop. The actuarial ledger records per-PR categorical billings — every intercepted
+threat is documented, not aggregated. This is a reproducibility-first approach to
+security measurement.</p>
+<h3 id="zero-upload-on-device-execution">Zero-Upload, On-Device Execution</h3>
+<p>The Janitor never transmits source code to a remote server. Analysis runs entirely
+in-memory via <code>memmap2</code> zero-copy file access. This is a structural privacy guarantee
+for academic institutions, national security research environments, and healthcare
+providers who cannot permit code exfiltration to cloud SAST vendors.</p>
+<h3 id="open-source-formal-methods-for-security">Open-Source Formal Methods for Security</h3>
+<p>All Kani harnesses, IFDS lattice structures, and Z3 constraint templates are open-source
+under the project's license. Researchers can reproduce, extend, and formally verify every
+security claim. This contrasts with opaque ML-scored SAST tools whose false-positive
+rates are untestable.</p>
+<h2 id="fairness">Fairness</h2>
+<p>The Janitor's scoring model is <strong>deterministic, not confidence-scored</strong>. A finding either
+satisfies the structural predicate (proven by Kani) or it does not. There is no
+probabilistic threshold that produces disparate outcomes across code styles, author
+demographics, or language ecosystems. The same formal rule applies to Rust, Go, Python,
+Solidity, and TypeScript identically — eliminating the ML bias variance documented in AI
+code review tools trained on pre-AI, predominantly English-language codebases.</p>
+<h2 id="grant-metrics">Grant Metrics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pull requests audited</td>
+<td>33,000+</td>
+<td><code>.janitor/bounce_log.ndjson</code> actuarial ledger</td>
+</tr>
+<tr>
+<td>Enterprise repositories</td>
+<td>22</td>
+<td>Production deployments</td>
+</tr>
+<tr>
+<td>Analysis latency</td>
+<td>6.7 s/PR</td>
+<td>Benchmarked on 8GB Dell Inspiron (WSL2)</td>
+</tr>
+<tr>
+<td>Language grammars</td>
+<td>23</td>
+<td><code>crates/polyglot/src/lib.rs</code></td>
+</tr>
+<tr>
+<td>Kani-verified predicates</td>
+<td>12+</td>
+<td><code>crates/forge/src/reflexive_assurance.rs</code></td>
+</tr>
+<tr>
+<td>Detectors with TP/TN test coverage</td>
+<td>100%</td>
+<td>CI enforced — no detector ships without tests</td>
+</tr>
+<tr>
+<td>False-positive rate on Godot Engine PRs</td>
+<td>&lt;5%</td>
+<td>Structural Eradication Law enforcement</td>
+</tr>
+<tr>
+<td>SLSA compliance level</td>
+<td>Level 4</td>
+<td><code>justfile verify-reproducible</code></td>
+</tr>
+<tr>
+<td>PQC attestation</td>
+<td>FIPS 204 + FIPS 205</td>
+<td>ML-DSA-65 + SLH-DSA-SHAKE-192s dual key bundle</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.60a45f97.min.js"></script>
+      
+    
+  </body>
+</html>
