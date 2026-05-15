@@ -3753,6 +3753,12 @@ fn scan_buffer(
     findings.extend(forge::java_deser_guard::emit_java_deser_findings(
         source_str, label,
     ));
+    findings.extend(
+        forge::llm_prompt_injection::find_llm_unbounded_prompt_concat(Some(label), source_str),
+    );
+    findings.extend(forge::oidc_scope_guard::emit_oidc_scope_findings(
+        source_str, label,
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(

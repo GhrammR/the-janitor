@@ -81,6 +81,7 @@ pub mod negtaint;
 pub mod noninterference;
 pub mod oauth_account_fusion;
 pub mod oauth_scope;
+pub mod oidc_scope_guard;
 pub mod optimizer_authority;
 pub mod policy_drift;
 pub mod pr_collider;

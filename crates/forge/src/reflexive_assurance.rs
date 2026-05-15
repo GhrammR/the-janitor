@@ -30,6 +30,7 @@ mod kani_proofs {
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
     use crate::noninterference::declassification_gate_missing;
+    use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
@@ -199,6 +200,19 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the OIDC scope-abuse gate is an exact conjunction:
+    /// fires iff id-token write permission is present AND audience scope is absent.
+    #[kani::proof]
+    fn oidc_scope_gate_is_exact() {
+        let has_write_permission: bool = kani::any();
+        let has_audience_scope: bool = kani::any();
+        let fired = oidc_scope_missing_audience(has_write_permission, has_audience_scope);
+        kani::assert(
+            fired == (has_write_permission && !has_audience_scope),
+            "OIDC scope-abuse gate must be exact conjunction",
+        );
+    }
+
     /// Prove the MCP confused-deputy predicate is an exact conjunction:
     /// fires iff dispatch is present AND secret verification is absent.
     ///
@@ -229,6 +243,7 @@ mod tests {
     use crate::java_deser_guard::deser_missing_allowlist;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::noninterference::declassification_gate_missing;
+    use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
@@ -321,5 +336,13 @@ mod tests {
         assert!(!deser_missing_allowlist(true, true));
         assert!(!deser_missing_allowlist(false, false));
         assert!(!deser_missing_allowlist(false, true));
+    }
+
+    #[test]
+    fn oidc_scope_gate_requires_write_and_missing_audience() {
+        assert!(oidc_scope_missing_audience(true, false));
+        assert!(!oidc_scope_missing_audience(true, true));
+        assert!(!oidc_scope_missing_audience(false, false));
+        assert!(!oidc_scope_missing_audience(false, true));
     }
 }
