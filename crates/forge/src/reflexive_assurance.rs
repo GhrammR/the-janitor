@@ -23,8 +23,10 @@
 #[allow(unexpected_cfgs)]
 #[cfg(kani)]
 mod kani_proofs {
+    use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
+    use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
     use crate::noninterference::declassification_gate_missing;
     use crate::proof_obligation::proof_obligation_missing;
@@ -157,6 +159,32 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the linker-hijack gate is an exact conjunction:
+    /// fires iff LD_PRELOAD is present AND digest check is absent.
+    #[kani::proof]
+    fn linker_hijack_gate_is_exact() {
+        let has_ld_preload: bool = kani::any();
+        let has_digest_check: bool = kani::any();
+        let fired = linker_hijack_missing_attestation(has_ld_preload, has_digest_check);
+        kani::assert(
+            fired == (has_ld_preload && !has_digest_check),
+            "linker hijack gate must be exact conjunction",
+        );
+    }
+
+    /// Prove the debug-endpoint gate is an exact conjunction:
+    /// fires iff a debug route is present AND auth middleware is absent.
+    #[kani::proof]
+    fn debug_endpoint_gate_is_exact() {
+        let has_debug_route: bool = kani::any();
+        let has_auth_middleware: bool = kani::any();
+        let fired = debug_endpoint_missing_auth(has_debug_route, has_auth_middleware);
+        kani::assert(
+            fired == (has_debug_route && !has_auth_middleware),
+            "debug endpoint gate must be exact conjunction",
+        );
+    }
+
     /// Prove the MCP confused-deputy predicate is an exact conjunction:
     /// fires iff dispatch is present AND secret verification is absent.
     ///
@@ -181,8 +209,10 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
+    use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
+    use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::noninterference::declassification_gate_missing;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
@@ -242,6 +272,22 @@ mod tests {
     fn proof_obligation_gate_requires_missing_class() {
         assert!(proof_obligation_missing(true, false));
         assert!(!proof_obligation_missing(true, true));
+    }
+
+    #[test]
+    fn linker_hijack_gate_requires_missing_attestation() {
+        assert!(linker_hijack_missing_attestation(true, false));
+        assert!(!linker_hijack_missing_attestation(true, true));
+        assert!(!linker_hijack_missing_attestation(false, false));
+        assert!(!linker_hijack_missing_attestation(false, true));
+    }
+
+    #[test]
+    fn debug_endpoint_gate_requires_missing_auth() {
+        assert!(debug_endpoint_missing_auth(true, false));
+        assert!(!debug_endpoint_missing_auth(true, true));
+        assert!(!debug_endpoint_missing_auth(false, false));
+        assert!(!debug_endpoint_missing_auth(false, true));
     }
 
     #[test]

@@ -3731,6 +3731,18 @@ fn scan_buffer(
         ));
     }
     findings.extend(forge::idor::scan_source(ext, source, label));
+    let source_str = std::str::from_utf8(source).unwrap_or("");
+    findings
+        .extend(forge::mcp_dispatch_guard::emit_mcp_confused_deputy_findings(source_str, label));
+    findings.extend(forge::workflow_evidence::emit_workflow_provenance_finding(
+        label, source_str,
+    ));
+    findings.extend(forge::debug_endpoint_guard::emit_debug_endpoint_findings(
+        source_str, label,
+    ));
+    findings.extend(forge::linker_hijack::emit_linker_hijack_findings(
+        source_str, label,
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
