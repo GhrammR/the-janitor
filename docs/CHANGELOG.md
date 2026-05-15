@@ -3,6 +3,21 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 131: ffi_taint Oracle Fix, P2-25 java_deser_guard, Hunt Sweep & AR-036..040 (partial)
+
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::ffi_taint::detect_ffi_boundary_violations(source_str, label)` into `scan_buffer` after the `financial_pii` call. Module was registered in `lib.rs` covering Rust/C/Python FFI boundary violations (`extern "C"` raw-pointer exposure, `Box<T>` ownership leaks, PyO3 GIL mismatches) with zero SAST competition, but had zero callers. Also wired `forge::java_deser_guard::emit_java_deser_findings(source_str, label)` after `ffi_taint`.
+* `crates/forge/src/java_deser_guard.rs` *(created)* — P2-25: AhoCorasick on `ObjectSerializationDecoder`/`readObject()`/`deserialize(` sinks; `setAllowClasses(`/`ClassFilter`/`AllowList` suppressors; ±10-line window; `security:java_deser_allowlist_bypass` at KevCritical (CVE-2026-42779, CVSS 9.8); PCI-DSS-6.3 + HIPAA-164.312 regulatory tagging; 9 deterministic tests (5 TP, 4 TN).
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Kani proof harness `deser_gate_is_exact()` added; regression test `deser_gate_requires_decoder_and_missing_allowlist()` added to `#[cfg(test)]` block.
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod java_deser_guard;` registered alphabetically after `invisible_payload`.
+* `.INNOVATION_LOG.md` *(modified)* — P2-25 block physically hard-deleted (Absolute Eradication Law).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 3 new rows: aave/aave-v3-periphery no_findings; chainlink command_injection FP (local config tooling); mattermost-plugin-ai workflow_no_provenance TSX FP.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — 1 new row: chainlink `security:protobuf_any_unguarded_decode` (OCR2 oracle consensus surface, 25%, [lattice-gap: P2-16]).
+* **Hunt sweep**: aave/aave-v3-periphery → no_findings; smartcontractkit/chainlink → command_injection (LOW_YIELD: local tooling) + protobuf_any (CANDIDATE: 25%); mattermost-plugin-ai → workflow_no_provenance (LOW_YIELD: TSX FP).
+* **Article Review**: AR-036..040 — SAP Commerce Cloud (AR-036), Linux second vuln (AR-037), PHP SOAP (AR-038), Reuters Mythos (AR-039), Cookie thieves/Labyrinth (AR-040) — background agent in progress; entries pending.
+* Commit: `1618b3a` pushed to `codex/crossroads-site-health`.
+
+**Verification**: `just audit` ✓ | 9/9 `java_deser_guard` tests ✓ | Kani `deser_gate_is_exact` ✓
+
 ## 2026-05-14 — Sprint Batch 130: financial_pii Wiring, P2-17 Promotion, Hunt Sweep & AR-031..035
 
 * `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::financial_pii::emit_financial_pii_to_llm_findings(Some(label), source_str)` into `scan_buffer` after the `linker_hijack` call. Module was registered in `lib.rs` with GDPR/CCPA/HIPAA 24-PII-identifier + 12-LLM-sink detection but had zero callers in any `crates/cli/src/` path. Highest commercial-compliance TAM of any previously dead module.
