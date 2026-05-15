@@ -3,6 +3,23 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 132: llm_prompt_injection Oracle Fix, P2-28 oidc_scope_guard, enforce_admins & Hunt Sweep
+
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::llm_prompt_injection::find_llm_unbounded_prompt_concat(Some(label), source_str)` into `scan_buffer` after the `java_deser_guard` call. Module was registered in `lib.rs` covering unbounded LLM prompt concatenation (user-controlled strings concatenated directly into LLM prompts without size caps) but had zero callers in any `crates/cli/src/` path. Also wired `forge::oidc_scope_guard::emit_oidc_scope_findings(source_str, label)` after `llm_prompt_injection`.
+* `crates/forge/src/oidc_scope_guard.rs` *(created)* — P2-28: AhoCorasick on `id-token: write`/`id-token:write` sinks; `audience:`/`issuer:`/`subject:` suppressors; ±15-line window; `security:oidc_scope_abuse` at KevCritical (CVE-2026-45321 Mini Shai-Hulud worm, ISO-27001-A.12.6, SLSA-L3); `security:unpinned_cache_restore` at High (SLSA-L2); SHA-pin true-negative (40-char lowercase hex = safe); `.github/workflows/` path guard prevents non-workflow FPs; 10 deterministic tests (5 TP, 5 TN).
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Kani proof harness `oidc_scope_gate_is_exact()` added; regression test `oidc_scope_gate_requires_write_and_missing_audience()` added to `#[cfg(test)]` block.
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod oidc_scope_guard;` registered alphabetically after `pub mod oauth_scope`.
+* `crates/mcp/src/lib.rs` *(modified)* — Oracle dead_code fix: removed `#[allow(dead_code)]` suppressor on `jsonrpc: String` field; renamed to `_jsonrpc: String` per Rust idiom. `cargo check -p mcp` clean.
+* `GitHub branch protection` *(modified)* — `enforce_admins` enabled on `main` via `gh api -X PUT repos/janitor-security/the-janitor/branches/main/protection` with full protection payload. Verified: `enforce_admins.enabled: true`.
+* `.INNOVATION_LOG.md` *(modified)* — P2-28 block physically hard-deleted (Absolute Eradication Law).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 6 new rows: immutable/ts-immutable-sdk ssrf_dynamic_url (developer config, 3%); immutable/ts-immutable-sdk dom_xss_innerHTML (static template FP, 3%); openai/codex unauthenticated_debug_endpoint (loopback-only, 2%); openai/codex raw_pointer_deref (reviewed `// SAFETY:`, 2%); openai/codex financial_pii_to_external_llm (shell script FP, 2%); freedomofpress/securedrop-client subprocess_shell_injection (reviewed `# noqa`/`# nosemgrep`, 2%).
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — 1 new row: freedomofpress/securedrop-client `security:public_ffi_unsafe_deref` (`proxy/src/config_qubesdb.rs:26`) — `qdb_read()` raw pointer into `CStr::from_ptr` without bounds/null check; QubesDB Xen store; 15%; [lattice-gap: P2-21].
+* **Hunt sweep**: immutable/ts-immutable-sdk → 2 LOW_YIELD (config-controlled SSRF + static template XSS); openai/codex → 3 LOW_YIELD (loopback debug endpoint + reviewed unsafe + shell-script FP); freedomofpress/securedrop-client → 1 CANDIDATE (FFI raw ptr deref, 15%) + 1 LOW_YIELD (reviewed subprocess).
+* **Article Review**: AR-037..040 — Linux second vuln (AR-037), PHP SOAP (AR-038), Reuters Mythos (AR-039), Cookie thieves/Labyrinth (AR-040) — WebFetch/WebSearch blocked; all preserved in queue.
+* Commit: `98df957` (code changes) pushed to `codex/crossroads-site-health`; governance artifacts committed in this batch.
+
+**Verification**: `just audit` ✓ | 10/10 `oidc_scope_guard` tests ✓ | Kani `oidc_scope_gate_is_exact` ✓ | `cargo check -p mcp` ✓
+
 ## 2026-05-15 — Sprint Batch 131: ffi_taint Oracle Fix, P2-25 java_deser_guard, Hunt Sweep & AR-036..040 (partial)
 
 * `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::ffi_taint::detect_ffi_boundary_violations(source_str, label)` into `scan_buffer` after the `financial_pii` call. Module was registered in `lib.rs` covering Rust/C/Python FFI boundary violations (`extern "C"` raw-pointer exposure, `Box<T>` ownership leaks, PyO3 GIL mismatches) with zero SAST competition, but had zero callers. Also wired `forge::java_deser_guard::emit_java_deser_findings(source_str, label)` after `ffi_taint`.
