@@ -3,6 +3,18 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-14 — Sprint Batch 130: financial_pii Wiring, P2-17 Promotion, Hunt Sweep & AR-031..035
+
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::financial_pii::emit_financial_pii_to_llm_findings(Some(label), source_str)` into `scan_buffer` after the `linker_hijack` call. Module was registered in `lib.rs` with GDPR/CCPA/HIPAA 24-PII-identifier + 12-LLM-sink detection but had zero callers in any `crates/cli/src/` path. Highest commercial-compliance TAM of any previously dead module.
+* `GitHub branch protection` *(created)* — P2-17 Phase B: enabled branch protection on `main` via `gh api -X PUT` with `secretless-gate-smoke` as the sole required status check. Verified: `required_status_checks.contexts` = `["secretless-gate-smoke"]`. P2-17 block hard-deleted from `.INNOVATION_LOG.md`.
+* `.INNOVATION_LOG.md` *(modified)* — P2-17 block physically hard-deleted (Absolute Eradication Law); AR-2026-05-14-031 through AR-2026-05-14-035 appended; P2-28 (GitHub Actions OIDC Scope Abuse & Cache Poisoning Detector) filed based on Mini Shai-Hulud worm analysis.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 5 new rows: skroutz/rspecq no_findings; karapace JWT bypass FP (JWKS-client suppressor gap); karapace workflow_no_provenance benchmark FP; Uniswap/v3-core workflow_no_provenance Solidity FP.
+* **Article Review**: AR-031 (Checkmarx Jenkins — `attack_ledger_update`), AR-032 (Mini Shai-Hulud worm — `new_innovation_item` → P2-28), AR-033 (Claude Chrome Extension — BLOCKED/preserved), AR-034 (RubyGems signups — `already_defended`), AR-035 (Cookie thieves — BLOCKED/preserved).
+* **Hunt sweep**: skroutz/rspecq → no_findings; Aiven-Open/karapace → JWT bypass FP + workflow_no_provenance; Uniswap/v3-core → workflow_no_provenance. All to LOW_YIELD_LEDGER.
+* Commit: `b66bdee` (financial_pii wiring) pushed to `codex/crossroads-site-health`.
+
+**Verification**: `just audit` ✓ | `cargo check -p cli` ✓
+
 ## 2026-05-14 — Sprint Batch 128: Dead-Module Resurrection & Linker/Debug Guards
 
 * `crates/cli/src/hunt.rs` *(modified)* — wired four previously dead detector modules into `scan_buffer`: `mcp_dispatch_guard`, `workflow_evidence`, `debug_endpoint_guard`, and `linker_hijack` (5-line insertion after `idor::scan_source`). All four were registered in `forge/src/lib.rs` but had zero callers in production scanning.
