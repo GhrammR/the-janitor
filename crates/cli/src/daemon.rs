@@ -533,9 +533,7 @@ pub mod unix {
                             zombies: zombie_symbols_added,
                             antipatterns: antipatterns_count,
                             antipattern_details: std::mem::take(&mut log_entry.antipatterns),
-                            collided_pr_numbers: std::mem::take(
-                                &mut log_entry.collided_pr_numbers,
-                            ),
+                            collided_pr_numbers: std::mem::take(&mut log_entry.collided_pr_numbers),
                             is_vouched,
                         }
                     }

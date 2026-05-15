@@ -61,10 +61,7 @@ const SECRET_SUPPRESSORS: &[&str] = &[
 /// This function is deliberately extracted as a pure predicate so that
 /// `reflexive_assurance.rs` can prove it is an exact conjunction under all
 /// possible boolean inputs without requiring the full AhoCorasick machinery.
-pub fn session_dispatch_missing_secret_check(
-    has_dispatch: bool,
-    has_secret_verify: bool,
-) -> bool {
+pub fn session_dispatch_missing_secret_check(has_dispatch: bool, has_secret_verify: bool) -> bool {
     has_dispatch && !has_secret_verify
 }
 
@@ -103,10 +100,7 @@ fn find_unguarded_dispatch_lines(source: &str, window: usize) -> Vec<u32> {
 
 /// Scan `source` (the full content of a file at `file`) for unguarded MCP
 /// session-dispatch patterns.  Returns one `StructuredFinding` per violation.
-pub fn emit_mcp_confused_deputy_findings(
-    source: &str,
-    file: &str,
-) -> Vec<StructuredFinding> {
+pub fn emit_mcp_confused_deputy_findings(source: &str, file: &str) -> Vec<StructuredFinding> {
     find_unguarded_dispatch_lines(source, 10)
         .into_iter()
         .map(|line_no| StructuredFinding {
@@ -119,7 +113,8 @@ pub fn emit_mcp_confused_deputy_findings(
 per-call secret verification. Add a HMAC or session-secret check immediately \
 after session lookup: `sessions.get(req.id).filter(|s| verify(s.secret, \
 req.presented_secret))`. Without this guard, any connected agent can execute \
-tools in another tenant's session context (confused deputy).".to_string(),
+tools in another tenant's session context (confused deputy)."
+                    .to_string(),
             ),
             ..Default::default()
         })
@@ -189,7 +184,10 @@ fn dispatch(req: &Request, session_map: &SessionMap) -> Result<()> {
 }
 "#;
         let findings = emit_mcp_confused_deputy_findings(src, "dispatch.rs");
-        assert!(findings.is_empty(), "hmac suppressor must silence the finding");
+        assert!(
+            findings.is_empty(),
+            "hmac suppressor must silence the finding"
+        );
     }
 
     // ── TP: multiple unguarded sinks → one finding per line ──────────────────

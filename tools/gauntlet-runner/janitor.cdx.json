@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:a35cddf2-69c5-48de-82bd-d6f21bc2d76c",
+  "serialNumber": "urn:uuid:2575118f-fca1-4986-9c0c-af34e4b8aa4c",
   "metadata": {
-    "timestamp": "2026-05-10T09:57:12.677209177Z",
+    "timestamp": "2026-05-15T07:51:48.463633115Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -2893,6 +2893,41 @@
     },
     {
       "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1",
+      "author": "The Rand Project Developers",
+      "name": "rand_core",
+      "version": "0.10.1",
+      "description": "Core random number generation traits and tools for implementation.",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rand_core@0.10.1",
+      "externalReferences": [
+        {
+          "type": "documentation",
+          "url": "https://docs.rs/rand_core"
+        },
+        {
+          "type": "website",
+          "url": "https://rust-random.github.io/book"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/rust-random/rand_core"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.6.4",
       "author": "The Rand Project Developers, The Rust Project Developers",
       "name": "rand_core",
@@ -5245,7 +5280,8 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4",
-        "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186"
+        "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",
+        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
       ]
     },
     {
@@ -5469,6 +5505,9 @@
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#ptr_meta@0.3.1"
       ]
+    },
+    {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.6.4",

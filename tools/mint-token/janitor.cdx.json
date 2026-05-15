@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:a814b6bf-c128-42b3-8d19-19f91a14312e",
+  "serialNumber": "urn:uuid:1c27e809-5d49-4301-9d15-086a9a1999f5",
   "metadata": {
-    "timestamp": "2026-05-10T09:57:12.659100947Z",
+    "timestamp": "2026-05-15T07:51:48.445491441Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -309,6 +309,37 @@
     },
     {
       "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#chacha20@0.10.0",
+      "author": "RustCrypto Developers",
+      "name": "chacha20",
+      "version": "0.10.0",
+      "description": "The ChaCha20 stream cipher (RFC 8439) implemented in pure Rust using traits from the RustCrypto `cipher` crate, with optional architecture-specific hardware acceleration (AVX2, SSE2). Additionally provides the ChaCha8, ChaCha12, XChaCha20, XChaCha12 and XChaCha8 stream ciphers, and also optional rand_core-compatible RNGs based on those ciphers. ",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6f8d983286843e49675a4b7a2d174efe136dc93a18d69130dd18198a6c167601"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/chacha20@0.10.0",
+      "externalReferences": [
+        {
+          "type": "documentation",
+          "url": "https://docs.rs/chacha20"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/RustCrypto/stream-ciphers"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#clap@4.6.1",
       "name": "clap",
       "version": "4.6.1",
@@ -488,6 +519,37 @@
         }
       ],
       "purl": "pkg:cargo/cpufeatures@0.2.17",
+      "externalReferences": [
+        {
+          "type": "documentation",
+          "url": "https://docs.rs/cpufeatures"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/RustCrypto/utils"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.3.0",
+      "author": "RustCrypto Developers",
+      "name": "cpufeatures",
+      "version": "0.3.0",
+      "description": "Lightweight runtime CPU feature detection for aarch64, loongarch64, and x86/x86_64 targets, with no_std support and support for mobile targets including Android and iOS ",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/cpufeatures@0.3.0",
       "externalReferences": [
         {
           "type": "documentation",
@@ -787,16 +849,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.3.4",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.2",
       "author": "The Rand Project Developers",
       "name": "getrandom",
-      "version": "0.3.4",
+      "version": "0.4.2",
       "description": "A small cross-platform library for retrieving random data from system source",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+          "content": "0de51e6874e94e7bf76d726fc5d13ba782deca734ff60d5bb2fb2607c7406555"
         }
       ],
       "licenses": [
@@ -804,7 +866,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/getrandom@0.3.4",
+      "purl": "pkg:cargo/getrandom@0.4.2",
       "externalReferences": [
         {
           "type": "documentation",
@@ -982,33 +1044,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#ppv-lite86@0.2.21",
-      "author": "The CryptoCorrosion Contributors",
-      "name": "ppv-lite86",
-      "version": "0.2.21",
-      "description": "Cross-platform cryptography-oriented low-level SIMD library.",
-      "scope": "required",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/ppv-lite86@0.2.21",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/cryptocorrosion/cryptocorrosion"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106",
       "author": "David Tolnay <dtolnay@gmail.com>, Alex Crichton <alex@alexcrichton.com>",
       "name": "proc-macro2",
@@ -1071,16 +1106,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand@0.9.4",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand@0.10.1",
       "author": "The Rand Project Developers, The Rust Project Developers",
       "name": "rand",
-      "version": "0.9.4",
+      "version": "0.10.1",
       "description": "Random number generators and other randomness functionality. ",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
+          "content": "d2e8e8bcc7961af1fdac401278c6a831614941f6164ee3bf4ce61b7edb162207"
         }
       ],
       "licenses": [
@@ -1088,7 +1123,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/rand@0.9.4",
+      "purl": "pkg:cargo/rand@0.10.1",
       "externalReferences": [
         {
           "type": "documentation",
@@ -1106,16 +1141,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand_chacha@0.9.0",
-      "author": "The Rand Project Developers, The Rust Project Developers, The CryptoCorrosion Contributors",
-      "name": "rand_chacha",
-      "version": "0.9.0",
-      "description": "ChaCha random number generator ",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1",
+      "author": "The Rand Project Developers",
+      "name": "rand_core",
+      "version": "0.10.1",
+      "description": "Core random number generation traits and tools for implementation.",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+          "content": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
         }
       ],
       "licenses": [
@@ -1123,11 +1158,11 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/rand_chacha@0.9.0",
+      "purl": "pkg:cargo/rand_core@0.10.1",
       "externalReferences": [
         {
           "type": "documentation",
-          "url": "https://docs.rs/rand_chacha"
+          "url": "https://docs.rs/rand_core"
         },
         {
           "type": "website",
@@ -1135,7 +1170,7 @@
         },
         {
           "type": "vcs",
-          "url": "https://github.com/rust-random/rand"
+          "url": "https://github.com/rust-random/rand_core"
         }
       ]
     },
@@ -1159,41 +1194,6 @@
         }
       ],
       "purl": "pkg:cargo/rand_core@0.6.4",
-      "externalReferences": [
-        {
-          "type": "documentation",
-          "url": "https://docs.rs/rand_core"
-        },
-        {
-          "type": "website",
-          "url": "https://rust-random.github.io/book"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/rust-random/rand"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.9.5",
-      "author": "The Rand Project Developers, The Rust Project Developers",
-      "name": "rand_core",
-      "version": "0.9.5",
-      "description": "Core random number generator traits and tools for implementation. ",
-      "scope": "required",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/rand_core@0.9.5",
       "externalReferences": [
         {
           "type": "documentation",
@@ -1691,33 +1691,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.48",
-      "author": "Joshua Liebow-Feeser <joshlf@google.com>, Jack Wrenn <jswrenn@amazon.com>",
-      "name": "zerocopy",
-      "version": "0.8.48",
-      "description": "Zerocopy makes zero-cost memory manipulation effortless. We write \"unsafe\" so you don't have to.",
-      "scope": "required",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "eed437bf9d6692032087e337407a86f04cd8d6a16a37199ed57949d415bd68e9"
-        }
-      ],
-      "licenses": [
-        {
-          "expression": "BSD-2-Clause OR Apache-2.0 OR MIT"
-        }
-      ],
-      "purl": "pkg:cargo/zerocopy@0.8.48",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/google/zerocopy"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#zeroize@1.8.2",
       "author": "The RustCrypto Project Developers",
       "name": "zeroize",
@@ -1784,7 +1757,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#clap@4.6.1",
         "registry+https://github.com/rust-lang/crates.io-index#ed25519-dalek@2.2.0",
         "registry+https://github.com/rust-lang/crates.io-index#hex@0.4.3",
-        "registry+https://github.com/rust-lang/crates.io-index#rand@0.9.4"
+        "registry+https://github.com/rust-lang/crates.io-index#rand@0.10.1"
       ]
     },
     {
@@ -1829,6 +1802,14 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4"
     },
     {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#chacha20@0.10.0",
+      "dependsOn": [
+        "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4",
+        "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.3.0",
+        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
+      ]
+    },
+    {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#clap@4.6.1",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#clap_builder@4.6.0",
@@ -1864,6 +1845,9 @@
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.2.17"
+    },
+    {
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.3.0"
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.1.6",
@@ -1944,10 +1928,11 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.3.4",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.4",
-        "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186"
+        "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",
+        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
       ]
     },
     {
@@ -1976,12 +1961,6 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#ppv-lite86@0.2.21",
-      "dependsOn": [
-        "registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.48"
-      ]
-    },
-    {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.106",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.24"
@@ -1994,29 +1973,20 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand@0.9.4",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand@0.10.1",
       "dependsOn": [
-        "registry+https://github.com/rust-lang/crates.io-index#rand_chacha@0.9.0",
-        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.9.5"
+        "registry+https://github.com/rust-lang/crates.io-index#chacha20@0.10.0",
+        "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.2",
+        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_chacha@0.9.0",
-      "dependsOn": [
-        "registry+https://github.com/rust-lang/crates.io-index#ppv-lite86@0.2.21",
-        "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.9.5"
-      ]
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1"
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.6.4",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.2.17"
-      ]
-    },
-    {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#rand_core@0.9.5",
-      "dependsOn": [
-        "registry+https://github.com/rust-lang/crates.io-index#getrandom@0.3.4"
       ]
     },
     {
@@ -2096,9 +2066,6 @@
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5"
-    },
-    {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.48"
     },
     {
       "ref": "registry+https://github.com/rust-lang/crates.io-index#zeroize@1.8.2",

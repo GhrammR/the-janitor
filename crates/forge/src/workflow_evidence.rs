@@ -138,13 +138,9 @@ const RESULT_SINK_PATTERNS: &[&str] = &[
 /// This is intentionally O(source_len) — safe for files under the 1 MiB gate.
 pub fn extract_evidence(source: &str) -> WorkflowEvidence {
     WorkflowEvidence {
-        dataset_hash_present: DATASET_HASH_PATTERNS
-            .iter()
-            .any(|p| source.contains(p)),
+        dataset_hash_present: DATASET_HASH_PATTERNS.iter().any(|p| source.contains(p)),
         seed_present: SEED_PATTERNS.iter().any(|p| source.contains(p)),
-        test_command_present: TEST_COMMAND_PATTERNS
-            .iter()
-            .any(|p| source.contains(p)),
+        test_command_present: TEST_COMMAND_PATTERNS.iter().any(|p| source.contains(p)),
         env_lock_present: ENV_LOCK_PATTERNS.iter().any(|p| source.contains(p)),
     }
 }
@@ -159,10 +155,7 @@ pub fn has_result_emission(source: &str) -> bool {
 /// Emit a `security:workflow_no_provenance` finding for a script that produces
 /// outputs without a full reproducibility envelope.  Returns `None` when the
 /// script has no result emission or when provenance is complete.
-pub fn emit_workflow_provenance_finding(
-    file: &str,
-    source: &str,
-) -> Option<StructuredFinding> {
+pub fn emit_workflow_provenance_finding(file: &str, source: &str) -> Option<StructuredFinding> {
     if !has_result_emission(source) {
         return None;
     }
@@ -216,7 +209,11 @@ mod tests {
         let status = validate_workflow_evidence(&WorkflowEvidence::default());
         match status {
             WorkflowEnvelopeStatus::MissingProvenance(missing) => {
-                assert_eq!(missing.len(), 4, "all four pillars must be reported missing");
+                assert_eq!(
+                    missing.len(),
+                    4,
+                    "all four pillars must be reported missing"
+                );
             }
             WorkflowEnvelopeStatus::Complete => panic!("should have failed"),
         }
@@ -301,8 +298,8 @@ df.to_parquet("output.parquet")
     #[test]
     fn finding_id_on_missing_provenance() {
         let src = "df.to_csv('out.csv')\n";
-        let finding = emit_workflow_provenance_finding("analysis.py", src)
-            .expect("must emit finding");
+        let finding =
+            emit_workflow_provenance_finding("analysis.py", src).expect("must emit finding");
         assert_eq!(finding.id, "security:workflow_no_provenance");
         assert_eq!(finding.severity.as_deref(), Some("High"));
     }
