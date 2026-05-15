@@ -3789,6 +3789,7 @@ fn scan_buffer(
                 ..Default::default()
             }),
     );
+    findings.extend(forge::solidity_taint::find_solidity_slop(source));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
