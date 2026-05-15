@@ -3759,6 +3759,16 @@ fn scan_buffer(
     findings.extend(forge::oidc_scope_guard::emit_oidc_scope_findings(
         source_str, label,
     ));
+    findings.extend(
+        forge::embedding_trust::detect_embedding_trust_transposition(source_str.as_bytes())
+            .into_iter()
+            .map(|f| StructuredFinding {
+                id: f.description.clone(),
+                severity: Some(format!("{:?}", f.severity)),
+                file: Some(label.to_string()),
+                ..Default::default()
+            }),
+    );
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
