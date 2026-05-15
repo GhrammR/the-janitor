@@ -246,8 +246,16 @@ fast-release version:
 	git tag -s v{{version}} -m "release v{{version}}" || { echo "FATAL: Tag failed."; exit 1; }
 	MAJOR="$(echo "{{version}}" | cut -d. -f1)"
 	git tag -fa "v${MAJOR}" -m "v${MAJOR} → v{{version}}"
-	git push origin HEAD:main "v{{version}}"
+	git checkout -b "release/v{{version}}"
+	git push origin "release/v{{version}}" "v{{version}}"
 	git push origin "v${MAJOR}" --force
+	RELEASE_PR_URL="$(gh pr create \
+	    --base main \
+	    --head "release/v{{version}}" \
+	    --title "Release v{{version}}" \
+	    --body "Automated release PR for v{{version}}. Merge after \`secretless-gate-smoke\` passes." \
+	    2>&1 || true)"
+	echo "Release PR: ${RELEASE_PR_URL}"
 	if gh release view "v{{version}}" >/dev/null 2>&1; then
 	    echo "Idempotency guard: GitHub Release v{{version}} already exists. Skipping gh release create."
 	else

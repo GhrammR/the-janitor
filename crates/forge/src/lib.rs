@@ -21,6 +21,7 @@
 //! // → same structural hash
 //! ```
 
+pub mod agent_intent;
 pub mod agentic_graph;
 pub mod agentic_tool_audit;
 pub mod agnostic_shield;
@@ -62,6 +63,7 @@ pub mod invisible_payload;
 pub mod java_deser_guard;
 pub mod kani_bridge;
 pub mod labyrinth;
+pub mod lcm;
 pub mod legacy_c_mining;
 pub mod library_identity;
 pub mod linker_hijack;

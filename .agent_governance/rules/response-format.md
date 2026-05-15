@@ -94,7 +94,22 @@ The prompt MUST:
 5. Reassert all existing UAP laws by name: Eradication, Structural Guard,
    Triage Empathy, and Tri-Ledger.
 6. Include one strategic operator tip that maximizes revenue / impact.
-7. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
+7. **Mirror all actionable `[OPERATOR INTELLIGENCE]` tips as explicit phases.**
+   Every tip from the current session's `[OPERATOR INTELLIGENCE]` section that
+   describes a concrete, implementable fix MUST appear as a numbered `### Phase X:`
+   block inside the sovereign directive prompt — verbatim enough for the next agent
+   to execute without re-reading the operator section. Apply this rule to:
+   - **Entropy Modulator Tip**: if it names a specific file, function, or struct to
+     change, include it as a phase with the exact edit described.
+   - **Systems Health Signal**: if it names a remediation step (not just an
+     observation), include it as a phase with the exact file and change.
+   - **Platform Expansion Tip**: always include as a phase. It invariably names an
+     exact command, workflow file, or API operation — surface it directly so the
+     next agent executes it rather than re-deriving it.
+   Tips that are purely observational (e.g., "no anomaly detected", queue-state
+   reports, blocked ARTICLE_REVIEW entries) are exempt — only tips with a concrete
+   next-step action become phases.
+8. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
    legacy infrastructure such as `crates/cli/src/daemon.rs`,
    `crates/common/src/physarum.rs`, and `action.yml`. The tip must scan across
    ALL of the following drift categories and report the highest-priority find:
@@ -142,12 +157,18 @@ and explicitly answer:
 3. How does this make money or crush competitors?
 
 [OPERATOR INTELLIGENCE]
-A human-directed operator brief that is NOT fed back into the next agent.
-It must contain one **Entropy Modulator Tip** derived from the last 3 sprint
-entries in `docs/CHANGELOG.md`, one **Systems Health Signal** covering
-holistic operational awareness beyond pure revenue, one **ARTICLE_REVIEW
-Summary**, AND one **Platform Expansion Tip** covering the next best GitHub
-capability upgrade.
+A human-directed operator brief. It must contain one **Entropy Modulator Tip**
+derived from the last 3 sprint entries in `docs/CHANGELOG.md`, one **Systems
+Health Signal** covering holistic operational awareness beyond pure revenue, one
+**ARTICLE_REVIEW Summary**, AND one **Platform Expansion Tip** covering the next
+best GitHub capability upgrade.
+
+**Mirroring contract**: every tip in this section that names a concrete,
+implementable fix MUST also appear as an explicit `### Phase X:` block inside
+the `[NEXT RECOMMENDED ACTION]` sovereign directive prompt. Write each tip here
+for the operator's situational awareness AND write it there for the next agent's
+execution. The two representations must be consistent: the operator section
+explains the why; the NRA phase provides the exact file, function, and command.
 
 Entropy Modulator protocol:
 1. Inspect the last 3 completed sprints in `docs/CHANGELOG.md`.
@@ -192,6 +213,36 @@ Platform Expansion Tip protocol:
    within 10 minutes", "dependency PRs auto-merge after CodeQL + integrity
    green", or "same PR gate deployed to one external pilot repository".
 4. Do not use vague capability-roadmap language.
+
+[SHOWCASE ATTESTATION]
+Mandatory grant-readiness evaluation. Runs AFTER [OPERATOR INTELLIGENCE] and BEFORE
+the response is finalised. Governed by `.agent_governance/rules/grant-readiness.md`.
+
+Protocol:
+1. Read `README.md` and `docs/index.md` (first 60 lines of each suffice).
+2. Evaluate against the three grant mission profiles: OpenAI Researcher Access,
+   Google Cloud/AI Futures Fund, Anthropic alignment.
+3. Check for all five degradation triggers defined in the Grant Readiness Law.
+4. Report one of two verdicts per program:
+
+   **PASS** — repository presentation satisfies this program's reviewer criteria.
+   State which specific sections or capabilities provide the evidence.
+
+   **FAIL** — name the exact degradation trigger that fired, the exact file and
+   section that is deficient, and the one-paragraph fix. If FAIL, a
+   `### Phase N: Grant Readiness Fix` block MUST appear in [NEXT RECOMMENDED ACTION].
+
+Format:
+```
+[SHOWCASE ATTESTATION]
+OpenAI Researcher Access:  PASS/FAIL — <one-line rationale>
+Google AI Futures Fund:    PASS/FAIL — <one-line rationale>
+Anthropic Alignment:       PASS/FAIL — <one-line rationale>
+Fix required: YES/NO
+```
+
+If Fix required: YES, the [NEXT RECOMMENDED ACTION] sovereign directive MUST
+contain a Phase block titled "Grant Readiness Fix" with the exact edit.
 ```
 
 ## Enforcement

@@ -3,6 +3,26 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 133: bayesian_taint Oracle Fix, P2-21 lcm.rs, P2-22 agent_intent.rs, Daemon Heartbeat, Release PR Flow & Hunt Sweep
+
+* `crates/forge/src/lcm.rs` *(created)* — P2-21: Cross-Language Memory Safety Witness Translation. AhoCorasick on `FFI_SINKS` (`CStr::from_ptr`, `slice::from_raw_parts`, `std::ptr::read`, `unsafe { *`) and `FFI_SOURCES` (`extern "C" fn`, `qdb_read`, `pub unsafe fn`, `::ffi::`); ±20-line window; `GUARDS` null-check suppressors; emits `security:ffi_unsafe_deref_unguarded` at KevCritical; `ffi_deref_unguarded()` boolean predicate for Kani; 9 deterministic tests (4 TP, 4 TN, 1 predicate).
+* `crates/forge/src/agent_intent.rs` *(created)* — P2-22: AI-Agent Deception Witness and Tool-Intent Guard. AhoCorasick on `TOOL_SINKS` (11 patterns), `ESCALATION_INDICATORS` (16 patterns), `INTENT_SUPPRESSORS` (10 patterns); ±15-line window; emits `security:agent_tool_intent_drift` at KevCritical (CWE-284, ISO-27001-A.9.4); `session_tool_intent_drift()` predicate for Kani; 9 deterministic tests (4 TP, 4 TN, 1 predicate).
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod agent_intent;` and `pub mod lcm;` registered alphabetically.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Kani harnesses `lcm_ffi_gate_is_exact()` and `agent_intent_gate_is_exact()` added; regression tests `lcm_ffi_gate_requires_sink_source_and_missing_guard()` and `agent_intent_gate_requires_sink_escalation_and_missing_suppressor()` added.
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::bayesian_taint::find_probabilistic_llm_hijacks(source_str.as_bytes())` after embedding_trust. Also wired `forge::lcm::emit_cross_language_memory_witnesses(source_str, label)` and `forge::agent_intent::emit_agent_intent_guard_findings(source_str, label)`.
+* `crates/cli/src/daemon.rs` *(modified)* — Phase 6: `last_heartbeat_ms: AtomicU64` field added to `DaemonState`; `record_heartbeat()` stores `SystemTime::now()` as milliseconds (called on every `process_request()`); `check_heartbeat_timeout()` returns `Some(elapsed_ms)` when gap exceeds 30,000ms; SIEM event emitted in `handle_connection` while loop on timeout; test `heartbeat_timeout_fires_at_30s_gap()` added.
+* `justfile` *(modified)* — Phase 5: `just release` now creates `release/v{{version}}` branch, pushes it and the version tag, force-pushes the major alias, then runs `gh pr create --base main` instead of direct `git push origin HEAD:main`; eliminates `secretless-gate-smoke` required-status-check rejection.
+* `.agent_governance/rules/grant-readiness.md` *(created)* — Phase 0: Grant Readiness Law; three mission profiles (OpenAI Researcher Access, Google Cloud/AI Futures Fund, Anthropic); 5 degradation triggers; mandatory `### Phase N: Grant Readiness Fix` NRA block when any trigger fires.
+* `.agent_governance/rules/response-format.md` *(modified)* — Phase 0: `[SHOWCASE ATTESTATION]` section appended enforcing per-sprint grant-readiness evaluation against all three profiles; Mirroring Contract item added requiring operator intelligence tips to appear as explicit NRA phases.
+* `.INNOVATION_LOG.md` *(modified)* — P2-21 and P2-22 blocks physically hard-deleted (Absolute Eradication Law; both shipped `just audit` ✓).
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — 1 row: trustwallet/wallet-core `security:lcm_double_free` (`trezor-crypto/crypto/scrypt.c:334,336`); 22%; [lattice-gap: P2-21].
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 3 rows: trustwallet/wallet-core `security:lcm_off_by_one_loop` (7%, vendored trezor-crypto AES/KDF); binance/binance-connector-typescript `security:workflow_no_provenance` (3%, TypeScript source FP); bullish-exchange/api-docs no findings (0%, docs-only repo).
+* **Hunt sweep**: trustwallet/wallet-core → 1 CANDIDATE (lcm_double_free, 22%) + 1 LOW_YIELD (off-by-one, 7%); binance/binance-connector-typescript → 1 LOW_YIELD (workflow_no_provenance FP, 3%); bullish-exchange/api-docs → no findings.
+* **Article Review**: AR-037..040 — all 4 WebFetch attempts blocked (arstechnica.com/cybersecuritynews.com/theregister.com/reuters.com — domain restrictions or guessed URLs); preserved in queue.
+* `crates/mcp/src/lib.rs` *(corrected)* — `_jsonrpc` rename reverted to `jsonrpc` + `#[allow(dead_code)]` restored; field is Deserialize-only (never read at runtime); 15 test constructor sites were broken by the rename.
+
+**Verification**: `just audit` ✓ | 9/9 `lcm` tests ✓ | 9/9 `agent_intent` tests ✓ | Kani `lcm_ffi_gate_is_exact` ✓ | Kani `agent_intent_gate_is_exact` ✓ | Oracle `bayesian_taint` wired ✓
+
 ## 2026-05-15 — Sprint Batch 132: llm_prompt_injection Oracle Fix, P2-28 oidc_scope_guard, enforce_admins & Hunt Sweep
 
 * `crates/cli/src/hunt.rs` *(modified)* — Oracle Mandatory Fix: wired `forge::llm_prompt_injection::find_llm_unbounded_prompt_concat(Some(label), source_str)` into `scan_buffer` after the `java_deser_guard` call. Module was registered in `lib.rs` covering unbounded LLM prompt concatenation (user-controlled strings concatenated directly into LLM prompts without size caps) but had zero callers in any `crates/cli/src/` path. Also wired `forge::oidc_scope_guard::emit_oidc_scope_findings(source_str, label)` after `llm_prompt_injection`.

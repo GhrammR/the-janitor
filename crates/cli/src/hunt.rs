@@ -3769,6 +3769,15 @@ fn scan_buffer(
                 ..Default::default()
             }),
     );
+    findings.extend(forge::lcm::emit_cross_language_memory_witnesses(
+        source_str, label,
+    ));
+    findings.extend(forge::agent_intent::emit_agent_intent_guard_findings(
+        source_str, label,
+    ));
+    findings.extend(forge::bayesian_taint::find_probabilistic_llm_hijacks(
+        source_str.as_bytes(),
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
