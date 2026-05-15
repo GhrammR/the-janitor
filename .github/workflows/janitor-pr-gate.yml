@@ -53,18 +53,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sccache-janitor-pr-
 
-      # P4-11: Install Kani formal verifier. When Kani is pre-installed in the
-      # runner environment, harnesses run at full strength. On GitHub-hosted
-      # runners where the toolchain is absent, the step skips gracefully —
-      # Kani proof coverage is enforced locally via `just audit` and in
-      # dedicated formal-verification environments, not on every PR runner.
+      # P4-11: Install Kani formal verifier. Matches janitor.yml install pattern.
+      # toolchain-preflight.sh uses `cargo kani --version` — must be present
+      # or the preflight exits 1 and fails the gate.
       - name: Install Kani Verifier
         shell: bash
         run: |
           set -euo pipefail
-          command -v kani || { echo "Kani not installed — skipping formal verification step."; exit 0; }
-          echo "✅ Kani verifier present."
-        timeout-minutes: 5
+          if cargo install --locked kani-verifier 2>/dev/null && cargo kani setup 2>/dev/null; then
+            echo "✅ Kani verifier installed successfully."
+          else
+            echo "Kani installation failed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
+          fi
+        timeout-minutes: 10
 
       - name: Install durable Z3
         shell: bash
