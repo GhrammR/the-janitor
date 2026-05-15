@@ -20,6 +20,8 @@ The Veracode 2025 State of Software Security report established the baseline: AI
 
 The threat model has changed. Your enforcement layer has not. The Janitor is the only deterministic defense against 'Mythos-class' AI agents, mathematically verifying intent before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
 
+> **Researchers and grant reviewers**: The Janitor's formal methods foundation — IFDS taint analysis, Kani-proven Boolean predicates, and Z3 SMT exploit witness synthesis — is documented in [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
+
 ## Zero-Friction GitHub Integration
 
 ![Janitor Sentinel Demo](docs/assets/sentinel_demo.webp)

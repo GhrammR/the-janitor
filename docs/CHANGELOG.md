@@ -3,6 +3,23 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 134: P2-20 Proof Obligation Spine, oauth_account_fusion Oracle, CI Gate, Grant Brief & DeFi Hunt Sweep
+
+* `crates/forge/src/lcm.rs` *(modified)* — P2-20 fix: added `proof_class: Some(ProofClass::LatticeGapProposal)` to `security:ffi_unsafe_deref_unguarded` finding emission; import updated to `use common::slop::{ProofClass, StructuredFinding}`. Without this, KevCritical findings were silently suppressed by `enforce_false_positive_proof_obligation` at `hunt.rs:2896`.
+* `crates/forge/src/agent_intent.rs` *(modified)* — P2-20 fix: same `proof_class: Some(ProofClass::LatticeGapProposal)` on `security:agent_tool_intent_drift` emission.
+* `crates/forge/src/proof_obligation.rs` *(modified)* — P2-20: added 2 new tests: `preserves_kev_critical_finding_with_lattice_gap_proof_class` (TP regression proving lcm/agent_intent findings pass the gate) and `suppresses_kev_critical_finding_without_any_proof_class` (TN proving unproven KevCritical findings are suppressed).
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle: wired `forge::oauth_account_fusion::detect_oauth_account_fusion(source)` after `bayesian_taint` with SlopFinding→StructuredFinding adapter carrying `proof_class: Some(ProofClass::LatticeGapProposal)`. Module had zero callers in `crates/cli/src/` prior to this sprint.
+* `.INNOVATION_LOG.md` *(modified)* — P2-20 block hard-deleted (Absolute Eradication Law; proof obligation spine shipped, just audit clean); AR-038 and AR-040 updated with successful fetch evidence.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 4 new rows: Uniswap/v3-periphery no findings (0%, solidity_taint unwired); aave/aave-v3-periphery no findings (0%, same lattice gap); tempus-ex/hello-video-codec workflow_no_provenance FP on Rust source files (3%, same path-guard gap as Sprint 133 binance FP).
+* `.github/workflows/workflow-lint.yml` *(modified)* — Phase 5: added `'release/v*'` to push branches trigger so `secretless-gate-smoke` job runs on release branch pushes, enabling CI status before PR merge gate.
+* `docs/grant-research-brief.md` *(created)* — Phase 6: Grant Readiness Fix — formal methods research narrative (IFDS, Kani, Z3 AEG), alignment surface (agent_intent P2-22 firewall, bayesian_taint hijack detection, proof obligation constitutional constraint), societal impact (FP elimination, zero-upload privacy, open-source formal methods), fairness (deterministic over ML-scored), grant metrics table.
+* `README.md` *(modified)* — Phase 6: cross-reference paragraph added to `## The Problem` section pointing grant reviewers to `docs/grant-research-brief.md`.
+* `docs/CHANGELOG.md` *(modified)* — Sprint 134 entry appended.
+* **Hunt sweep**: Uniswap/v3-periphery → no findings (Solidity contracts present, `solidity_taint` module unwired); aave/aave-v3-periphery → no findings (same gap); tempus-ex/hello-video-codec → `workflow_no_provenance` FP on `.rs` files (same path-guard gap, 3%).
+* **Article Review**: AR-038 (PHP SOAP CVE-2026-6722 UAF) — fetched, `attack_ledger_update`; AR-040 (cookie thieves via fake Claude Code) — fetched, `mapped_innovation_item` → P2-22 validated + `invisible_payload` COM interface surface. AR-037 (arstechnica Linux vuln) and AR-039 (Reuters Mythos) remain blocked (domain restrictions).
+
+**Verification**: `just audit` ✓ | 2 new `proof_obligation` tests ✓ | Kani `proof_obligation_gate_is_exact` ✓ | `oauth_account_fusion` wired ✓ | P2-20 hard-deleted ✓
+
 ## 2026-05-15 — Sprint Batch 133: bayesian_taint Oracle Fix, P2-21 lcm.rs, P2-22 agent_intent.rs, Daemon Heartbeat, Release PR Flow & Hunt Sweep
 
 * `crates/forge/src/lcm.rs` *(created)* — P2-21: Cross-Language Memory Safety Witness Translation. AhoCorasick on `FFI_SINKS` (`CStr::from_ptr`, `slice::from_raw_parts`, `std::ptr::read`, `unsafe { *`) and `FFI_SOURCES` (`extern "C" fn`, `qdb_read`, `pub unsafe fn`, `::ffi::`); ±20-line window; `GUARDS` null-check suppressors; emits `security:ffi_unsafe_deref_unguarded` at KevCritical; `ffi_deref_unguarded()` boolean predicate for Kani; 9 deterministic tests (4 TP, 4 TN, 1 predicate).

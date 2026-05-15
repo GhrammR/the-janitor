@@ -219,4 +219,35 @@ mod tests {
         assert!(!proof_obligation_missing(true, true));
         assert!(!proof_obligation_missing(false, false));
     }
+
+    #[test]
+    fn preserves_kev_critical_finding_with_lattice_gap_proof_class() {
+        // Regression: lcm.rs and agent_intent.rs emit LatticeGapProposal.
+        // Verify the gate passes them through rather than suppressing.
+        let findings = vec![StructuredFinding {
+            id: "security:ffi_unsafe_deref_unguarded".to_string(),
+            severity: Some("KevCritical".to_string()),
+            proof_class: Some(ProofClass::LatticeGapProposal),
+            ..Default::default()
+        }];
+
+        let filtered = enforce_false_positive_proof_obligation(&findings);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(
+            filtered[0].proof_class,
+            Some(ProofClass::LatticeGapProposal)
+        );
+    }
+
+    #[test]
+    fn suppresses_kev_critical_finding_without_any_proof_class() {
+        let findings = vec![StructuredFinding {
+            id: "security:ffi_unsafe_deref_unguarded".to_string(),
+            severity: Some("KevCritical".to_string()),
+            ..Default::default()
+        }];
+
+        let filtered = enforce_false_positive_proof_obligation(&findings);
+        assert!(filtered.is_empty());
+    }
 }

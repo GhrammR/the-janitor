@@ -6,7 +6,7 @@
 //! surfaces (freedomofpress/securedrop-client proxy/src/config_qubesdb.rs).
 
 use aho_corasick::{AhoCorasick, MatchKind};
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding};
 
 const FFI_SINKS: &[&str] = &[
     "CStr::from_ptr",
@@ -91,6 +91,7 @@ pub fn emit_cross_language_memory_witnesses(source: &str, file: &str) -> Vec<Str
             severity: Some("KevCritical".to_string()),
             file: Some(file.to_string()),
             line: Some((i + 1) as u32),
+            proof_class: Some(ProofClass::LatticeGapProposal),
             remediation: Some(
                 "Add a null check before dereferencing the raw pointer: \
                  `if ptr.is_null() { return Err(...); }` or use `NonNull::new(ptr).ok_or(...)?`."

@@ -3778,6 +3778,17 @@ fn scan_buffer(
     findings.extend(forge::bayesian_taint::find_probabilistic_llm_hijacks(
         source_str.as_bytes(),
     ));
+    findings.extend(
+        forge::oauth_account_fusion::detect_oauth_account_fusion(source)
+            .into_iter()
+            .map(|f| StructuredFinding {
+                id: f.description.clone(),
+                severity: Some(format!("{:?}", f.severity)),
+                file: Some(label.to_string()),
+                proof_class: Some(common::slop::ProofClass::LatticeGapProposal),
+                ..Default::default()
+            }),
+    );
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(

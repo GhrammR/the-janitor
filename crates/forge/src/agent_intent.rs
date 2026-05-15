@@ -7,7 +7,7 @@
 //! tool_use, and LangChain/AutoGPT agent tool dispatch patterns.
 
 use aho_corasick::{AhoCorasick, MatchKind};
-use common::slop::StructuredFinding;
+use common::slop::{ProofClass, StructuredFinding};
 
 /// Tool dispatch sinks — any of these indicate an agent is invoking or selecting
 /// a tool.
@@ -112,6 +112,7 @@ pub fn emit_agent_intent_guard_findings(source: &str, file: &str) -> Vec<Structu
             severity: Some("KevCritical".to_string()),
             file: Some(file.to_string()),
             line: Some((i + 1) as u32),
+            proof_class: Some(ProofClass::LatticeGapProposal),
             remediation: Some(
                 "Declare an explicit intent label (`read_only`, `dry_run`, `sandbox`) alongside \
                  every tool dispatch that could execute privileged operations. Verify tool intent \
