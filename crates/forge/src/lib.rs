@@ -78,6 +78,7 @@ pub mod mesh_taint;
 pub mod metadata;
 pub mod mev_synthesis;
 pub mod migration_guard;
+pub mod model_backdoor;
 pub mod model_lineage;
 pub mod model_pinning;
 pub mod multimodal_poison;

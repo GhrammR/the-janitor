@@ -3831,6 +3831,13 @@ fn scan_buffer(
         ));
     }
 
+    // Neural model weight backdoor scanner (Phase A: header anomaly detection).
+    if label.ends_with(".safetensors") {
+        findings.extend(forge::model_backdoor::emit_model_backdoor_findings(
+            source, label,
+        ));
+    }
+
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
         filename,
