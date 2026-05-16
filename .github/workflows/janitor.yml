@@ -85,28 +85,8 @@ jobs:
 
       # Execute Stateless Firewall — full repo scan on HEAD.
       # Writes .janitor/janitor_badge.svg as part of the scan report.
-      # P4-11: Install Kani formal verifier for proof-harness gate.
-      # Missing proof tooling is a hard failure; temporary installs are rejected
-      # by tools/toolchain-preflight.sh.
-      - name: Install Kani Verifier
-        shell: bash
-        run: |
-          set -euo pipefail
-          if cargo install --locked kani-verifier 2>/dev/null && cargo kani setup 2>/dev/null; then
-            echo "✅ Kani verifier installed."
-          else
-            echo "Kani installation failed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
-            exit 1
-          fi
-
-      - name: Install durable Z3
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m venv "${HOME}/.local/share/janitor-tools/z3-venv"
-          "${HOME}/.local/share/janitor-tools/z3-venv/bin/python" -m pip install --upgrade pip z3-solver
-          mkdir -p "${HOME}/.local/bin"
-          ln -sf "${HOME}/.local/share/janitor-tools/z3-venv/bin/z3" "${HOME}/.local/bin/z3"
+      - name: Set up Janitor toolchain
+        uses: ./.github/actions/toolchain-setup
 
       - name: Formal toolchain preflight
         shell: bash
