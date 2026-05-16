@@ -2410,6 +2410,73 @@ pub fn bounce_git(
                 .semantic_mutation_roots
                 .append(&mut score.semantic_mutation_roots);
         }
+
+        // ── patch_proof Oracle (P7-2 Phase B) ────────────────────────────────
+        //
+        // Retrieve the base blob from the base commit tree and run the AST
+        // bisimulation prover against the HEAD blob.  New files (absent from
+        // the base tree) are skipped — Unsatisfiable only fires on parse
+        // failures, not on genuine new-file additions.
+        {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or_default();
+            if let Ok(base_commit) = repo.find_commit(base_oid) {
+                if let Ok(base_tree) = base_commit.tree() {
+                    if let Ok(entry) = base_tree.get_path(path) {
+                        if let Ok(obj) = entry.to_object(&repo) {
+                            if let Some(base_blob) = obj.as_blob() {
+                                let base_bytes = base_blob.content();
+                                if let Some(proof) = crate::patch_proof::prove_patch_correctness(
+                                    base_bytes, blob_bytes, ext,
+                                ) {
+                                    let file_str = path.to_string_lossy().into_owned();
+                                    match &proof.verdict {
+                                        crate::patch_proof::PatchVerdict::IntroducesNewBehavior {
+                                            changed_nodes,
+                                        } if changed_nodes.len() >= 3 => {
+                                            use common::slop::StructuredFinding;
+                                            total.structured_findings.push(StructuredFinding {
+                                                id: format!(
+                                                    "architecture:patch_introduces_new_behavior \
+                                                     — {file_str} introduces {} structural \
+                                                     changes beyond the declared fix scope",
+                                                    changed_nodes.len()
+                                                ),
+                                                severity: Some("Medium".to_string()),
+                                                file: Some(file_str),
+                                                proof_class: Some(
+                                                    common::slop::ProofClass::InvariantViolationProof,
+                                                ),
+                                                ..Default::default()
+                                            });
+                                        }
+                                        crate::patch_proof::PatchVerdict::Unsatisfiable => {
+                                            use common::slop::StructuredFinding;
+                                            total.structured_findings.push(StructuredFinding {
+                                                id: format!(
+                                                    "architecture:patch_proof_unsatisfiable \
+                                                     — AST bisimulation failed for {file_str}; \
+                                                     parser rejected one or both buffers"
+                                                ),
+                                                severity: Some("Low".to_string()),
+                                                file: Some(file_str),
+                                                proof_class: Some(
+                                                    common::slop::ProofClass::LatticeGapProposal,
+                                                ),
+                                                ..Default::default()
+                                            });
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok((total, snapshot.blobs))
@@ -3626,6 +3693,52 @@ diff --git a/docs/review.md b/docs/review.md
         assert!(
             score.structured_findings.is_empty(),
             "clean patch must produce no structured findings"
+        );
+    }
+
+    // ── P7-2 Phase B: patch_proof oracle verdict tests ───────────────────────
+
+    #[test]
+    fn patch_proof_oracle_emits_introduces_new_behavior_at_threshold() {
+        // 5 Rust functions each modified to add a distinct AST construct so that
+        // changed_node_kinds accumulates ≥3 distinct kinds and modified_functions.len() > 3.
+        let before = b"\
+fn a(x: i32) -> i32 { x }\n\
+fn b(x: i32) -> i32 { x }\n\
+fn c(x: i32) -> i32 { x }\n\
+fn d(x: i32) -> i32 { x }\n\
+fn e(x: i32) -> i32 { x }\n";
+        let after = b"\
+fn a(x: i32) -> i32 { if x > 0 { x } else { 0 } }\n\
+fn b(x: i32) -> i32 { loop { return x; } }\n\
+fn c(x: i32) -> i32 { while x > 0 { return x; } x }\n\
+fn d(x: i32) -> i32 { for _i in 0..x { return x; } x }\n\
+fn e(x: i32) -> i32 { match x { 0 => 1, n => n } }\n";
+        let proof = crate::patch_proof::prove_patch_correctness(before, after, "rs");
+        assert!(proof.is_some(), "rs is a supported extension");
+        let proof = proof.unwrap();
+        assert!(
+            matches!(
+                &proof.verdict,
+                crate::patch_proof::PatchVerdict::IntroducesNewBehavior { changed_nodes }
+                    if changed_nodes.len() >= 3
+            ),
+            "5-function poly-construct diff must be IntroducesNewBehavior with ≥3 node kinds: {:?}",
+            proof.verdict
+        );
+    }
+
+    #[test]
+    fn patch_proof_oracle_emits_unsatisfiable_on_empty_before() {
+        // An empty base buffer (new file) must produce PatchVerdict::Unsatisfiable.
+        let before = b"";
+        let after = b"def a(): pass\n";
+        let proof = crate::patch_proof::prove_patch_correctness(before, after, "py");
+        assert!(proof.is_some());
+        assert_eq!(
+            proof.unwrap().verdict,
+            crate::patch_proof::PatchVerdict::Unsatisfiable,
+            "empty base buffer must be Unsatisfiable"
         );
     }
 }

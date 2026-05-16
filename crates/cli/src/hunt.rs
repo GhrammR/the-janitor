@@ -3829,6 +3829,22 @@ fn scan_buffer(
                 ..Default::default()
             }),
     );
+    if matches!(
+        ext,
+        "py" | "js" | "ts" | "tsx" | "rb" | "go" | "java" | "php" | "kt"
+    ) {
+        findings.extend(
+            forge::oauth_account_fusion::detect_missing_state_validation(source, label)
+                .into_iter()
+                .map(|f| StructuredFinding {
+                    id: f.description.clone(),
+                    severity: Some(format!("{:?}", f.severity)),
+                    file: Some(label.to_string()),
+                    proof_class: Some(common::slop::ProofClass::ReachabilityProof),
+                    ..Default::default()
+                }),
+        );
+    }
     findings.extend(forge::solidity_taint::find_solidity_slop(source));
     findings.extend(
         forge::config_taint::track_config_taint_js(source)

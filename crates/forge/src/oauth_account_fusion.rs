@@ -132,6 +132,70 @@ pub fn detect_oauth_account_fusion(source: &[u8]) -> Vec<SlopFinding> {
 }
 
 // ---------------------------------------------------------------------------
+// OAuth State Parameter Absence Detector (P17-4)
+// ---------------------------------------------------------------------------
+
+/// AhoCorasick automaton for OAuth authorization-code extraction patterns.
+fn oauth_code_ac() -> &'static AhoCorasick {
+    static AC: OnceLock<AhoCorasick> = OnceLock::new();
+    AC.get_or_init(|| {
+        AhoCorasick::new([
+            b"code=" as &[u8],
+            b"authorization_code",
+            b"grant_type=authorization_code",
+            b"oauth_code",
+            b"auth_code",
+        ])
+        .expect("oauth_code_ac: static patterns are valid")
+    })
+}
+
+/// AhoCorasick automaton for state-parameter validation patterns.
+fn oauth_state_ac() -> &'static AhoCorasick {
+    static AC: OnceLock<AhoCorasick> = OnceLock::new();
+    AC.get_or_init(|| {
+        AhoCorasick::new([
+            b"state_param" as &[u8],
+            b"oauth_state",
+            b"csrf_token",
+            b"request_verifier",
+            b"pkce_verifier",
+            b"state =",
+            b"state=",
+        ])
+        .expect("oauth_state_ac: static patterns are valid")
+    })
+}
+
+/// Scan `source` for OAuth callbacks that extract an authorization code without
+/// validating the `state` parameter (CSRF-driven code injection, CWE-352/352).
+///
+/// Emits one finding when group-1 (code extraction) fires anywhere in the
+/// source AND group-2 (state validation) is entirely absent from the source.
+/// Both groups are whole-file: a handler that receives `code=` shares a file
+/// with state validation or it doesn't — intra-handler windowing would add FPs
+/// for files where state is validated in a helper referenced by name.
+pub fn detect_missing_state_validation(source: &[u8], label: &str) -> Vec<SlopFinding> {
+    if !oauth_code_ac().is_match(source) {
+        return Vec::new();
+    }
+    if oauth_state_ac().is_match(source) {
+        return Vec::new();
+    }
+    vec![SlopFinding {
+        start_byte: 0,
+        end_byte: source.len().min(1),
+        description: format!(
+            "security:oauth_missing_state_validation — OAuth callback handler in `{label}` \
+             extracts authorization code without validating state parameter \
+             (CSRF-driven code injection vector, CWE-352)"
+        ),
+        domain: DOMAIN_FIRST_PARTY,
+        severity: Severity::High,
+    }]
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -265,6 +329,78 @@ end
         assert!(
             !findings.is_empty(),
             "OmniAuth find_or_create_by without email_verified must fire"
+        );
+    }
+
+    // ── P17-4: detect_missing_state_validation ──────────────────────────────
+
+    #[test]
+    fn state_validation_tp_code_without_state() {
+        // TP: code= present, no state validation → must fire
+        let src = b"
+def oauth_callback(request):
+    code = request.GET.get('code=')
+    token = exchange_code_for_token(code)
+    user = get_or_create_user(token)
+    login(request, user)
+";
+        let findings = detect_missing_state_validation(src, "views.py");
+        assert!(
+            !findings.is_empty(),
+            "code= without state validation must fire"
+        );
+        assert!(
+            findings[0]
+                .description
+                .contains("oauth_missing_state_validation"),
+            "finding description must contain the rule ID"
+        );
+        assert_eq!(findings[0].severity, Severity::High);
+    }
+
+    #[test]
+    fn state_validation_tn_code_with_state_present() {
+        // TN: code= present AND state= present → must not fire
+        let src = b"
+def oauth_callback(request):
+    code = request.GET['code=']
+    state = request.GET['state=']
+    if state != request.session['oauth_state']:
+        raise SuspiciousOperation
+    token = exchange_code_for_token(code)
+";
+        let findings = detect_missing_state_validation(src, "views.py");
+        assert!(
+            findings.is_empty(),
+            "state= present must suppress the finding"
+        );
+    }
+
+    #[test]
+    fn state_validation_tn_no_oauth_code() {
+        // TN: no code-extraction pattern → must not fire
+        let src = b"
+def home(request):
+    user = request.user
+    return render(request, 'home.html', {'user': user})
+";
+        let findings = detect_missing_state_validation(src, "views.py");
+        assert!(findings.is_empty(), "no OAuth code pattern must not fire");
+    }
+
+    #[test]
+    fn state_validation_tn_state_without_code() {
+        // TN: state= present but no code-extract → must not fire
+        let src = b"
+function validateState(req) {
+    const state = req.query['state='];
+    if (state !== req.session.oauth_state) throw new Error('CSRF');
+}
+";
+        let findings = detect_missing_state_validation(src, "auth.js");
+        assert!(
+            findings.is_empty(),
+            "state= without code-extract must not fire"
         );
     }
 }
