@@ -3803,9 +3803,16 @@ fn scan_buffer(
                 ..Default::default()
             }),
     );
-    findings.extend(forge::model_lineage::emit_llm_model_provenance_findings(
-        source_str, label,
-    ));
+    // LLM load provenance: Python/JS/TS/notebook only — Rust test strings contain
+    // these patterns as literals and trigger false positives on .rs diffs.
+    if matches!(
+        label.rsplit('.').next().unwrap_or(""),
+        "py" | "ipynb" | "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx"
+    ) {
+        findings.extend(forge::model_lineage::emit_llm_model_provenance_findings(
+            source_str, label,
+        ));
+    }
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
