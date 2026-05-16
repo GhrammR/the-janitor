@@ -3734,9 +3734,11 @@ fn scan_buffer(
     let source_str = std::str::from_utf8(source).unwrap_or("");
     findings
         .extend(forge::mcp_dispatch_guard::emit_mcp_confused_deputy_findings(source_str, label));
-    findings.extend(forge::workflow_evidence::emit_workflow_provenance_finding(
-        label, source_str,
-    ));
+    if (label.ends_with(".yml") || label.ends_with(".yaml")) && source_str.contains("jobs:") {
+        findings.extend(forge::workflow_evidence::emit_workflow_provenance_finding(
+            label, source_str,
+        ));
+    }
     findings.extend(forge::debug_endpoint_guard::emit_debug_endpoint_findings(
         source_str, label,
     ));
@@ -3790,6 +3792,20 @@ fn scan_buffer(
             }),
     );
     findings.extend(forge::solidity_taint::find_solidity_slop(source));
+    findings.extend(
+        forge::config_taint::track_config_taint_js(source)
+            .into_iter()
+            .map(|f| common::slop::StructuredFinding {
+                id: format!("security:config_taint_{}", f.property_path),
+                severity: Some("High".to_string()),
+                file: Some(label.to_string()),
+                proof_class: Some(common::slop::ProofClass::LatticeGapProposal),
+                ..Default::default()
+            }),
+    );
+    findings.extend(forge::model_lineage::emit_llm_model_provenance_findings(
+        source_str, label,
+    ));
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(

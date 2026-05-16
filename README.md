@@ -3,7 +3,30 @@
 
 ![Integrity Status](.janitor/janitor_badge.svg)
 
-*Attested by The Janitor v10.2.2: Zero-Upload, FIPS 204 + FIPS 205 Compliant.*
+*Attested by The Janitor v10.2.2
+
+
+## Research Foundation
+
+> **For grant reviewers and academic collaborators**: The Janitor implements three formally verified layers — [IFDS interprocedural taint analysis](docs/grant-research-brief.md#1-ifds-backed-taint-analysis-across-23-language-grammars) across 23 language grammars, [Kani-proven Boolean predicates](docs/grant-research-brief.md#2-kani-proven-boolean-predicates-for-security-gate-correctness) for detection correctness, and [Z3 SMT exploit witness synthesis](docs/grant-research-brief.md#3-z3-smt-constraint-solving-for-exploit-witness-synthesis). Full research brief: [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+: Zero-Upload, FIPS 204 + FIPS 205 Compliant.*
 
 ---
 

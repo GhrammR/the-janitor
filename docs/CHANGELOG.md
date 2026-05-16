@@ -3,6 +3,19 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 135: workflow_no_provenance Structural Eradication, P6-5 model_lineage, config_taint Oracle, Grant Readiness Fix & Governance Checklist
+
+* `crates/cli/src/hunt.rs` *(modified)* — Phase 0: `workflow_no_provenance` path guard — `emit_workflow_provenance_finding` now wrapped in `(label.ends_with(".yml") || label.ends_with(".yaml")) && source_str.contains("jobs:")` check; eradicates 3-consecutive-sprint FP on `.rs`/`.ts`/`.tsx` source files (binance/mattermost/tempus-ex).
+* `crates/cli/src/hunt.rs` *(modified)* — Phase 1 Oracle: `forge::config_taint::track_config_taint_js(source)` wired after `solidity_taint`; `ConfigTaintFlow → StructuredFinding` adapter with `proof_class: LatticeGapProposal`; zero callers in `crates/cli/src/` prior to this sprint.
+* `crates/forge/src/model_lineage.rs` *(modified)* — Phase 2 P6-5: extended with `llm_provenance_missing(has_load_sink, has_provenance)` Boolean predicate + `emit_llm_model_provenance_findings(source_str, label)` (AhoCorasick on 5 LLM load sinks: `from_pretrained(`, `AutoModelForCausalLM.from_pretrained`, `load_model(`, `trust_remote_code=True`, `pipeline(`; ±10-line window for 9 provenance suppressors: `model_sha256=`, `model_hash=`, `verify_model_hash(`, etc.; `security:llm_model_unverified_load` at KevCritical; 8 new tests — 4 TP + 4 TN).
+* `crates/cli/src/hunt.rs` *(modified)* — Phase 2: `forge::model_lineage::emit_llm_model_provenance_findings` wired after `config_taint`.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Phase 2: Kani harness `llm_provenance_gate_is_exact()` added to `kani_proofs` block (symbolic `has_load_sink` × `has_provenance` covering all 4 input states); regression test `llm_provenance_gate_requires_sink_and_missing_attestation` added to `#[cfg(test)] mod tests` with `use crate::model_lineage::llm_provenance_missing` import.
+* `README.md` *(modified)* — Phase 3 Grant Readiness Fix: `## Research Foundation` section inserted after attestation line, before commercial copy — surfaces IFDS/Kani/Z3 above the fold for OpenAI Researcher Access reviewers.
+* `.INNOVATION_LOG.md` *(modified)* — P6-5 block physically hard-deleted (Absolute Eradication Law; `model_lineage::emit_llm_model_provenance_findings` shipped, `just audit` ✓).
+* `.agent_governance/rules/response-format.md` *(modified)* — Mirroring Pre-Emission Checklist appended: 4-gate verification (Systems Health Signal, Platform Expansion Tip, Entropy Modulator, already-shipped exemption) required before sealing NRA prompt. Closes governance violation from Sprint 134 where Platform Expansion Tip was not mirrored as a Phase.
+
+**Verification**: `just audit` ✓ | 8/8 `model_lineage` P6-5 tests ✓ | 1 regression test in `reflexive_assurance` ✓ | Kani `llm_provenance_gate_is_exact` ✓ | `workflow_no_provenance` path guard active ✓ | `config_taint` Oracle wired ✓ | P6-5 hard-deleted ✓
+
 ## 2026-05-15 — Sprint Batch 134: P2-20 Proof Obligation Spine, oauth_account_fusion Oracle, CI Gate, Grant Brief & DeFi Hunt Sweep
 
 * `crates/forge/src/lcm.rs` *(modified)* — P2-20 fix: added `proof_class: Some(ProofClass::LatticeGapProposal)` to `security:ffi_unsafe_deref_unguarded` finding emission; import updated to `use common::slop::{ProofClass, StructuredFinding}`. Without this, KevCritical findings were silently suppressed by `enforce_false_positive_proof_obligation` at `hunt.rs:2896`.

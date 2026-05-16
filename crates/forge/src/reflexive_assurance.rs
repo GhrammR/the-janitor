@@ -31,6 +31,7 @@ mod kani_proofs {
     use crate::lcm::ffi_deref_unguarded;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
+    use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
@@ -260,6 +261,17 @@ mod kani_proofs {
             "agent tool-intent drift gate must be exact conjunction",
         );
     }
+
+    #[kani::proof]
+    fn llm_provenance_gate_is_exact() {
+        let has_load_sink: bool = kani::any();
+        let has_provenance: bool = kani::any();
+        let result = crate::model_lineage::llm_provenance_missing(has_load_sink, has_provenance);
+        kani::assert(
+            result == (has_load_sink && !has_provenance),
+            "llm_provenance_missing must be true only when sink present and provenance absent",
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -275,6 +287,7 @@ mod tests {
     use crate::java_deser_guard::deser_missing_allowlist;
     use crate::lcm::ffi_deref_unguarded;
     use crate::linker_hijack::linker_hijack_missing_attestation;
+    use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
@@ -393,5 +406,13 @@ mod tests {
         assert!(!session_tool_intent_drift(true, true, true));
         assert!(!session_tool_intent_drift(false, true, false));
         assert!(!session_tool_intent_drift(true, false, false));
+    }
+
+    #[test]
+    fn llm_provenance_gate_requires_sink_and_missing_attestation() {
+        assert!(llm_provenance_missing(true, false));
+        assert!(!llm_provenance_missing(true, true));
+        assert!(!llm_provenance_missing(false, false));
+        assert!(!llm_provenance_missing(false, true));
     }
 }
