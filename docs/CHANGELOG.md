@@ -3,6 +3,20 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-16 — Sprint Batch 137: P6-3 Neural Model Weight Backdoor Scanner, P7-2 Patch Correctness Proof, invisible_payload Oracle & Hunt Sweep
+
+* `crates/forge/src/model_backdoor.rs` *(created)* — P6-3 Phase A: `emit_model_backdoor_findings(source, label)` parses safetensors binary format (8-byte LE u64 header_len + UTF-8 JSON); 3 anomaly detectors: unknown dtype (Anomaly A, Medium), suspicious scalar tensor with non-standard name prefix (Anomaly B, Medium), oversized header >10 MiB (Anomaly C, Low); gated on `.safetensors` extension; 6 deterministic tests; no external crate (serde_json only). Wired in `hunt.rs` after browser_ext block.
+* `crates/forge/src/patch_proof.rs` *(created)* — P7-2 Phase A: `prove_patch_correctness(before, after, lang_ext) -> Option<PatchProof>`; tree-sitter AST diff over 8 languages (rs/go/py/js/ts/c/cpp/java); `collect_functions` extracts function-map (node-kind sorted sets); symmetric diff → `PatchVerdict::EquivalentExceptForFix | IntroducesNewBehavior | Unsatisfiable`; `IntroducesNewBehavior` triggered when >3 modified functions, top-3 changed kinds reported; 6 deterministic tests. No wire into hunt.rs (Phase B).
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod model_backdoor;` (after malware_genome) and `pub mod patch_proof;` (after patch_proof alphabetically) registered.
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle: `forge::invisible_payload::scan_invisible_payloads` (zero callers confirmed) wired after deobfuscate pre-pass; extension gate (py/js/ts/tsx/jsx/rs/go/java/kt/swift/rb/php/lua/sh/bash/ps1/cs/cpp/c/h); `SlopFinding` mapped to `StructuredFinding` via `extract_rule_id` + `byte_to_line` + severity format.
+* `.INNOVATION_LOG.md` *(modified)* — P6-3 and P7-2 blocks hard-deleted (Absolute Eradication Law). AR-041 (PortSwigger OAuth state-machine, `mapped_innovation_item` → P17-4 filed) and AR-042 (CISA KEV: Exchange XSS + Cisco SD-WAN auth bypass, both `attack_ledger_update`) appended.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — mattermost-plugin-boards promoted 30% → 55% (scope confirmed, marked v4 raw HTML passthrough verified, 8 sinks confirmed, no DOMPurify). Both cashapp/misk protobuf_any rows removed (response-only Any field, no unguarded decode path).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 4 new rows: misk protobuf_any (response-only server field, 2%); next.js SSRF (Host header, trustHostHeader-gated, 3%); next.js react_xss_dangerous_html (framework CSS template literals, 2%); next.js workflow_no_provenance (first-party actions/cache, 2%).
+* PR #107: `DIRTY`/`CONFLICTING` — operator must resolve merge conflicts in `codex/formal-ai-governance` branch.
+* Sprint 137 commits pushed to `release/v10.2.2`; PR #112 CI re-triggered (run `in_progress` at push time).
+
+**Verification**: `just audit` ✓ | 6/6 `model_backdoor` tests ✓ | 6/6 `patch_proof` tests ✓ | invisible_payload oracle wired ✓ | P6-3/P7-2 hard-deleted ✓ | AR-041 `mapped_innovation_item` P17-4 filed ✓ | AR-042 `attack_ledger_update` ✓ | 3-org hunt complete ✓
+
 ## 2026-05-15 — Sprint Batch 136: P6-2 Malware Genome Tracker, P8-5 Browser Extension Pack, deobfuscate Oracle, Composite Toolchain Action & Hunt Sweep
 
 * `crates/forge/src/malware_genome.rs` *(created)* — P6-2: `extract_genome(source, lang_ext) -> Option<MalwareGenome>` using tree-sitter DFS walk over polyglot registry; `simhash_from_kinds` FNV1a-mixed positional SimHash; `genome_similarity(a, b) -> f32`; `is_genome_variant(candidate, known, threshold) -> bool`; 7 deterministic tests (2 TP cosmetic/reorder + 2 TN unrelated/empty + 2 predicate + 1 unsupported ext). Wired in `hunt.rs` scan_buffer with `let _ = genome` stub for Sprint 137 corpus comparison.
