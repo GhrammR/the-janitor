@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
       - 'action.yml'
   push:
     branches:
@@ -21,6 +22,7 @@ on:
       - 'release/v*'
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
       - 'action.yml'
 
 permissions:
@@ -54,6 +56,12 @@ jobs:
               || { echo "FAIL: invalid YAML — $f"; exit 1; }
             echo "OK: $f"
           done
+          # Extend to composite actions under .github/actions/
+          while IFS= read -r -d '' f; do
+            python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" \
+              || { echo "FAIL: invalid YAML — $f"; exit 1; }
+            echo "OK: $f"
+          done < <(find .github/actions -name '*.yml' -print0 2>/dev/null || true)
 
       - name: actionlint
         shell: bash
@@ -88,7 +96,7 @@ jobs:
           # and SHA pins (40-hex string) are allowed.
           UNPINNED=$(
             grep -rEn '^\s*-?\s*uses:\s*[^./].*@(v[0-9]+(\.[0-9]+)?|main|master|latest)\s*$' \
-              .github/workflows/ action.yml 2>/dev/null || true
+              .github/workflows/ .github/actions/ action.yml 2>/dev/null || true
           )
           if [ -n "${UNPINNED}" ]; then
             echo "::error::Found unpinned action references (must SHA-pin):"

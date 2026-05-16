@@ -3,6 +3,13 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-16 — Sprint Batch 137 (cont.): blast_radius Release-PR Exemption & actionlint Coverage Expansion
+
+* `crates/forge/src/slop_filter.rs` *(modified)* — Release-PR exemption for `architecture:blast_radius_violation`: when both `Cargo.toml` and a `CHANGELOG.md` are present in the diff, the blast-radius gate is suppressed — coordinated version bumps legitimately span >5 top-level directories. Added `is_release_pr` boolean computed from `section_paths` before the gate. 2 new tests: `test_blast_radius_gate_exempt_for_release_pr` (Cargo.toml + CHANGELOG.md across 9 dirs → no finding) and `test_blast_radius_gate_fires_without_changelog` (Cargo.toml but no CHANGELOG.md → fires normally). Closes CI failure on PR #112.
+* `.github/workflows/workflow-lint.yml` *(modified)* — Extended trigger paths to include `.github/actions/**` so composite-action changes trigger the lint job. YAML syntax check now also validates `.github/actions/**/*.yml` via `find … -print0` loop. SHA-pin discipline grep extended to check `.github/actions/` directory. Satisfies Platform Expansion Tip from Sprint 137.
+
+**Verification**: `just audit` ✓ | 5/5 blast_radius tests ✓ | `slop_score == 0` on release-pattern PR ✓
+
 ## 2026-05-16 — Sprint Batch 137: P6-3 Neural Model Weight Backdoor Scanner, P7-2 Patch Correctness Proof, invisible_payload Oracle & Hunt Sweep
 
 * `crates/forge/src/model_backdoor.rs` *(created)* — P6-3 Phase A: `emit_model_backdoor_findings(source, label)` parses safetensors binary format (8-byte LE u64 header_len + UTF-8 JSON); 3 anomaly detectors: unknown dtype (Anomaly A, Medium), suspicious scalar tensor with non-standard name prefix (Anomaly B, Medium), oversized header >10 MiB (Anomaly C, Low); gated on `.safetensors` extension; 6 deterministic tests; no external crate (serde_json only). Wired in `hunt.rs` after browser_ext block.
