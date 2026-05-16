@@ -1,0 +1,51 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    branches:
+      - main
+
+# Minimal surface: read repo, write PR state and merge queue.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: dependabot-automerge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Hard-guard: only act when the PR author is the Dependabot bot.
+    # github.actor is set by GitHub and cannot be spoofed by PR content.
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      # Enable auto-merge first so the merge fires the moment required checks
+      # pass — even if the approve step below races with check completion.
+      - name: Enable auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh pr merge --auto --squash \
+            --repo "${{ github.repository }}" \
+            "${{ github.event.pull_request.number }}"
+
+      # Approve so any "required review" branch-protection rule is satisfied.
+      # GITHUB_TOKEN is the Actions app identity — distinct from dependabot[bot]
+      # — so self-approval restrictions do not apply here.
+      - name: Approve PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh pr review --approve \
+            --repo "${{ github.repository }}" \
+            --body "Auto-approved: Dependabot dependency update. Squash-merge queued pending required checks (secretless-gate-smoke, MSRV, YAML + actionlint + SHA-pin)." \
+            "${{ github.event.pull_request.number }}"
