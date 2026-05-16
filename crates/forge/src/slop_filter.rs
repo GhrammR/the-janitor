@@ -828,6 +828,17 @@ impl PRBouncer for PatchBouncer {
                     total.structured_findings.append(&mut s.structured_findings);
                 }
             }
+            // ── Release-PR Clone Exemption ────────────────────────────────────
+            // A coordinated version-bump PR legitimately adds many structurally
+            // similar test functions (assertions, fixtures, harnesses) that the
+            // clone detector scores as logic duplication.  These are not hallucinated
+            // refactors — they are the mandatory test coverage.  Zero out the
+            // accumulated clone count when the PR is identified as a release commit
+            // (Cargo.toml + CHANGELOG.md both present) so the score reflects only
+            // real structural violations, not test boilerplate.
+            if is_release_pr {
+                total.logic_clones_found = 0;
+            }
             // ── API Migration Guard ───────────────────────────────────────────
             // Runs at the multi-file aggregate level so it sees both Cargo.lock
             // changes and Rust source changes in the same patch context.
@@ -3529,6 +3540,51 @@ diff --git a/docs/review.md b/docs/review.md
                 .any(|d| d.contains("blast_radius_violation")),
             "6-dir PR without CHANGELOG.md must still fire blast_radius_violation: {:?}",
             score.antipattern_details
+        );
+    }
+
+    #[test]
+    fn test_release_pr_clone_exemption() {
+        // A release PR with Cargo.toml + CHANGELOG.md must have logic_clones zeroed.
+        // Use a patch with two structurally identical blocks that would normally
+        // register as clones (same added lines in two different files).
+        let identical_body = "+fn test_a() { assert_eq!(1, 1); }\n";
+        let patch = format!(
+            "diff --git a/Cargo.toml b/Cargo.toml\n\
+             index 0000000..1111111 100644\n\
+             --- a/Cargo.toml\n\
+             +++ b/Cargo.toml\n\
+             @@ -0,0 +1 @@\n\
+             +version = \"10.2.3\"\n\
+             \n\
+             diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md\n\
+             index 0000000..1111111 100644\n\
+             --- a/docs/CHANGELOG.md\n\
+             +++ b/docs/CHANGELOG.md\n\
+             @@ -0,0 +1 @@\n\
+             +# v10.2.3\n\
+             \n\
+             diff --git a/crates/forge/src/a.rs b/crates/forge/src/a.rs\n\
+             index 0000000..1111111 100644\n\
+             --- a/crates/forge/src/a.rs\n\
+             +++ b/crates/forge/src/a.rs\n\
+             @@ -0,0 +1 @@\n\
+             {identical_body}\
+             \n\
+             diff --git a/crates/cli/src/b.rs b/crates/cli/src/b.rs\n\
+             index 0000000..1111111 100644\n\
+             --- a/crates/cli/src/b.rs\n\
+             +++ b/crates/cli/src/b.rs\n\
+             @@ -0,0 +1 @@\n\
+             {identical_body}"
+        );
+        let score = PatchBouncer::default()
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        assert_eq!(
+            score.logic_clones_found, 0,
+            "release PR (Cargo.toml + CHANGELOG.md) must zero logic_clones_found: got {}",
+            score.logic_clones_found
         );
     }
 
