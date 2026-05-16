@@ -3,6 +3,12 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 135 Hotfix: PR #112 Structural Firewall Fix
+
+* `crates/cli/src/hunt.rs` *(modified)* — `emit_llm_model_provenance_findings` gated to ML-adjacent extensions only (`py`, `ipynb`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`). Root cause: `.rs` files in the PR diff contained LLM API patterns as string literals in tests (`from_pretrained(`, `pipeline(`, `trust_remote_code=True`), generating 2× KevCritical findings (slop_score 300). Extension guard eradicates the false positive.
+
+**Commit**: `bd7eea5` — pushed to `release/v10.2.2`; PR #112 CI re-triggered.
+
 ## 2026-05-15 — Sprint Batch 135: workflow_no_provenance Structural Eradication, P6-5 model_lineage, config_taint Oracle, Grant Readiness Fix & Governance Checklist
 
 * `crates/cli/src/hunt.rs` *(modified)* — Phase 0: `workflow_no_provenance` path guard — `emit_workflow_provenance_finding` now wrapped in `(label.ends_with(".yml") || label.ends_with(".yaml")) && source_str.contains("jobs:")` check; eradicates 3-consecutive-sprint FP on `.rs`/`.ts`/`.tsx` source files (binance/mattermost/tempus-ex).
