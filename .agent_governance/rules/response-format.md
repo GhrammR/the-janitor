@@ -134,6 +134,30 @@ sprint. Trivial optimizations (e.g., eliminating a `String::clone()`, pinning a
 deprecated action version, collapsing a redundant loop) MUST NOT be deferred to
 a future sprint.
 
+**Mirroring Pre-Emission Checklist** (run BEFORE sealing the NRA prompt):
+
+Before writing the closing `"` of the sovereign directive, explicitly verify
+each of the following. A missing mirror is a governance violation — add the
+phase rather than emit and rationalize the omission.
+
+1. **Systems Health Signal mirror**: Did the `[OPERATOR INTELLIGENCE]` Systems
+   Health Signal name a remediation step (not a pure observation)? If yes, is
+   there a `### Phase N:` block in the prompt with the exact file and change?
+   If no phase exists, ADD IT before sealing.
+2. **Platform Expansion Tip mirror**: The Platform Expansion Tip ALWAYS names
+   a concrete next-step command or workflow file. Is there a `### Phase N:`
+   block in the prompt that reproduces that command verbatim? If no phase
+   exists, ADD IT before sealing.
+3. **Entropy Modulator mirror**: Did the Entropy Modulator Tip name a specific
+   file, function, or struct to change? If yes, is there a `### Phase N:` block
+   with the exact edit? If no phase exists, ADD IT before sealing.
+4. **Already-shipped exemption**: A fix applied DURING THE CURRENT SESSION is
+   exempt from mirroring — the next sprint need not repeat completed work.
+   Verify the tip's described fix has not already been applied before claiming
+   the exemption. Applying a fix in-session and then omitting it from the NRA
+   is CORRECT behavior. Omitting a fix that was NOT applied and was NOT
+   included in the NRA is a governance violation.
+
 The section must be operator-ready text, not analysis about the text. Do not
 emit vague "consider" language. Do not suggest manual git commands, staging,
 signing, `/compact`, or other workflow rituals outside the quoted Sovereign
