@@ -78,6 +78,20 @@ The generated `[NEXT RECOMMENDED ACTION]` prompt MUST strictly use
 `### Phase X:` headers to delineate the implementation steps, making the prompt
 directly trackable for the operator.
 
+**Anti-Context-Drift Mandate**: The first line of every generated Sovereign
+Directive prompt MUST be:
+
+```
+Governing Law: Before outputting your final response, read
+.agent_governance/rules/response-format.md and produce the mandatory
+[EXECUTION STATUS] / [CHANGES STAGED] / [TELEMETRY] / [NEXT RECOMMENDED
+ACTION] / [SOVEREIGN TRANSLATION] / [OPERATOR INTELLIGENCE] /
+[SHOWCASE ATTESTATION] structure. This is non-negotiable.
+```
+
+This line must appear verbatim inside the quadruple-backtick fence so the
+receiving agent cannot skip the format even after context compaction.
+
 The prompt MUST:
 1. Begin with `agent "You are executing a Sovereign Directive:` and end with a
    closing `"`.

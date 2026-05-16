@@ -13,7 +13,6 @@ runs:
         else
           echo "Kani installation failed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
         fi
-      timeout-minutes: 10
 
     - name: Install durable Z3
       shell: bash
