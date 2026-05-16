@@ -3731,6 +3731,9 @@ fn scan_buffer(
         ));
     }
     findings.extend(forge::idor::scan_source(ext, source, label));
+    // Deobfuscation pre-pass: decode base64/hex/concat payloads before pattern detectors run.
+    let normalized = forge::deobfuscate::normalize_payload(source);
+    let source = normalized.as_deref().unwrap_or(source);
     let source_str = std::str::from_utf8(source).unwrap_or("");
     findings
         .extend(forge::mcp_dispatch_guard::emit_mcp_confused_deputy_findings(source_str, label));
@@ -3810,6 +3813,20 @@ fn scan_buffer(
         "py" | "ipynb" | "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx"
     ) {
         findings.extend(forge::model_lineage::emit_llm_model_provenance_findings(
+            source_str, label,
+        ));
+    }
+
+    // Malware genome extraction — baseline for corpus comparison in Sprint 137.
+    if let Some(genome) =
+        forge::malware_genome::extract_genome(source, label.rsplit('.').next().unwrap_or(""))
+    {
+        let _ = genome;
+    }
+
+    // Browser extension MV3 over-permission and MV2-compat-shim detector.
+    if filename == "manifest.json" {
+        findings.extend(forge::browser_ext::emit_browser_ext_findings(
             source_str, label,
         ));
     }
