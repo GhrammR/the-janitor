@@ -8,6 +8,8 @@ implemented as a result.
 * `crates/forge/src/slop_filter.rs` *(modified)* — Release-PR exemption for `architecture:blast_radius_violation`: when both `Cargo.toml` and a `CHANGELOG.md` are present in the diff, the blast-radius gate is suppressed — coordinated version bumps legitimately span >5 top-level directories. Added `is_release_pr` boolean computed from `section_paths` before the gate. 2 new tests: `test_blast_radius_gate_exempt_for_release_pr` (Cargo.toml + CHANGELOG.md across 9 dirs → no finding) and `test_blast_radius_gate_fires_without_changelog` (Cargo.toml but no CHANGELOG.md → fires normally). Closes CI failure on PR #112.
 * `.github/workflows/workflow-lint.yml` *(modified)* — Extended trigger paths to include `.github/actions/**` so composite-action changes trigger the lint job. YAML syntax check now also validates `.github/actions/**/*.yml` via `find … -print0` loop. SHA-pin discipline grep extended to check `.github/actions/` directory. Satisfies Platform Expansion Tip from Sprint 137.
 
+* `justfile` *(modified)* — Architectural Oracle fix: `verify-reproducible` target still referenced `rust:1.91.0-alpine` (lines 129/136) after the MSRV migration to 1.92.0. Updated to `rust:1.92.0-alpine` to match `rust-toolchain.toml`. Fix is <5 lines; Oracle Execution Law mandatory in-sprint.
+
 **Verification**: `just audit` ✓ | 5/5 blast_radius tests ✓ | `slop_score == 0` on release-pattern PR ✓
 
 ## 2026-05-16 — Sprint Batch 137: P6-3 Neural Model Weight Backdoor Scanner, P7-2 Patch Correctness Proof, invisible_payload Oracle & Hunt Sweep
