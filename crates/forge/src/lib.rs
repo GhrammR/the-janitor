@@ -21,6 +21,7 @@
 //! // → same structural hash
 //! ```
 
+pub mod agent_intent;
 pub mod agentic_graph;
 pub mod agentic_tool_audit;
 pub mod agnostic_shield;
@@ -31,6 +32,7 @@ pub mod automotive;
 pub mod bayesian_taint;
 pub mod binary_recovery;
 pub mod brain;
+pub mod browser_ext;
 pub mod callgraph;
 pub mod campaign;
 pub mod chronometric_auth;
@@ -62,11 +64,13 @@ pub mod invisible_payload;
 pub mod java_deser_guard;
 pub mod kani_bridge;
 pub mod labyrinth;
+pub mod lcm;
 pub mod legacy_c_mining;
 pub mod library_identity;
 pub mod linker_hijack;
 pub mod llm_decompile;
 pub mod llm_prompt_injection;
+pub mod malware_genome;
 pub mod mcp_dispatch_guard;
 pub mod memory_bomb;
 pub mod memory_proof;
@@ -74,6 +78,7 @@ pub mod mesh_taint;
 pub mod metadata;
 pub mod mev_synthesis;
 pub mod migration_guard;
+pub mod model_backdoor;
 pub mod model_lineage;
 pub mod model_pinning;
 pub mod multimodal_poison;
@@ -81,7 +86,9 @@ pub mod negtaint;
 pub mod noninterference;
 pub mod oauth_account_fusion;
 pub mod oauth_scope;
+pub mod oidc_scope_guard;
 pub mod optimizer_authority;
+pub mod patch_proof;
 pub mod policy_drift;
 pub mod pr_collider;
 pub mod proof_obligation;

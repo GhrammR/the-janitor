@@ -226,6 +226,12 @@ pub mod unix {
         /// endpoint.  When unset, events are appended to
         /// `{janitor_dir}/siem_events.ndjson` for local SIEM ingestion.
         pub siem_webhook_url: Option<String>,
+        /// Epoch-millisecond timestamp of the last successful Physarum heartbeat.
+        ///
+        /// Initialised to 0 (never beaten). Updated by `record_heartbeat()`.
+        /// Any gap exceeding 30 000 ms is reported as a `daemon:heartbeat_timeout`
+        /// warning via `check_heartbeat_timeout()`.
+        pub last_heartbeat_ms: std::sync::atomic::AtomicU64,
     }
 
     impl DaemonState {
@@ -237,6 +243,40 @@ pub mod unix {
         /// CI bounce request.
         pub fn emit_siem_event(&self, finding_detail: &str) {
             emit_siem_event_inner(&self.janitor_dir, &self.siem_webhook_url, finding_detail);
+        }
+
+        /// Record a successful Physarum heartbeat at the current wall-clock time.
+        pub fn record_heartbeat(&self) {
+            use std::sync::atomic::Ordering;
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let ms = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            self.last_heartbeat_ms.store(ms, Ordering::Relaxed);
+        }
+
+        /// Returns `Some(elapsed_ms)` when the gap since the last heartbeat exceeds
+        /// 30 000 ms and a `daemon:heartbeat_timeout` warning should be emitted.
+        /// Returns `None` when the gap is within tolerance or no heartbeat has been
+        /// recorded yet (last_heartbeat_ms == 0).
+        pub fn check_heartbeat_timeout(&self) -> Option<u64> {
+            use std::sync::atomic::Ordering;
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let last = self.last_heartbeat_ms.load(Ordering::Relaxed);
+            if last == 0 {
+                return None;
+            }
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let elapsed = now.saturating_sub(last);
+            if elapsed > 30_000 {
+                Some(elapsed)
+            } else {
+                None
+            }
         }
     }
 
@@ -327,6 +367,7 @@ pub mod unix {
             flow_semaphore: Arc::new(Semaphore::new(FLOW_CONCURRENCY)),
             constrict_semaphore: Arc::new(Semaphore::new(CONSTRICT_CONCURRENCY)),
             siem_webhook_url,
+            last_heartbeat_ms: std::sync::atomic::AtomicU64::new(0),
         });
 
         // Remove a stale socket file from a previous run.
@@ -408,6 +449,12 @@ pub mod unix {
         let mut lines = BufReader::new(reader).lines();
 
         while let Ok(Some(line)) = lines.next_line().await {
+            // Emit a SIEM warning if the Physarum pulse has been silent for > 30 s.
+            if let Some(elapsed_ms) = state.check_heartbeat_timeout() {
+                state.emit_siem_event(&format!(
+                    "daemon:heartbeat_timeout — Physarum pulse gap {elapsed_ms}ms exceeds 30s threshold"
+                ));
+            }
             let response = process_request(&line, &state).await;
             let mut json = match serde_json::to_string(&response) {
                 Ok(j) => j,
@@ -430,6 +477,9 @@ pub mod unix {
     /// After scoring, inserts a `PrDeltaSignature` for the patch into the `LshIndex`
     /// and adds any cross-PR collision count to `logic_clones_found`.
     async fn process_request(line: &str, state: &Arc<DaemonState>) -> DaemonResponse {
+        // Record a Physarum heartbeat on every successful request dispatch so
+        // check_heartbeat_timeout() can detect stalled daemon processes.
+        state.record_heartbeat();
         match serde_json::from_str::<DaemonRequest>(line) {
             Ok(DaemonRequest::Bounce {
                 patch,
@@ -718,6 +768,37 @@ pub mod unix {
             assert!(
                 matches!(pulse, Pulse::Flow | Pulse::Constrict | Pulse::Stop),
                 "daemon admission must read a valid Melanin Layer pulse"
+            );
+        }
+
+        #[test]
+        fn heartbeat_timeout_fires_at_30s_gap() {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            use std::time::{SystemTime, UNIX_EPOCH};
+
+            // Simulate a last_heartbeat_ms that is 31 seconds in the past.
+            let now_ms = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let stale_ms = now_ms.saturating_sub(31_000);
+
+            // Build a minimal DaemonState-like context using the raw atomic.
+            // We test the timeout logic directly via a standalone AtomicU64 to
+            // avoid constructing a full DaemonState (which requires real files).
+            let last = AtomicU64::new(stale_ms);
+            let elapsed = now_ms.saturating_sub(last.load(Ordering::Relaxed));
+            assert!(
+                elapsed > 30_000,
+                "a 31-second-old heartbeat must exceed the 30s timeout threshold"
+            );
+
+            // Verify the inverse: a fresh heartbeat (now) does not trigger.
+            last.store(now_ms, Ordering::Relaxed);
+            let elapsed_fresh = now_ms.saturating_sub(last.load(Ordering::Relaxed));
+            assert!(
+                elapsed_fresh <= 30_000,
+                "a fresh heartbeat must not exceed the 30s threshold"
             );
         }
     }

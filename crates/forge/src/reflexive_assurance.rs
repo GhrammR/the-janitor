@@ -23,13 +23,17 @@
 #[allow(unexpected_cfgs)]
 #[cfg(kani)]
 mod kani_proofs {
+    use crate::agent_intent::session_tool_intent_drift;
     use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
     use crate::java_deser_guard::deser_missing_allowlist;
+    use crate::lcm::ffi_deref_unguarded;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
+    use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
+    use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
@@ -199,6 +203,19 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the OIDC scope-abuse gate is an exact conjunction:
+    /// fires iff id-token write permission is present AND audience scope is absent.
+    #[kani::proof]
+    fn oidc_scope_gate_is_exact() {
+        let has_write_permission: bool = kani::any();
+        let has_audience_scope: bool = kani::any();
+        let fired = oidc_scope_missing_audience(has_write_permission, has_audience_scope);
+        kani::assert(
+            fired == (has_write_permission && !has_audience_scope),
+            "OIDC scope-abuse gate must be exact conjunction",
+        );
+    }
+
     /// Prove the MCP confused-deputy predicate is an exact conjunction:
     /// fires iff dispatch is present AND secret verification is absent.
     ///
@@ -215,6 +232,46 @@ mod kani_proofs {
             "MCP confused-deputy gate must be exact conjunction",
         );
     }
+
+    /// Prove the FFI raw-pointer dereference gate is an exact conjunction:
+    /// fires iff a sink is present AND an FFI source is present AND no guard exists.
+    #[kani::proof]
+    fn lcm_ffi_gate_is_exact() {
+        let has_sink: bool = kani::any();
+        let has_source: bool = kani::any();
+        let has_guard: bool = kani::any();
+        let fired = ffi_deref_unguarded(has_sink, has_source, has_guard);
+        kani::assert(
+            fired == (has_sink && has_source && !has_guard),
+            "FFI deref unguarded gate must be exact conjunction",
+        );
+    }
+
+    /// Prove the AI-agent tool-intent drift gate is an exact conjunction:
+    /// fires iff a tool sink is present AND an escalation indicator is present
+    /// AND no intent suppressor blocks it.
+    #[kani::proof]
+    fn agent_intent_gate_is_exact() {
+        let has_tool_sink: bool = kani::any();
+        let has_escalation: bool = kani::any();
+        let has_suppressor: bool = kani::any();
+        let fired = session_tool_intent_drift(has_tool_sink, has_escalation, has_suppressor);
+        kani::assert(
+            fired == (has_tool_sink && has_escalation && !has_suppressor),
+            "agent tool-intent drift gate must be exact conjunction",
+        );
+    }
+
+    #[kani::proof]
+    fn llm_provenance_gate_is_exact() {
+        let has_load_sink: bool = kani::any();
+        let has_provenance: bool = kani::any();
+        let result = crate::model_lineage::llm_provenance_missing(has_load_sink, has_provenance);
+        kani::assert(
+            result == (has_load_sink && !has_provenance),
+            "llm_provenance_missing must be true only when sink present and provenance absent",
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -223,12 +280,16 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
+    use crate::agent_intent::session_tool_intent_drift;
     use crate::debug_endpoint_guard::debug_endpoint_missing_auth;
     use crate::dma_revocation::dma_shadow_access_missing_revocation_dominance;
     use crate::embedding_trust::trust_prioritization_missing;
     use crate::java_deser_guard::deser_missing_allowlist;
+    use crate::lcm::ffi_deref_unguarded;
     use crate::linker_hijack::linker_hijack_missing_attestation;
+    use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
+    use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::proof_obligation_missing;
     use crate::slop_hunter::Severity;
 
@@ -321,5 +382,37 @@ mod tests {
         assert!(!deser_missing_allowlist(true, true));
         assert!(!deser_missing_allowlist(false, false));
         assert!(!deser_missing_allowlist(false, true));
+    }
+
+    #[test]
+    fn oidc_scope_gate_requires_write_and_missing_audience() {
+        assert!(oidc_scope_missing_audience(true, false));
+        assert!(!oidc_scope_missing_audience(true, true));
+        assert!(!oidc_scope_missing_audience(false, false));
+        assert!(!oidc_scope_missing_audience(false, true));
+    }
+
+    #[test]
+    fn lcm_ffi_gate_requires_sink_source_and_missing_guard() {
+        assert!(ffi_deref_unguarded(true, true, false));
+        assert!(!ffi_deref_unguarded(true, true, true));
+        assert!(!ffi_deref_unguarded(false, true, false));
+        assert!(!ffi_deref_unguarded(true, false, false));
+    }
+
+    #[test]
+    fn agent_intent_gate_requires_sink_escalation_and_missing_suppressor() {
+        assert!(session_tool_intent_drift(true, true, false));
+        assert!(!session_tool_intent_drift(true, true, true));
+        assert!(!session_tool_intent_drift(false, true, false));
+        assert!(!session_tool_intent_drift(true, false, false));
+    }
+
+    #[test]
+    fn llm_provenance_gate_requires_sink_and_missing_attestation() {
+        assert!(llm_provenance_missing(true, false));
+        assert!(!llm_provenance_missing(true, true));
+        assert!(!llm_provenance_missing(false, false));
+        assert!(!llm_provenance_missing(false, true));
     }
 }

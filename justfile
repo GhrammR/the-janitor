@@ -112,10 +112,10 @@ prune:
 # Verify bit-for-bit binary reproducibility (SLSA Level 4).
 #
 # Builds the release binary twice inside isolated Docker containers using an
-# identical rust:1.91.0-alpine image with lld and compares the SHA-384 digests.
+# identical rust:1.92.0-alpine image with lld and compares the SHA-384 digests.
 # Both digests must match for the build to be considered reproducible.
 #
-# Requirements: Docker must be running and rust:1.91.0-alpine must be pullable.
+# Requirements: Docker must be running and rust:1.92.0-alpine must be pullable.
 verify-reproducible:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -126,14 +126,14 @@ verify-reproducible:
 	    -v "$(pwd):/src:ro" \
 	    -v "${REPRO_DIR}/build1:/out" \
 	    -w /src \
-	    rust:1.91.0-alpine \
+	    rust:1.92.0-alpine \
 	    sh -c "apk add --no-cache lld musl-dev >/dev/null 2>&1 && CARGO_TARGET_DIR=/out cargo build --release -p janitor-cli 2>/dev/null"
 	echo "→ Reproducible build pass 2..."
 	docker run --rm \
 	    -v "$(pwd):/src:ro" \
 	    -v "${REPRO_DIR}/build2:/out" \
 	    -w /src \
-	    rust:1.91.0-alpine \
+	    rust:1.92.0-alpine \
 	    sh -c "apk add --no-cache lld musl-dev >/dev/null 2>&1 && CARGO_TARGET_DIR=/out cargo build --release -p janitor-cli 2>/dev/null"
 	echo "→ Comparing binaries..."
 	sha384sum "${REPRO_DIR}/build1/release/janitor" "${REPRO_DIR}/build2/release/janitor"
@@ -197,6 +197,9 @@ fast-release version:
 	    echo "error: GPG signing key is locked; run gpg-unlock or export JANITOR_GPG_PASSPHRASE before just fast-release {{version}}" >&2
 	    exit 1
 	fi
+	# Bump workspace version in Cargo.toml to the release target BEFORE sync-versions reads it.
+	sed -i "s/^version = \".*\"/version = \"{{version}}\"/" Cargo.toml
+	echo "→ Cargo.toml version set to {{version}}"
 	just sync-versions
 	# Idempotent audit gate: skip test suite if crates/ is unchanged since last audit.
 	CURRENT_HASH="$(find crates/ -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}')"
@@ -246,8 +249,16 @@ fast-release version:
 	git tag -s v{{version}} -m "release v{{version}}" || { echo "FATAL: Tag failed."; exit 1; }
 	MAJOR="$(echo "{{version}}" | cut -d. -f1)"
 	git tag -fa "v${MAJOR}" -m "v${MAJOR} → v{{version}}"
-	git push origin HEAD:main "v{{version}}"
+	git checkout -B "release/v{{version}}"
+	git push origin "release/v{{version}}" "v{{version}}"
 	git push origin "v${MAJOR}" --force
+	RELEASE_PR_URL="$(gh pr create \
+	    --base main \
+	    --head "release/v{{version}}" \
+	    --title "Release v{{version}}" \
+	    --body "Automated release PR for v{{version}}. Merge after \`secretless-gate-smoke\` passes." \
+	    2>&1 || true)"
+	echo "Release PR: ${RELEASE_PR_URL}"
 	if gh release view "v{{version}}" >/dev/null 2>&1; then
 	    echo "Idempotency guard: GitHub Release v{{version}} already exists. Skipping gh release create."
 	else

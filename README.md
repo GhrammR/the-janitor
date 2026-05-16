@@ -1,9 +1,32 @@
 # The Janitor: The Mathematical Firewall Against Autonomous AI
-**v10.2.0-rc.4 — Rust-Native. Zero-Copy. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds.**
+**v10.2.2 — Rust-Native. Zero-Copy. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds.**
 
 ![Integrity Status](.janitor/janitor_badge.svg)
 
-*Attested by The Janitor v10.2.0-rc.4: Zero-Upload, FIPS 204 + FIPS 205 Compliant.*
+*Attested by The Janitor v10.2.2
+
+
+## Research Foundation
+
+> **For grant reviewers and academic collaborators**: The Janitor implements three formally verified layers — [IFDS interprocedural taint analysis](docs/grant-research-brief.md#1-ifds-backed-taint-analysis-across-23-language-grammars) across 23 language grammars, [Kani-proven Boolean predicates](docs/grant-research-brief.md#2-kani-proven-boolean-predicates-for-security-gate-correctness) for detection correctness, and [Z3 SMT exploit witness synthesis](docs/grant-research-brief.md#3-z3-smt-constraint-solving-for-exploit-witness-synthesis). Full research brief: [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+: Zero-Upload, FIPS 204 + FIPS 205 Compliant.*
 
 ---
 
@@ -19,6 +42,8 @@
 The Veracode 2025 State of Software Security report established the baseline: AI-assisted code contains **36% more high-severity vulnerabilities** than human-written equivalents. But the threat has evolved from Copilot assistance to 'Mythos-class' autonomous AI agents that inject vulnerabilities and orchestrate attack chains across microservices. Your linter passes agentic output. Your SAST tool uploads it to a cloud pipeline. By the time the report arrives, the PR is merged.
 
 The threat model has changed. Your enforcement layer has not. The Janitor is the only deterministic defense against 'Mythos-class' AI agents, mathematically verifying intent before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
+
+> **Researchers and grant reviewers**: The Janitor's formal methods foundation — IFDS taint analysis, Kani-proven Boolean predicates, and Z3 SMT exploit witness synthesis — is documented in [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
 
 ## Zero-Friction GitHub Integration
 

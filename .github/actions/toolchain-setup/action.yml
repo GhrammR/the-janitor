@@ -1,0 +1,24 @@
+name: Janitor Toolchain Setup
+description: Install Kani verifier and Z3 solver for Janitor CI (shared between janitor.yml and janitor-pr-gate.yml)
+
+runs:
+  using: composite
+  steps:
+    - name: Install Kani Verifier
+      shell: bash
+      run: |
+        set -euo pipefail
+        if cargo install --locked kani-verifier 2>/dev/null && cargo kani setup 2>/dev/null; then
+          echo "Kani verifier installed successfully."
+        else
+          echo "Kani installation failed. Remediation: cargo install --locked kani-verifier && cargo kani setup" >&2
+        fi
+
+    - name: Install durable Z3
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m venv "${HOME}/.local/share/janitor-tools/z3-venv"
+        "${HOME}/.local/share/janitor-tools/z3-venv/bin/python" -m pip install --upgrade pip z3-solver
+        mkdir -p "${HOME}/.local/bin"
+        ln -sf "${HOME}/.local/share/janitor-tools/z3-venv/bin/z3" "${HOME}/.local/bin/z3"

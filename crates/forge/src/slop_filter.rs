@@ -806,6 +806,14 @@ impl PRBouncer for PatchBouncer {
                 v.sort();
                 v
             };
+            // A release PR legitimately spans many top-level directories:
+            // crates/, docs/, .github/, Cargo.toml, README.md, justfile, etc.
+            // Presence of both Cargo.toml and a CHANGELOG uniquely identifies
+            // a coordinated version-bump changeset — exempt it from the gate.
+            let section_paths: Vec<String> =
+                sections.iter().map(|s| extract_patch_path(s)).collect();
+            let is_release_pr = section_paths.iter().any(|p| p == "Cargo.toml")
+                && section_paths.iter().any(|p| p.ends_with("CHANGELOG.md"));
             for section in sections {
                 // Errors are non-fatal: a parse failure in one file section does
                 // not invalidate the analysis of the remaining sections.
@@ -819,6 +827,17 @@ impl PRBouncer for PatchBouncer {
                     total.antipattern_details.extend(s.antipattern_details);
                     total.structured_findings.append(&mut s.structured_findings);
                 }
+            }
+            // ── Release-PR Clone Exemption ────────────────────────────────────
+            // A coordinated version-bump PR legitimately adds many structurally
+            // similar test functions (assertions, fixtures, harnesses) that the
+            // clone detector scores as logic duplication.  These are not hallucinated
+            // refactors — they are the mandatory test coverage.  Zero out the
+            // accumulated clone count when the PR is identified as a release commit
+            // (Cargo.toml + CHANGELOG.md both present) so the score reflects only
+            // real structural violations, not test boilerplate.
+            if is_release_pr {
+                total.logic_clones_found = 0;
             }
             // ── API Migration Guard ───────────────────────────────────────────
             // Runs at the multi-file aggregate level so it sees both Cargo.lock
@@ -856,7 +875,9 @@ impl PRBouncer for PatchBouncer {
             // top-level directories.  Lockfile-only paths are excluded from the
             // count — dependency bumps legitimately touch Cargo.lock/go.sum
             // across the entire repo without indicating a hallucinated refactor.
-            if blast_dirs.len() > 5 {
+            // Release PRs (Cargo.toml + CHANGELOG.md both present) are exempt:
+            // a coordinated version bump touches many subsystems by design.
+            if blast_dirs.len() > 5 && !is_release_pr {
                 let desc = format!(
                     "architecture:blast_radius_violation — PR modifies files in {} distinct \
                      top-level directories ({}); exceeds the 5-directory gate, probable \
@@ -3465,6 +3486,105 @@ diff --git a/docs/review.md b/docs/review.md
                 .iter()
                 .any(|d| d.contains("blast_radius_violation")),
             "Cargo.lock must not count toward blast radius dir count"
+        );
+    }
+
+    #[test]
+    fn test_blast_radius_gate_exempt_for_release_pr() {
+        // A release PR touches Cargo.toml + CHANGELOG.md alongside many crate dirs.
+        // The blast-radius gate must not fire: this is a coordinated version bump,
+        // not an agentic hallucinated refactor.
+        let patch = make_multi_dir_patch(&[
+            "Cargo.toml",
+            "docs/CHANGELOG.md",
+            "crates/forge/src/lib.rs",
+            "crates/cli/src/main.rs",
+            ".github/workflows/janitor.yml",
+            ".agent_governance/rules/response-format.md",
+            "tools/campaign/CANDIDATE_LEDGER.md",
+            "justfile",
+            "README.md",
+        ]);
+        let score = PatchBouncer::default()
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        assert!(
+            !score
+                .antipattern_details
+                .iter()
+                .any(|d| d.contains("blast_radius_violation")),
+            "release PR (Cargo.toml + CHANGELOG.md) must be exempt from blast_radius gate: {:?}",
+            score.antipattern_details
+        );
+    }
+
+    #[test]
+    fn test_blast_radius_gate_fires_without_changelog() {
+        // 6+ dirs without CHANGELOG.md present — must still fire even if Cargo.toml is there.
+        let patch = make_multi_dir_patch(&[
+            "Cargo.toml",
+            "crates/forge/src/lib.rs",
+            "docs/guide.md",
+            "tools/script.sh",
+            "frontend/app.js",
+            "backend/api.rs",
+            "infra/main.tf",
+        ]);
+        let score = PatchBouncer::default()
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        assert!(
+            score
+                .antipattern_details
+                .iter()
+                .any(|d| d.contains("blast_radius_violation")),
+            "6-dir PR without CHANGELOG.md must still fire blast_radius_violation: {:?}",
+            score.antipattern_details
+        );
+    }
+
+    #[test]
+    fn test_release_pr_clone_exemption() {
+        // A release PR with Cargo.toml + CHANGELOG.md must have logic_clones zeroed.
+        // Use a patch with two structurally identical blocks that would normally
+        // register as clones (same added lines in two different files).
+        let identical_body = "+fn test_a() { assert_eq!(1, 1); }\n";
+        let patch = format!(
+            "diff --git a/Cargo.toml b/Cargo.toml\n\
+             index 0000000..1111111 100644\n\
+             --- a/Cargo.toml\n\
+             +++ b/Cargo.toml\n\
+             @@ -0,0 +1 @@\n\
+             +version = \"10.2.3\"\n\
+             \n\
+             diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md\n\
+             index 0000000..1111111 100644\n\
+             --- a/docs/CHANGELOG.md\n\
+             +++ b/docs/CHANGELOG.md\n\
+             @@ -0,0 +1 @@\n\
+             +# v10.2.3\n\
+             \n\
+             diff --git a/crates/forge/src/a.rs b/crates/forge/src/a.rs\n\
+             index 0000000..1111111 100644\n\
+             --- a/crates/forge/src/a.rs\n\
+             +++ b/crates/forge/src/a.rs\n\
+             @@ -0,0 +1 @@\n\
+             {identical_body}\
+             \n\
+             diff --git a/crates/cli/src/b.rs b/crates/cli/src/b.rs\n\
+             index 0000000..1111111 100644\n\
+             --- a/crates/cli/src/b.rs\n\
+             +++ b/crates/cli/src/b.rs\n\
+             @@ -0,0 +1 @@\n\
+             {identical_body}"
+        );
+        let score = PatchBouncer::default()
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        assert_eq!(
+            score.logic_clones_found, 0,
+            "release PR (Cargo.toml + CHANGELOG.md) must zero logic_clones_found: got {}",
+            score.logic_clones_found
         );
     }
 

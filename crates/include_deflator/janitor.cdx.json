@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:dc9a6e10-e1b3-468c-84d0-4e27a0906cdc",
+  "serialNumber": "urn:uuid:ec616e4a-e229-4703-89f2-2f402ebc8878",
   "metadata": {
-    "timestamp": "2026-05-15T07:51:48.339847378Z",
+    "timestamp": "2026-05-15T19:17:49.221980624Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,23 +14,23 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.2",
       "name": "include_deflator",
-      "version": "10.2.0-rc.4",
+      "version": "10.2.2",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/include_deflator@10.2.0-rc.4?download_url=file://.",
+      "purl": "pkg:cargo/include_deflator@10.2.2?download_url=file://.",
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.2 bin-target-0",
           "name": "include_deflator",
-          "version": "10.2.0-rc.4",
-          "purl": "pkg:cargo/include_deflator@10.2.0-rc.4?download_url=file://.#src/lib.rs"
+          "version": "10.2.2",
+          "purl": "pkg:cargo/include_deflator@10.2.2?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -2580,7 +2580,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.0-rc.4",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/include_deflator#10.2.2",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.5",

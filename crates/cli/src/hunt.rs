@@ -3731,12 +3731,52 @@ fn scan_buffer(
         ));
     }
     findings.extend(forge::idor::scan_source(ext, source, label));
+    // Deobfuscation pre-pass: decode base64/hex/concat payloads before pattern detectors run.
+    let normalized = forge::deobfuscate::normalize_payload(source);
+    let source = normalized.as_deref().unwrap_or(source);
     let source_str = std::str::from_utf8(source).unwrap_or("");
+    // Oracle: invisible Unicode payload scanner (trojan source / steganographic characters).
+    if matches!(
+        label.rsplit('.').next().unwrap_or(""),
+        "py" | "js"
+            | "ts"
+            | "tsx"
+            | "jsx"
+            | "rs"
+            | "go"
+            | "java"
+            | "kt"
+            | "swift"
+            | "rb"
+            | "php"
+            | "lua"
+            | "sh"
+            | "bash"
+            | "ps1"
+            | "cs"
+            | "cpp"
+            | "c"
+            | "h"
+    ) {
+        findings.extend(
+            forge::invisible_payload::scan_invisible_payloads(source, false)
+                .into_iter()
+                .map(|f| StructuredFinding {
+                    id: extract_rule_id(&f.description),
+                    severity: Some(format!("{:?}", f.severity)),
+                    file: Some(label.to_string()),
+                    line: Some(byte_to_line(source, f.start_byte)),
+                    ..Default::default()
+                }),
+        );
+    }
     findings
         .extend(forge::mcp_dispatch_guard::emit_mcp_confused_deputy_findings(source_str, label));
-    findings.extend(forge::workflow_evidence::emit_workflow_provenance_finding(
-        label, source_str,
-    ));
+    if (label.ends_with(".yml") || label.ends_with(".yaml")) && source_str.contains("jobs:") {
+        findings.extend(forge::workflow_evidence::emit_workflow_provenance_finding(
+            label, source_str,
+        ));
+    }
     findings.extend(forge::debug_endpoint_guard::emit_debug_endpoint_findings(
         source_str, label,
     ));
@@ -3753,6 +3793,85 @@ fn scan_buffer(
     findings.extend(forge::java_deser_guard::emit_java_deser_findings(
         source_str, label,
     ));
+    findings.extend(
+        forge::llm_prompt_injection::find_llm_unbounded_prompt_concat(Some(label), source_str),
+    );
+    findings.extend(forge::oidc_scope_guard::emit_oidc_scope_findings(
+        source_str, label,
+    ));
+    findings.extend(
+        forge::embedding_trust::detect_embedding_trust_transposition(source_str.as_bytes())
+            .into_iter()
+            .map(|f| StructuredFinding {
+                id: f.description.clone(),
+                severity: Some(format!("{:?}", f.severity)),
+                file: Some(label.to_string()),
+                ..Default::default()
+            }),
+    );
+    findings.extend(forge::lcm::emit_cross_language_memory_witnesses(
+        source_str, label,
+    ));
+    findings.extend(forge::agent_intent::emit_agent_intent_guard_findings(
+        source_str, label,
+    ));
+    findings.extend(forge::bayesian_taint::find_probabilistic_llm_hijacks(
+        source_str.as_bytes(),
+    ));
+    findings.extend(
+        forge::oauth_account_fusion::detect_oauth_account_fusion(source)
+            .into_iter()
+            .map(|f| StructuredFinding {
+                id: f.description.clone(),
+                severity: Some(format!("{:?}", f.severity)),
+                file: Some(label.to_string()),
+                proof_class: Some(common::slop::ProofClass::LatticeGapProposal),
+                ..Default::default()
+            }),
+    );
+    findings.extend(forge::solidity_taint::find_solidity_slop(source));
+    findings.extend(
+        forge::config_taint::track_config_taint_js(source)
+            .into_iter()
+            .map(|f| common::slop::StructuredFinding {
+                id: format!("security:config_taint_{}", f.property_path),
+                severity: Some("High".to_string()),
+                file: Some(label.to_string()),
+                proof_class: Some(common::slop::ProofClass::LatticeGapProposal),
+                ..Default::default()
+            }),
+    );
+    // LLM load provenance: Python/JS/TS/notebook only — Rust test strings contain
+    // these patterns as literals and trigger false positives on .rs diffs.
+    if matches!(
+        label.rsplit('.').next().unwrap_or(""),
+        "py" | "ipynb" | "js" | "mjs" | "cjs" | "ts" | "tsx" | "jsx"
+    ) {
+        findings.extend(forge::model_lineage::emit_llm_model_provenance_findings(
+            source_str, label,
+        ));
+    }
+
+    // Malware genome extraction — baseline for corpus comparison in Sprint 137.
+    if let Some(genome) =
+        forge::malware_genome::extract_genome(source, label.rsplit('.').next().unwrap_or(""))
+    {
+        let _ = genome;
+    }
+
+    // Browser extension MV3 over-permission and MV2-compat-shim detector.
+    if filename == "manifest.json" {
+        findings.extend(forge::browser_ext::emit_browser_ext_findings(
+            source_str, label,
+        ));
+    }
+
+    // Neural model weight backdoor scanner (Phase A: header anomaly detection).
+    if label.ends_with(".safetensors") {
+        findings.extend(forge::model_backdoor::emit_model_backdoor_findings(
+            source, label,
+        ));
+    }
 
     // Repojacking & unpinned Git dependency shield: scan manifest files.
     if matches!(
