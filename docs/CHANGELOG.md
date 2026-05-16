@@ -14,7 +14,10 @@ implemented as a result.
 * `.INNOVATION_LOG.md` *(modified)* — P6-5 block physically hard-deleted (Absolute Eradication Law; `model_lineage::emit_llm_model_provenance_findings` shipped, `just audit` ✓).
 * `.agent_governance/rules/response-format.md` *(modified)* — Mirroring Pre-Emission Checklist appended: 4-gate verification (Systems Health Signal, Platform Expansion Tip, Entropy Modulator, already-shipped exemption) required before sealing NRA prompt. Closes governance violation from Sprint 134 where Platform Expansion Tip was not mirrored as a Phase.
 
-**Verification**: `just audit` ✓ | 8/8 `model_lineage` P6-5 tests ✓ | 1 regression test in `reflexive_assurance` ✓ | Kani `llm_provenance_gate_is_exact` ✓ | `workflow_no_provenance` path guard active ✓ | `config_taint` Oracle wired ✓ | P6-5 hard-deleted ✓
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — Phase 4: 6 new rows: Uniswap/v3-periphery no findings (0%, `solidity_taint` wired but patterns don't match periphery contract style); aave/aave-v3-periphery no findings (0%, same gap); trezor/trezor-firmware `lcm_double_free` (5%, 8/11 hits in fuzzer code + 3 in Unix simulator, no production firmware path confirmed); trezor `ssrf_dynamic_url` (2%, developer tooling scripts); trezor `intent_divergence` (2%, generated protobuf code).
+* `.INNOVATION_LOG.md` *(modified)* — Phase 5 AR-037/039: AR-037 `attack_ledger_update` (CVE-2026-31431 "Copy Fail" LPE, kernel AEAD socket, userspace-only engine has no overlap, CVSS 7.8, confidence 0.95); AR-039 `mapped_innovation_item` (Claude Mythos Preview autonomous attack capabilities validate P2-22 `agent_intent.rs` + `bayesian_taint.rs` + README "Mythos-class" framing, confidence 0.97, red.anthropic.com primary source).
+
+**Verification**: `just audit` ✓ | 8/8 `model_lineage` P6-5 tests ✓ | 1 regression test in `reflexive_assurance` ✓ | Kani `llm_provenance_gate_is_exact` ✓ | `workflow_no_provenance` path guard active ✓ | `config_taint` Oracle wired ✓ | P6-5 hard-deleted ✓ | AR-037/039 routed ✓ | 3-org hunt complete ✓
 
 ## 2026-05-15 — Sprint Batch 134: P2-20 Proof Obligation Spine, oauth_account_fusion Oracle, CI Gate, Grant Brief & DeFi Hunt Sweep
 
