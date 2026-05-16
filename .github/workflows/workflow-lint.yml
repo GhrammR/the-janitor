@@ -110,7 +110,7 @@ jobs:
   # with no network dependency, fails closed on malformed output, and rejects
   # a non-passing verdict — on every change to action.yml.
   secretless-gate-smoke:
-    name: Secretless Gate Smoke
+    name: secretless-gate-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
