@@ -168,6 +168,8 @@ runs:
     # for 9+ hours.  Symmetric failure — the workflow fails when the engine
     # fails; it succeeds when the engine succeeds.
     - name: Execute Stateless Firewall
+      env:
+        GH_TOKEN: ${{ inputs.token }}
       shell: bash
       run: |
         set -euo pipefail
@@ -197,7 +199,25 @@ runs:
                 echo "failed to parse local bounce JSON verdict" >&2
                 exit 1
             fi
-            if [ "$(printf '%s\n' "${BOUNCE_JSON}" | jq -er '.gate_passed')" != "true" ]; then
+            GATE_PASSED="$(printf '%s\n' "${BOUNCE_JSON}" | jq -er '.gate_passed')"
+            # Post a named commit status so the verdict appears as "Janitor Integrity Check"
+            # on the PR even when running without a Governor URL.
+            if [ -n "${HEAD_SHA}" ] && [ -n "${{ github.repository }}" ]; then
+                STATUS_STATE="failure"
+                STATUS_DESC="Structural gate rejected patch (local-only mode)"
+                if [ "${GATE_PASSED}" = "true" ]; then
+                    STATUS_STATE="success"
+                    STATUS_DESC="Structural gate passed (local-only mode)"
+                fi
+                gh api \
+                    --method POST \
+                    "repos/${{ github.repository }}/statuses/${HEAD_SHA}" \
+                    -f state="${STATUS_STATE}" \
+                    -f context="Janitor Integrity Check" \
+                    -f description="${STATUS_DESC}" \
+                    --silent 2>/dev/null || true
+            fi
+            if [ "${GATE_PASSED}" != "true" ]; then
                 echo "Janitor gate rejected patch in local-only mode." >&2
                 exit 1
             fi
