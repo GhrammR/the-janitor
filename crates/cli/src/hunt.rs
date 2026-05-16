@@ -3735,6 +3735,41 @@ fn scan_buffer(
     let normalized = forge::deobfuscate::normalize_payload(source);
     let source = normalized.as_deref().unwrap_or(source);
     let source_str = std::str::from_utf8(source).unwrap_or("");
+    // Oracle: invisible Unicode payload scanner (trojan source / steganographic characters).
+    if matches!(
+        label.rsplit('.').next().unwrap_or(""),
+        "py" | "js"
+            | "ts"
+            | "tsx"
+            | "jsx"
+            | "rs"
+            | "go"
+            | "java"
+            | "kt"
+            | "swift"
+            | "rb"
+            | "php"
+            | "lua"
+            | "sh"
+            | "bash"
+            | "ps1"
+            | "cs"
+            | "cpp"
+            | "c"
+            | "h"
+    ) {
+        findings.extend(
+            forge::invisible_payload::scan_invisible_payloads(source, false)
+                .into_iter()
+                .map(|f| StructuredFinding {
+                    id: extract_rule_id(&f.description),
+                    severity: Some(format!("{:?}", f.severity)),
+                    file: Some(label.to_string()),
+                    line: Some(byte_to_line(source, f.start_byte)),
+                    ..Default::default()
+                }),
+        );
+    }
     findings
         .extend(forge::mcp_dispatch_guard::emit_mcp_confused_deputy_findings(source_str, label));
     if (label.ends_with(".yml") || label.ends_with(".yaml")) && source_str.contains("jobs:") {
