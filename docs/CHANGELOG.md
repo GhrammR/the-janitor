@@ -3,6 +3,24 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-15 — Sprint Batch 136: P6-2 Malware Genome Tracker, P8-5 Browser Extension Pack, deobfuscate Oracle, Composite Toolchain Action & Hunt Sweep
+
+* `crates/forge/src/malware_genome.rs` *(created)* — P6-2: `extract_genome(source, lang_ext) -> Option<MalwareGenome>` using tree-sitter DFS walk over polyglot registry; `simhash_from_kinds` FNV1a-mixed positional SimHash; `genome_similarity(a, b) -> f32`; `is_genome_variant(candidate, known, threshold) -> bool`; 7 deterministic tests (2 TP cosmetic/reorder + 2 TN unrelated/empty + 2 predicate + 1 unsupported ext). Wired in `hunt.rs` scan_buffer with `let _ = genome` stub for Sprint 137 corpus comparison.
+* `crates/forge/src/browser_ext.rs` *(created)* — P8-5 (MV3 layer only): `emit_browser_ext_findings(source_str, label)` fires only on `manifest.json` files; 9 `CRITICAL_PERMISSIONS` AhoCorasick check with `content_security_policy` suppressor; MV2 `background.scripts` in MV3 manifest compat-shim detection; 5 deterministic tests (2 TP + 3 TN). Wired in `hunt.rs` on `filename == "manifest.json"`.
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod malware_genome;` and `pub mod browser_ext;` registered alphabetically.
+* `crates/cli/src/hunt.rs` *(modified)* — Oracle: `forge::deobfuscate::normalize_payload(source)` wired as pre-scan normalizer before `source_str` binding; decodes base64/hex/concat obfuscated payloads before all detectors run (< 10 LOC).
+* `.github/actions/toolchain-setup/action.yml` *(created)* — Shared composite action: Kani install (pip z3-venv, cargo kani setup) extracted from duplicate 18-line blocks in both workflow files.
+* `.github/workflows/janitor-pr-gate.yml` *(modified)* — Kani+Z3 install steps replaced with `uses: ./.github/actions/toolchain-setup`.
+* `.github/workflows/janitor.yml` *(modified)* — Same replacement.
+* `.INNOVATION_LOG.md` *(modified)* — P6-2 and P8-5 blocks physically hard-deleted (Absolute Eradication Law).
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — 1 new row: mattermost/mattermost-plugin-boards `security:react_xss_stored_markdown` (30%, `marked ^4.0.12` + `dangerouslySetInnerHTML` in checkbox/h1/h2/h3 block components, no DOMPurify).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 6 new rows: chainlink `jwt_validation_bypass` FP (algorithm check present, 2%); chainlink `tls_verification_bypass` in deployment env (2%); mattermost-boards `ssrf_dynamic_url` client-side fetch (2%); mattermost-boards `dom_xss_innerHTML` dead code (2%); mattermost-boards `workflow_no_provenance` FP on tsx (0%); mattermost-github `workflow_no_provenance` FP on jsx/js (0%).
+* `.INNOVATION_LOG.md` *(modified)* — AR-038 (PHP SOAP UAF CVE-2026-6722, `attack_ledger_update`, no SAST surface) and AR-040 (Chrome extension credential theft, `mapped_innovation_item` → P8-5 `browser_ext.rs`) appended.
+* PR #107 (codex/formal-ai-governance): merge blocked — conflicts with main, operator action required.
+* Dependabot PRs #109/#110: Structural Firewall failures — binary needs to land on main via PR #112 before re-check.
+
+**Verification**: `just audit` ✓ | 7/7 `malware_genome` tests ✓ | 5/5 `browser_ext` tests ✓ | `deobfuscate` oracle wired ✓ | P6-2/P8-5 hard-deleted ✓ | AR-038/040 routed ✓ | 3-org hunt complete ✓
+
 ## 2026-05-15 — Sprint Batch 135 Hotfix: PR #112 Structural Firewall Fix
 
 * `crates/cli/src/hunt.rs` *(modified)* — `emit_llm_model_provenance_findings` gated to ML-adjacent extensions only (`py`, `ipynb`, `js`, `mjs`, `cjs`, `ts`, `tsx`, `jsx`). Root cause: `.rs` files in the PR diff contained LLM API patterns as string literals in tests (`from_pretrained(`, `pipeline(`, `trust_remote_code=True`), generating 2× KevCritical findings (slop_score 300). Extension guard eradicates the false positive.
