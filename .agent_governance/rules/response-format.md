@@ -123,7 +123,28 @@ The prompt MUST:
    Tips that are purely observational (e.g., "no anomaly detected", queue-state
    reports, blocked ARTICLE_REVIEW entries) are exempt — only tips with a concrete
    next-step action become phases.
-8. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
+8. **Inline Skill Quotation Rule (Sprint 140)**. Every `### Phase X:` block in
+   the Sovereign Directive prompt that depends on a rule, skill, protocol, or
+   detector module MUST quote the relevant text INLINE inside the
+   quadruple-backtick fence, not just reference the source file by path. The
+   next agent receives the prompt at a context reset — any
+   `.agent_governance/rules/*.md` or `.agent_governance/skills/*.md` file the
+   prompt expects to be re-read may be unavailable, compacted away, or modified
+   between sprints. A phase that says "apply the Pre-Action Validation Protocol
+   from cvp_red_team.md" is governance-invalid; the phase must reproduce the
+   full 5-tier protocol text inside the prompt, so the receiving agent can
+   execute Tier 1 without opening a file.
+
+   The exception: `response-format.md` itself is referenced (not inlined) on
+   the Governing Law line because the mandatory output structure it defines is
+   the format the receiving agent uses to compose its OWN response — it is
+   universal scaffolding, not phase-specific instruction.
+
+   Rules over 50 lines MAY be summarized to their decision-relevant content
+   when inlined, but the summary must be complete enough to execute without
+   source access. When in doubt, prefer the longer prompt over the brittle one.
+
+9. Include one **Architectural Oracle Tip** derived from a dynamic `rg` scan of
    legacy infrastructure such as `crates/cli/src/daemon.rs`,
    `crates/common/src/physarum.rs`, and `action.yml`. The tip must scan across
    ALL of the following drift categories and report the highest-priority find:
@@ -171,6 +192,16 @@ phase rather than emit and rationalize the omission.
    the exemption. Applying a fix in-session and then omitting it from the NRA
    is CORRECT behavior. Omitting a fix that was NOT applied and was NOT
    included in the NRA is a governance violation.
+
+5. **Inline Skill Quotation verification (Sprint 140)**: For every
+   `### Phase X:` block in the prompt, identify any rule, skill, protocol, or
+   detector module the phase invokes. Verify the FULL text (or a complete
+   decision-relevant summary for >50-line rules) is reproduced inside the
+   quadruple-backtick fence. A phase whose execution requires the next agent
+   to open a file in `.agent_governance/` or read source code in `crates/`
+   (other than to apply edits described in the phase itself) is governance-
+   invalid. Add the inline text before sealing. The lone exception is the
+   Governing Law boilerplate referencing `response-format.md` itself.
 
 The section must be operator-ready text, not analysis about the text. Do not
 emit vague "consider" language. Do not suggest manual git commands, staging,
