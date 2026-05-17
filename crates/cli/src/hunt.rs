@@ -2904,6 +2904,12 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // or a type assertion on token.Method. Closes the chainlink JWT FP class
     // (Sprint 141 Tier-1 disposition).
     apply_jwt_keyfunc_demotion(dir, &mut deduped);
+    // Sprint 142 — concrete-typed Unmarshal demotion. Demote
+    // security:protobuf_any_unguarded_decode findings when the surrounding
+    // proto.Unmarshal call has no anypb.Any reference nearby — the cited
+    // Unmarshal is into a concrete typed message, not an Any field. Closes
+    // the chainlink protobuf_any FP class (Sprint 141 Tier-1 disposition).
+    apply_concrete_typed_unmarshal_demotion(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
@@ -2944,6 +2950,76 @@ fn apply_threat_model_oracle(dir: &Path, findings: &mut Vec<StructuredFinding>) 
             forge::threat_model_oracle::ThreatModelVerdict::Emit => true,
         }
     });
+}
+
+/// Sprint 142 — Concrete-typed Unmarshal demotion.
+///
+/// The `security:protobuf_any_unguarded_decode` detector emits findings on
+/// every `proto.Unmarshal` call site without inspecting the destination
+/// type. The protobuf-Any vulnerability class requires an `anypb.Any`
+/// destination with `type_url` dispatch to arbitrary types — concrete
+/// typed messages cannot suffer the type-confusion attack.
+///
+/// Heuristic: scan ±10 lines of the cited line in the cited file. If
+/// no `anypb.Any` reference (`anypb.Any`, `*anypb.Any`, `anypb.New`,
+/// `anypb.UnmarshalNew`, `ptypes.UnmarshalAny`, or `Any.UnmarshalTo`)
+/// is present in that window, the Unmarshal target is concrete-typed
+/// and the finding is a false positive.
+///
+/// Motivating regression (Sprint 141 chainlink protobuf_any FP):
+/// `core/capabilities/confidentialrelay/handler.go:416` was
+/// `proto.Unmarshal(payloadBytes, &sdkReq)` where `sdkReq` is
+/// `sdkpb.CapabilityRequest` — a concrete typed protobuf message.
+/// The detector misidentified the threat model. This post-filter
+/// catches the class structurally.
+fn apply_concrete_typed_unmarshal_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    /// Scan window around the cited line for `anypb.Any` evidence.
+    /// 10 lines on each side covers the typical Go variable-declaration
+    /// distance from its `proto.Unmarshal` site.
+    const SCAN_RADIUS: usize = 10;
+    /// Substrings that indicate genuine `anypb.Any` usage near the
+    /// Unmarshal call. Any match in the scan window preserves the
+    /// upstream finding verdict.
+    const ANYPB_MARKERS: &[&str] = &[
+        "anypb.Any",
+        "*anypb.Any",
+        "anypb.New",
+        "anypb.UnmarshalNew",
+        "ptypes.UnmarshalAny",
+        "Any.UnmarshalTo",
+    ];
+
+    for finding in findings.iter_mut() {
+        if !finding.id.contains("protobuf_any_unguarded_decode") {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        let Ok(content) = std::fs::read_to_string(&abs_path) else {
+            continue;
+        };
+        let lines: Vec<&str> = content.lines().collect();
+        let Some(line_num) = finding.line else {
+            continue;
+        };
+        let target_idx = (line_num as usize).saturating_sub(1);
+        let start = target_idx.saturating_sub(SCAN_RADIUS);
+        let end = (target_idx + SCAN_RADIUS + 1).min(lines.len());
+        if start >= end {
+            continue;
+        }
+        let window = lines[start..end].join("\n");
+        let has_anypb = ANYPB_MARKERS.iter().any(|m| window.contains(m));
+        if !has_anypb {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [concrete_typed_unmarshal: cited Unmarshal target has no anypb.Any reference within {SCAN_RADIUS} lines — destination is a concrete typed message, not the Any type-confusion class]"
+            ));
+        }
+    }
 }
 
 /// Sprint 142 — Wire-in for `forge::jwt_keyfunc_oracle::classify_jwt_finding`.
@@ -6859,5 +6935,102 @@ class Handler {
             Some("Critical"),
             "fresh target must not be demoted"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Sprint 142 — Concrete-typed Unmarshal demotion. Sprint 141 demoted the
+    // chainlink protobuf_any CANDIDATE because the cited Unmarshal target was
+    // a concrete typed message (sdkpb.CapabilityRequest), not anypb.Any. This
+    // post-filter catches the class structurally.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn concrete_typed_unmarshal_demotes_when_no_anypb_nearby() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let go_path = dir.path().join("handler.go");
+        std::fs::write(
+            &go_path,
+            b"package handler\n\nimport sdkpb \"example.com/sdkpb\"\n\nfunc Handle(payloadBytes []byte) error {\n    var sdkReq sdkpb.CapabilityRequest\n    if err := proto.Unmarshal(payloadBytes, &sdkReq); err != nil {\n        return err\n    }\n    return nil\n}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("handler.go".to_string()),
+            line: Some(7),
+            severity: Some("High".to_string()),
+            remediation: Some("Validate Any.type_url".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(findings[0].severity.as_deref(), Some("Informational"));
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            remediation.contains("concrete_typed_unmarshal"),
+            "remediation must annotate: {remediation}"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_preserves_when_anypb_present_in_window() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let go_path = dir.path().join("genuine_any.go");
+        std::fs::write(
+            &go_path,
+            b"package handler\n\nimport \"google.golang.org/protobuf/types/known/anypb\"\n\nfunc Handle(payloadBytes []byte) error {\n    var msg anypb.Any\n    if err := proto.Unmarshal(payloadBytes, &msg); err != nil {\n        return err\n    }\n    return nil\n}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("genuine_any.go".to_string()),
+            line: Some(7),
+            severity: Some("High".to_string()),
+            remediation: Some("Validate Any.type_url".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("High"),
+            "anypb.Any presence must preserve upstream finding"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_unaffects_non_protobuf_findings() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("foo.go"),
+            b"package handler\n\nfunc Handle() {}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:sql_injection".to_string(),
+            file: Some("foo.go".to_string()),
+            line: Some(3),
+            severity: Some("High".to_string()),
+            remediation: Some("Parameterize query".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("High"),
+            "non-protobuf finding must be unaffected"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_safe_on_missing_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("nonexistent.go".to_string()),
+            line: Some(1),
+            severity: Some("High".to_string()),
+            ..Default::default()
+        }];
+        // Must not panic, must not modify the finding.
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(findings[0].severity.as_deref(), Some("High"));
     }
 }
