@@ -2910,6 +2910,12 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // Unmarshal is into a concrete typed message, not an Any field. Closes
     // the chainlink protobuf_any FP class (Sprint 141 Tier-1 disposition).
     apply_concrete_typed_unmarshal_demotion(dir, &mut deduped);
+    // Sprint 143 — SQL sanitizer oracle. Demote security:sql_injection
+    // / security:sqli* findings when the cited line is in a properly-
+    // sanitized SQL context (pq.QuoteIdentifier / prepared statement /
+    // //nolint:gosec annotation / test-fixture function). Closes the
+    // chainlink SQLi FP class (Sprint 141 Tier-1 disposition).
+    apply_sql_sanitizer_demotion(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
@@ -3017,6 +3023,40 @@ fn apply_concrete_typed_unmarshal_demotion(dir: &Path, findings: &mut [Structure
             let existing = finding.remediation.take().unwrap_or_default();
             finding.remediation = Some(format!(
                 "{existing} [concrete_typed_unmarshal: cited Unmarshal target has no anypb.Any reference within {SCAN_RADIUS} lines — destination is a concrete typed message, not the Any type-confusion class]"
+            ));
+        }
+    }
+}
+
+/// Sprint 143 — Wire-in for `forge::sql_sanitizer_oracle::classify_sql_finding`.
+///
+/// For each finding whose `id` matches `forge::sql_sanitizer_oracle::is_sql_class`
+/// (SQL injection class), inspect the cited file for sanitizer context. If
+/// the oracle returns `Sanitized`, the finding is demoted to `Informational`
+/// severity with an annotation citing which sanitizer signal matched.
+///
+/// Motivating regression (Sprint 141 chainlink SQLi FP): the cited line
+/// at `core/store/store.go:156` was inside `dropAndCreatePristineDB`
+/// (test infrastructure) and used `pq.QuoteIdentifier()` (proper
+/// identifier escaping) with an inline `//nolint:gosec` annotation. The
+/// upstream detector emitted on the syntactic concatenation pattern
+/// without any of these context signals.
+fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    for finding in findings.iter_mut() {
+        if !forge::sql_sanitizer_oracle::is_sql_class(finding) {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        if forge::sql_sanitizer_oracle::classify_sql_finding(&abs_path, finding.line)
+            == forge::sql_sanitizer_oracle::SqlSanitizerVerdict::Sanitized
+        {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [sql_sanitizer_oracle: cited line is in a sanitized SQL context (quoting helper, //nolint annotation, or test-fixture function)]"
             ));
         }
     }
