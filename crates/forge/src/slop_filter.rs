@@ -2654,6 +2654,157 @@ fn finding_fingerprint(rule_id: &str, file_path: &str, span_bytes: &[u8]) -> Str
 }
 
 // ---------------------------------------------------------------------------
+// Sprint 138 — Focus-Area Mapping Cross-Check
+// ---------------------------------------------------------------------------
+
+/// Sprint 138 — Focus-Area Mapping Cross-Check.
+///
+/// Parses the `### Focus Areas` section of a bug-bounty program's scope
+/// file at `tools/campaign/targets/<program>_targets.md` and checks whether
+/// each finding's vulnerability class textually overlaps any stated focus
+/// area. Findings without overlap have `[focus_area_mismatch]` appended to
+/// the `remediation` field; downstream triage and ledger routing must
+/// downgrade the estimated approval percentage by 50% for these findings.
+///
+/// Motivating case (Sprint 138 chainlink JWT): the chainlink program's
+/// stated focus areas are oracle/reentrancy/on-chain concerns. A JWT
+/// validation bypass in off-chain Go node code does NOT textually overlap
+/// any focus area, so the static `0.36` approval rating overestimates
+/// real-world payout odds and gets a 50% downgrade.
+///
+/// No-op when:
+/// - `scope_file_path` does not exist or cannot be read,
+/// - the scope file contains no `### Focus Areas` section,
+/// - the finding list is empty.
+pub fn apply_focus_area_check(
+    findings: &mut [common::slop::StructuredFinding],
+    scope_file_path: &Path,
+) {
+    if findings.is_empty() {
+        return;
+    }
+    let Ok(content) = std::fs::read_to_string(scope_file_path) else {
+        return;
+    };
+    let focus_keywords = extract_focus_area_keywords(&content);
+    if focus_keywords.is_empty() {
+        return;
+    }
+    for finding in findings.iter_mut() {
+        let finding_keywords = extract_finding_keywords(&finding.id);
+        let has_overlap = finding_keywords.iter().any(|fk| {
+            focus_keywords
+                .iter()
+                .any(|key| key.contains(fk.as_str()) || fk.contains(key.as_str()))
+        });
+        if !has_overlap {
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [focus_area_mismatch: not aligned to program focus areas; downgrade approval by 50%]"
+            ));
+        }
+    }
+}
+
+/// Extract bullet-item keywords from the `### Focus Areas` section of a
+/// scope file. Tokens shorter than 4 chars and a small stopword set are
+/// excluded so noise words like `and`, `for`, `into` cannot generate
+/// spurious matches.
+fn extract_focus_area_keywords(scope_content: &str) -> Vec<String> {
+    let mut keywords = Vec::new();
+    let mut in_focus_areas = false;
+    for line in scope_content.lines() {
+        let trimmed = line.trim();
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("###") && lower.contains("focus area") {
+            in_focus_areas = true;
+            continue;
+        }
+        if in_focus_areas
+            && (trimmed.starts_with("###")
+                || trimmed.starts_with("##")
+                || trimmed.starts_with("---"))
+        {
+            break;
+        }
+        if !in_focus_areas {
+            continue;
+        }
+        let item = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+            .unwrap_or(trimmed);
+        if item.is_empty() {
+            continue;
+        }
+        for token in item.split(|c: char| !c.is_alphanumeric() && c != '-') {
+            let cleaned = token.to_lowercase();
+            if cleaned.len() >= 4 && !is_focus_stopword(&cleaned) {
+                keywords.push(cleaned);
+            }
+        }
+    }
+    keywords
+}
+
+/// Extract keyword tokens from a finding's `id` field, expanded with a
+/// small synonym table so abbreviated rule ids match the natural-English
+/// vocabulary used in program focus-area bullet lists.
+fn extract_finding_keywords(finding_id: &str) -> Vec<String> {
+    let core = finding_id
+        .strip_prefix("security:")
+        .unwrap_or(finding_id)
+        .to_lowercase();
+    let mut keywords: Vec<String> = core
+        .split(['_', '-', ':'])
+        .filter(|s| s.len() >= 3)
+        .map(|s| s.to_string())
+        .collect();
+    const CLASS_SYNONYMS: &[(&str, &[&str])] = &[
+        ("xss", &["html", "scripting", "browser", "injection"]),
+        ("sql", &["database", "injection", "query"]),
+        ("sqli", &["database", "injection", "query"]),
+        ("ssrf", &["request", "forgery", "metadata"]),
+        ("jwt", &["authentication", "token", "session", "auth"]),
+        ("idor", &["access", "authorization", "ownership"]),
+        ("rce", &["execution", "command", "shell"]),
+        ("dom", &["browser", "client"]),
+        ("auth", &["authentication", "authorization"]),
+        ("crypto", &["cryptographic"]),
+        ("tls", &["transport"]),
+        ("ffi", &["memory"]),
+        ("deser", &["deserialization", "deserialisation"]),
+        ("backdoor", &["malicious", "implant"]),
+    ];
+    for (class, synonyms) in CLASS_SYNONYMS {
+        if keywords.iter().any(|k| k == class) {
+            for syn in *synonyms {
+                keywords.push((*syn).to_string());
+            }
+        }
+    }
+    keywords
+}
+
+fn is_focus_stopword(word: &str) -> bool {
+    matches!(
+        word,
+        "the"
+            | "and"
+            | "for"
+            | "with"
+            | "into"
+            | "from"
+            | "this"
+            | "that"
+            | "flaws"
+            | "issues"
+            | "between"
+            | "areas"
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -3740,5 +3891,116 @@ fn e(x: i32) -> i32 { match x { 0 => 1, n => n } }\n";
             crate::patch_proof::PatchVerdict::Unsatisfiable,
             "empty base buffer must be Unsatisfiable"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Sprint 138 — apply_focus_area_check tests.
+    // The motivating regression: a chainlink JWT bypass finding was rated
+    // 36% approval in CANDIDATE_LEDGER, but chainlink's program focus areas
+    // are oracle/reentrancy/on-chain only. Off-chain Go auth bugs do not
+    // textually overlap any focus area; the static approval was inflated.
+    // The cross-check downgrades approval by 50% for unmapped findings.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn focus_area_check_flags_chainlink_jwt_bypass_as_mismatch() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let scope_path = tmp.path().join("chainlink_targets.md");
+        std::fs::write(
+            &scope_path,
+            b"# Chainlink\n\n### Focus Areas\n- Oracle feed manipulation\n- Access control flaws in price aggregation\n- Reentrancy in callback handlers\n- Off-chain to on-chain data integrity\n\n---\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:jwt_validation_bypass".to_string(),
+            remediation: Some("Validate alg=none rejection".to_string()),
+            ..Default::default()
+        }];
+        apply_focus_area_check(&mut findings, &scope_path);
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            remediation.contains("focus_area_mismatch"),
+            "JWT bypass in off-chain Go must MISMATCH on-chain focus areas: {remediation}"
+        );
+    }
+
+    #[test]
+    fn focus_area_check_does_not_flag_oracle_finding_against_chainlink() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let scope_path = tmp.path().join("chainlink_targets.md");
+        std::fs::write(
+            &scope_path,
+            b"# Chainlink\n\n### Focus Areas\n- Oracle feed manipulation\n- Access control flaws in price aggregation\n- Reentrancy in callback handlers\n\n---\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:oracle_feed_tampering".to_string(),
+            remediation: Some("Validate aggregator signatures".to_string()),
+            ..Default::default()
+        }];
+        apply_focus_area_check(&mut findings, &scope_path);
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            !remediation.contains("focus_area_mismatch"),
+            "oracle finding must MATCH chainlink oracle focus area: {remediation}"
+        );
+    }
+
+    #[test]
+    fn focus_area_check_synonym_table_resolves_jwt_to_authentication() {
+        // Some programs phrase focus areas as "authentication weaknesses"
+        // rather than naming JWT explicitly. The synonym table must close
+        // this gap so common abbreviations are not over-flagged.
+        let tmp = tempfile::TempDir::new().unwrap();
+        let scope_path = tmp.path().join("authprog_targets.md");
+        std::fs::write(
+            &scope_path,
+            b"# AuthProg\n\n### Focus Areas\n- Authentication weaknesses\n- Session management flaws\n\n---\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:jwt_validation_bypass".to_string(),
+            remediation: Some("Validate alg=none rejection".to_string()),
+            ..Default::default()
+        }];
+        apply_focus_area_check(&mut findings, &scope_path);
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            !remediation.contains("focus_area_mismatch"),
+            "JWT synonym (authentication) must satisfy auth-focused program: {remediation}"
+        );
+    }
+
+    #[test]
+    fn focus_area_check_noop_when_no_focus_areas_section() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let scope_path = tmp.path().join("nofocus_targets.md");
+        std::fs::write(
+            &scope_path,
+            b"# Program with No Focus Areas\n\n### In Scope\n- https://github.com/x/y\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:jwt_validation_bypass".to_string(),
+            remediation: Some("test".to_string()),
+            ..Default::default()
+        }];
+        apply_focus_area_check(&mut findings, &scope_path);
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            !remediation.contains("focus_area_mismatch"),
+            "no focus areas section → no annotation: {remediation}"
+        );
+    }
+
+    #[test]
+    fn focus_area_check_noop_when_scope_file_missing() {
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:jwt_validation_bypass".to_string(),
+            remediation: Some("test".to_string()),
+            ..Default::default()
+        }];
+        apply_focus_area_check(&mut findings, Path::new("/nonexistent/file.md"));
+        assert_eq!(findings[0].remediation.as_deref(), Some("test"));
     }
 }
