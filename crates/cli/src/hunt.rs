@@ -2899,6 +2899,11 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // that declare a shared-access threat model. Runs BEFORE the deprecation
     // and focus-area filters so suppressed findings skip downstream cycles.
     apply_threat_model_oracle(dir, &mut deduped);
+    // Sprint 142 — JWT keyfunc oracle. Demote security:jwt_*_bypass findings
+    // when the surrounding keyfunc body contains an algorithm allowlist check
+    // or a type assertion on token.Method. Closes the chainlink JWT FP class
+    // (Sprint 141 Tier-1 disposition).
+    apply_jwt_keyfunc_demotion(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
@@ -2939,6 +2944,41 @@ fn apply_threat_model_oracle(dir: &Path, findings: &mut Vec<StructuredFinding>) 
             forge::threat_model_oracle::ThreatModelVerdict::Emit => true,
         }
     });
+}
+
+/// Sprint 142 — Wire-in for `forge::jwt_keyfunc_oracle::classify_jwt_finding`.
+///
+/// For each finding whose `id` is a JWT-class vulnerability (per
+/// `forge::jwt_keyfunc_oracle::is_jwt_class`), inspect the surrounding
+/// keyfunc body in the cited source file. If the keyfunc contains an
+/// algorithm allowlist check or a type assertion on `token.Method`, the
+/// finding is demoted to `Informational` severity with an annotation
+/// citing the guard.
+///
+/// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
+/// detector emitted a 36% approval CANDIDATE for `core/utils/jwt.go:230`
+/// without inspecting the keyfunc body at lines 258-266, which contains
+/// TWO algorithm validation gates (`token.Method.Alg() != ...` and a
+/// type assertion on `*SigningMethodEth`).
+fn apply_jwt_keyfunc_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    for finding in findings.iter_mut() {
+        if !forge::jwt_keyfunc_oracle::is_jwt_class(finding) {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        if forge::jwt_keyfunc_oracle::classify_jwt_finding(&abs_path, finding.line)
+            == forge::jwt_keyfunc_oracle::JwtKeyfuncVerdict::Guarded
+        {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [jwt_keyfunc_oracle: keyfunc_body_contains_algorithm_allowlist_or_type_assertion]"
+            ));
+        }
+    }
 }
 
 /// Sprint 138 — Wire-in for `forge::slop_filter::apply_focus_area_check`.

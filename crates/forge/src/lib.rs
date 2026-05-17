@@ -62,6 +62,7 @@ pub mod ifds;
 pub mod intent_divergence;
 pub mod invisible_payload;
 pub mod java_deser_guard;
+pub mod jwt_keyfunc_oracle;
 pub mod kani_bridge;
 pub mod labyrinth;
 pub mod lcm;
