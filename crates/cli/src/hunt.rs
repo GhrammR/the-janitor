@@ -2893,12 +2893,52 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     apply_p2_16_protobuf_demotion(&mut deduped);
     // P2-17: demote SSRF findings whose URL source is operator-config backed.
     apply_config_backed_ssrf_demotion(&mut deduped);
+    // Sprint 140 — threat-model oracle. Suppress findings covered by per-route
+    // auth decorators, downgrade to Informational when blueprint-level auth
+    // hooks cover the route, suppress ownership-class findings on projects
+    // that declare a shared-access threat model. Runs BEFORE the deprecation
+    // and focus-area filters so suppressed findings skip downstream cycles.
+    apply_threat_model_oracle(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
     // match the bounty program's stated focus areas (50% approval downgrade).
     apply_focus_area_demotion(dir, &mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
+}
+
+/// Sprint 140 — Wire-in for `forge::threat_model_oracle::classify_finding`.
+///
+/// Iterates the candidate finding set, asks the oracle for a verdict on
+/// each, and applies the verdict to the finding stream:
+/// - `Suppress`: remove from results — the cited code is protected by a
+///   per-route auth decorator or the project declares a shared-access
+///   threat model that the upstream detector failed to account for.
+/// - `DowngradeInformational`: keep the finding but set `severity` to
+///   `Informational` and annotate `remediation` with the cause. The
+///   blueprint covers the route via a framework-level hook, but
+///   attribution is coarse enough that we surface it for operator review.
+/// - `Emit`: no-op — preserve the upstream detector verdict.
+///
+/// Motivating regression (Sprint 140 SecureDrop IDOR FP): the upstream
+/// ownership-check detector emitted a 44% approval CANDIDATE for
+/// `journalist_app/admin.py:354` despite the `@admin_required` decorator
+/// at line 355. This wire-in catches the class structurally.
+fn apply_threat_model_oracle(dir: &Path, findings: &mut Vec<StructuredFinding>) {
+    findings.retain_mut(|finding| {
+        match forge::threat_model_oracle::classify_finding(dir, finding) {
+            forge::threat_model_oracle::ThreatModelVerdict::Suppress => false,
+            forge::threat_model_oracle::ThreatModelVerdict::DowngradeInformational => {
+                finding.severity = Some("Informational".to_string());
+                let existing = finding.remediation.take().unwrap_or_default();
+                finding.remediation = Some(format!(
+                    "{existing} [threat_model_oracle: blueprint_auth_hook_covers_route — downgraded by Sprint 140 oracle]"
+                ));
+                true
+            }
+            forge::threat_model_oracle::ThreatModelVerdict::Emit => true,
+        }
+    });
 }
 
 /// Sprint 138 — Wire-in for `forge::slop_filter::apply_focus_area_check`.

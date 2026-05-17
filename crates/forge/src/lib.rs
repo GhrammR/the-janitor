@@ -115,6 +115,7 @@ pub mod swarm_exfil;
 pub mod symbex;
 pub mod taint_catalog;
 pub mod taint_propagate;
+pub mod threat_model_oracle;
 pub mod toctou;
 pub mod toolchain_degradation;
 pub mod vector_topology;
