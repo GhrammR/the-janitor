@@ -16,7 +16,7 @@ axum = { version = "0.8.6", features = ["json"] }
 axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }
 base64.workspace = true
 common = { path = "../common" }
-dashmap = "6.1"
+dashmap = "6.2"
 ed25519-dalek.workspace = true
 hex.workspace = true
 hmac.workspace = true
