@@ -99,6 +99,7 @@ pub mod rebac_coherence;
 pub mod rebac_registry;
 pub mod reflexive_assurance;
 pub mod registry_probe;
+pub mod registry_watch;
 pub mod router_topology;
 pub mod rust_build_worm;
 pub mod sanitizer;
