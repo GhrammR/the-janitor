@@ -134,8 +134,19 @@ pub fn detect_agent_intent_misalignment(
 
 fn restrictive_prompt_span(text: &str) -> Option<(usize, usize)> {
     let marker = pattern_set(PROMPT_MARKERS).find(text)?;
-    let window_start = marker.start().saturating_sub(256);
-    let window_end = (marker.end() + 768).min(text.len());
+    let raw_start = marker.start().saturating_sub(256);
+    let raw_end = (marker.end() + 768).min(text.len());
+    // Snap to char boundaries before slicing — translation files and other
+    // UTF-8 inputs with multi-byte characters (e.g. CJK YAML in
+    // discourse/discourse) would otherwise panic at the slice boundary.
+    let mut window_start = raw_start;
+    while window_start > 0 && !text.is_char_boundary(window_start) {
+        window_start -= 1;
+    }
+    let mut window_end = raw_end;
+    while window_end > window_start && !text.is_char_boundary(window_end) {
+        window_end -= 1;
+    }
     let window = &text[window_start..window_end];
     let restrictive = pattern_set(RESTRICTIVE_PROMPT_PATTERNS).find(window)?;
     Some((

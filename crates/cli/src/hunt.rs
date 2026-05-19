@@ -2893,7 +2893,309 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     apply_p2_16_protobuf_demotion(&mut deduped);
     // P2-17: demote SSRF findings whose URL source is operator-config backed.
     apply_config_backed_ssrf_demotion(&mut deduped);
+    // Sprint 140 — threat-model oracle. Suppress findings covered by per-route
+    // auth decorators, downgrade to Informational when blueprint-level auth
+    // hooks cover the route, suppress ownership-class findings on projects
+    // that declare a shared-access threat model. Runs BEFORE the deprecation
+    // and focus-area filters so suppressed findings skip downstream cycles.
+    apply_threat_model_oracle(dir, &mut deduped);
+    // Sprint 142 — JWT keyfunc oracle. Demote security:jwt_*_bypass findings
+    // when the surrounding keyfunc body contains an algorithm allowlist check
+    // or a type assertion on token.Method. Closes the chainlink JWT FP class
+    // (Sprint 141 Tier-1 disposition).
+    apply_jwt_keyfunc_demotion(dir, &mut deduped);
+    // Sprint 142 — concrete-typed Unmarshal demotion. Demote
+    // security:protobuf_any_unguarded_decode findings when the surrounding
+    // proto.Unmarshal call has no anypb.Any reference nearby — the cited
+    // Unmarshal is into a concrete typed message, not an Any field. Closes
+    // the chainlink protobuf_any FP class (Sprint 141 Tier-1 disposition).
+    apply_concrete_typed_unmarshal_demotion(dir, &mut deduped);
+    // Sprint 143 — SQL sanitizer oracle. Demote security:sql_injection
+    // / security:sqli* findings when the cited line is in a properly-
+    // sanitized SQL context (pq.QuoteIdentifier / prepared statement /
+    // //nolint:gosec annotation / test-fixture function). Closes the
+    // chainlink SQLi FP class (Sprint 141 Tier-1 disposition).
+    apply_sql_sanitizer_demotion(dir, &mut deduped);
+    // Sprint 138 — demote findings on deprecated / community-only targets.
+    apply_deprecation_demotion(dir, &mut deduped);
+    // Sprint 138 — annotate findings whose vulnerability class does not
+    // match the bounty program's stated focus areas (50% approval downgrade).
+    apply_focus_area_demotion(dir, &mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
+}
+
+/// Sprint 140 — Wire-in for `forge::threat_model_oracle::classify_finding`.
+///
+/// Iterates the candidate finding set, asks the oracle for a verdict on
+/// each, and applies the verdict to the finding stream:
+/// - `Suppress`: remove from results — the cited code is protected by a
+///   per-route auth decorator or the project declares a shared-access
+///   threat model that the upstream detector failed to account for.
+/// - `DowngradeInformational`: keep the finding but set `severity` to
+///   `Informational` and annotate `remediation` with the cause. The
+///   blueprint covers the route via a framework-level hook, but
+///   attribution is coarse enough that we surface it for operator review.
+/// - `Emit`: no-op — preserve the upstream detector verdict.
+///
+/// Motivating regression (Sprint 140 SecureDrop IDOR FP): the upstream
+/// ownership-check detector emitted a 44% approval CANDIDATE for
+/// `journalist_app/admin.py:354` despite the `@admin_required` decorator
+/// at line 355. This wire-in catches the class structurally.
+fn apply_threat_model_oracle(dir: &Path, findings: &mut Vec<StructuredFinding>) {
+    findings.retain_mut(|finding| {
+        match forge::threat_model_oracle::classify_finding(dir, finding) {
+            forge::threat_model_oracle::ThreatModelVerdict::Suppress => false,
+            forge::threat_model_oracle::ThreatModelVerdict::DowngradeInformational => {
+                finding.severity = Some("Informational".to_string());
+                let existing = finding.remediation.take().unwrap_or_default();
+                finding.remediation = Some(format!(
+                    "{existing} [threat_model_oracle: blueprint_auth_hook_covers_route — downgraded by Sprint 140 oracle]"
+                ));
+                true
+            }
+            forge::threat_model_oracle::ThreatModelVerdict::Emit => true,
+        }
+    });
+}
+
+/// Sprint 142 — Concrete-typed Unmarshal demotion.
+///
+/// The `security:protobuf_any_unguarded_decode` detector emits findings on
+/// every `proto.Unmarshal` call site without inspecting the destination
+/// type. The protobuf-Any vulnerability class requires an `anypb.Any`
+/// destination with `type_url` dispatch to arbitrary types — concrete
+/// typed messages cannot suffer the type-confusion attack.
+///
+/// Heuristic: scan ±10 lines of the cited line in the cited file. If
+/// no `anypb.Any` reference (`anypb.Any`, `*anypb.Any`, `anypb.New`,
+/// `anypb.UnmarshalNew`, `ptypes.UnmarshalAny`, or `Any.UnmarshalTo`)
+/// is present in that window, the Unmarshal target is concrete-typed
+/// and the finding is a false positive.
+///
+/// Motivating regression (Sprint 141 chainlink protobuf_any FP):
+/// `core/capabilities/confidentialrelay/handler.go:416` was
+/// `proto.Unmarshal(payloadBytes, &sdkReq)` where `sdkReq` is
+/// `sdkpb.CapabilityRequest` — a concrete typed protobuf message.
+/// The detector misidentified the threat model. This post-filter
+/// catches the class structurally.
+fn apply_concrete_typed_unmarshal_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    /// Scan window around the cited line for `anypb.Any` evidence.
+    /// 10 lines on each side covers the typical Go variable-declaration
+    /// distance from its `proto.Unmarshal` site.
+    const SCAN_RADIUS: usize = 10;
+    /// Substrings that indicate genuine `anypb.Any` usage near the
+    /// Unmarshal call. Any match in the scan window preserves the
+    /// upstream finding verdict.
+    const ANYPB_MARKERS: &[&str] = &[
+        "anypb.Any",
+        "*anypb.Any",
+        "anypb.New",
+        "anypb.UnmarshalNew",
+        "ptypes.UnmarshalAny",
+        "Any.UnmarshalTo",
+    ];
+
+    for finding in findings.iter_mut() {
+        if !finding.id.contains("protobuf_any_unguarded_decode") {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        let Ok(content) = std::fs::read_to_string(&abs_path) else {
+            continue;
+        };
+        let lines: Vec<&str> = content.lines().collect();
+        let Some(line_num) = finding.line else {
+            continue;
+        };
+        let target_idx = (line_num as usize).saturating_sub(1);
+        let start = target_idx.saturating_sub(SCAN_RADIUS);
+        let end = (target_idx + SCAN_RADIUS + 1).min(lines.len());
+        if start >= end {
+            continue;
+        }
+        let window = lines[start..end].join("\n");
+        let has_anypb = ANYPB_MARKERS.iter().any(|m| window.contains(m));
+        if !has_anypb {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [concrete_typed_unmarshal: cited Unmarshal target has no anypb.Any reference within {SCAN_RADIUS} lines — destination is a concrete typed message, not the Any type-confusion class]"
+            ));
+        }
+    }
+}
+
+/// Sprint 143 — Wire-in for `forge::sql_sanitizer_oracle::classify_sql_finding`.
+///
+/// For each finding whose `id` matches `forge::sql_sanitizer_oracle::is_sql_class`
+/// (SQL injection class), inspect the cited file for sanitizer context. If
+/// the oracle returns `Sanitized`, the finding is demoted to `Informational`
+/// severity with an annotation citing which sanitizer signal matched.
+///
+/// Motivating regression (Sprint 141 chainlink SQLi FP): the cited line
+/// at `core/store/store.go:156` was inside `dropAndCreatePristineDB`
+/// (test infrastructure) and used `pq.QuoteIdentifier()` (proper
+/// identifier escaping) with an inline `//nolint:gosec` annotation. The
+/// upstream detector emitted on the syntactic concatenation pattern
+/// without any of these context signals.
+fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    for finding in findings.iter_mut() {
+        if !forge::sql_sanitizer_oracle::is_sql_class(finding) {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        if forge::sql_sanitizer_oracle::classify_sql_finding(&abs_path, finding.line)
+            == forge::sql_sanitizer_oracle::SqlSanitizerVerdict::Sanitized
+        {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [sql_sanitizer_oracle: cited line is in a sanitized SQL context (quoting helper, //nolint annotation, or test-fixture function)]"
+            ));
+        }
+    }
+}
+
+/// Sprint 142 — Wire-in for `forge::jwt_keyfunc_oracle::classify_jwt_finding`.
+///
+/// For each finding whose `id` is a JWT-class vulnerability (per
+/// `forge::jwt_keyfunc_oracle::is_jwt_class`), inspect the surrounding
+/// keyfunc body in the cited source file. If the keyfunc contains an
+/// algorithm allowlist check or a type assertion on `token.Method`, the
+/// finding is demoted to `Informational` severity with an annotation
+/// citing the guard.
+///
+/// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
+/// detector emitted a 36% approval CANDIDATE for `core/utils/jwt.go:230`
+/// without inspecting the keyfunc body at lines 258-266, which contains
+/// TWO algorithm validation gates (`token.Method.Alg() != ...` and a
+/// type assertion on `*SigningMethodEth`).
+fn apply_jwt_keyfunc_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    for finding in findings.iter_mut() {
+        if !forge::jwt_keyfunc_oracle::is_jwt_class(finding) {
+            continue;
+        }
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let abs_path = dir.join(rel_path);
+        if forge::jwt_keyfunc_oracle::classify_jwt_finding(&abs_path, finding.line)
+            == forge::jwt_keyfunc_oracle::JwtKeyfuncVerdict::Guarded
+        {
+            finding.severity = Some("Informational".to_string());
+            let existing = finding.remediation.take().unwrap_or_default();
+            finding.remediation = Some(format!(
+                "{existing} [jwt_keyfunc_oracle: keyfunc_body_contains_algorithm_allowlist_or_type_assertion]"
+            ));
+        }
+    }
+}
+
+/// Sprint 138 — Wire-in for `forge::slop_filter::apply_focus_area_check`.
+///
+/// Detects the bounty program for `dir` (via directory name + git remote
+/// canonicalisation) and looks up its scope file in
+/// `tools/campaign/targets/<program>_targets.md`. If a scope file is found,
+/// the focus-area cross-check runs and annotates any finding whose
+/// vulnerability class does not textually overlap the program's stated
+/// `### Focus Areas` bullet list.
+fn apply_focus_area_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    use crate::audit_report::extract_git_remote;
+
+    if findings.is_empty() {
+        return;
+    }
+    let Some(program_name) = dir.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    let canonical_target = extract_git_remote(dir);
+    let campaign_targets_dir = std::path::PathBuf::from("tools/campaign/targets");
+    let direct_path = campaign_targets_dir.join(format!("{program_name}_targets.md"));
+    let scope_file = if direct_path.exists() {
+        Some(direct_path)
+    } else {
+        find_targets_file_for_canonical_target(&campaign_targets_dir, &canonical_target)
+    };
+    if let Some(scope_file) = scope_file {
+        forge::slop_filter::apply_focus_area_check(findings, &scope_file);
+    }
+}
+
+/// Sprint 138 — Target Deprecation Cross-Check.
+///
+/// Scans the target directory's README.md, README, README.rst, SECURITY.md,
+/// and CONTRIBUTING.md for deprecation-signal keywords. If any are found,
+/// the project is no longer officially maintained; findings against it are
+/// bounty-ineligible per most bug-bounty program scope exclusions (community
+/// plugins are accepted "informational only" per program rules).
+///
+/// Returns `Some((filename, matched_keyword))` on first hit, `None` otherwise.
+pub fn is_deprecated_target(dir: &Path) -> Option<(String, String)> {
+    const KEYWORDS: &[&str] = &[
+        "archived",
+        "deprecated",
+        "community-maintained",
+        "no longer officially supported",
+        "transitioned to community",
+        "no longer actively maintained",
+        "moved to maintenance mode",
+    ];
+    const CANDIDATE_FILES: &[&str] = &[
+        "README.md",
+        "README.rst",
+        "README",
+        "README.txt",
+        "SECURITY.md",
+        "CONTRIBUTING.md",
+    ];
+    const SCAN_WINDOW_BYTES: usize = 16 * 1024;
+
+    for filename in CANDIDATE_FILES {
+        let path = dir.join(filename);
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let scan_window = content
+            .get(..content.len().min(SCAN_WINDOW_BYTES))
+            .unwrap_or(&content);
+        let lower = scan_window.to_lowercase();
+        for keyword in KEYWORDS {
+            if lower.contains(keyword) {
+                return Some((filename.to_string(), keyword.to_string()));
+            }
+        }
+    }
+    None
+}
+
+/// Sprint 138 — Deprecation Demotion Post-Filter.
+///
+/// When the scan target is a deprecated / archived / community-only project,
+/// every finding is demoted to `Informational` severity with the reason
+/// appended to the `remediation` field. The findings remain in the output
+/// (for LOW_YIELD ledger routing as negative training data) but are no
+/// longer eligible for promotion to CANDIDATE or BOUNTY.
+fn apply_deprecation_demotion(dir: &Path, findings: &mut [StructuredFinding]) {
+    if findings.is_empty() {
+        return;
+    }
+    let Some((filename, keyword)) = is_deprecated_target(dir) else {
+        return;
+    };
+    let marker = format!(
+        " [deprecated_target: {filename}=\"{keyword}\"] informational_only_per_scope_exclusion"
+    );
+    for finding in findings.iter_mut() {
+        finding.severity = Some("Informational".to_string());
+        let remediation = finding.remediation.take().unwrap_or_default();
+        finding.remediation = Some(format!("{remediation}{marker}"));
+    }
 }
 
 /// P2-16 — Protobuf Any Reachability Post-Filter.
@@ -3829,6 +4131,22 @@ fn scan_buffer(
                 ..Default::default()
             }),
     );
+    if matches!(
+        ext,
+        "py" | "js" | "ts" | "tsx" | "rb" | "go" | "java" | "php" | "kt"
+    ) {
+        findings.extend(
+            forge::oauth_account_fusion::detect_missing_state_validation(source, label)
+                .into_iter()
+                .map(|f| StructuredFinding {
+                    id: f.description.clone(),
+                    severity: Some(format!("{:?}", f.severity)),
+                    file: Some(label.to_string()),
+                    proof_class: Some(common::slop::ProofClass::ReachabilityProof),
+                    ..Default::default()
+                }),
+        );
+    }
     findings.extend(forge::solidity_taint::find_solidity_slop(source));
     findings.extend(
         forge::config_taint::track_config_taint_js(source)
@@ -6528,5 +6846,231 @@ class Handler {
             Some("KevCritical"),
             "Concrete SSRF with internal_metadata marker must never be demoted even in config file"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Sprint 138 — Target Deprecation Cross-Check (is_deprecated_target +
+    // apply_deprecation_demotion). Mattermost-plugin-boards was the
+    // motivating case: scope file listed it as in-scope but the project had
+    // been transitioned to community maintenance, making findings
+    // informational-only per scope exclusion. The cross-check catches this
+    // class of stale-scope failure before findings land in BOUNTY_LEDGER.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_deprecated_target_detects_archived_readme() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Old Project\n\nThis project has been archived. Please use the new fork.\n",
+        )
+        .unwrap();
+        let verdict = is_deprecated_target(dir.path());
+        assert!(
+            verdict.is_some(),
+            "archived README must register as deprecated"
+        );
+        let (filename, keyword) = verdict.unwrap();
+        assert_eq!(filename, "README.md");
+        assert_eq!(keyword, "archived");
+    }
+
+    #[test]
+    fn is_deprecated_target_returns_none_for_active_repo() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Active Project\n\nWelcome to Foo, an actively-developed open source library with first-class support.\n",
+        )
+        .unwrap();
+        assert!(
+            is_deprecated_target(dir.path()).is_none(),
+            "active project README must NOT register as deprecated"
+        );
+    }
+
+    #[test]
+    fn is_deprecated_target_recognises_mattermost_boards_community_pattern() {
+        // Mattermost-plugin-boards (Focalboard) README excerpt simulation
+        // for Sprint 138 deprecation detection.
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Mattermost Boards\n\nNote: as of late 2023 this plugin has transitioned to community maintenance and is no longer officially supported by Mattermost staff.\n",
+        )
+        .unwrap();
+        let verdict = is_deprecated_target(dir.path());
+        assert!(
+            verdict.is_some(),
+            "community-maintained pattern must register as deprecated"
+        );
+    }
+
+    #[test]
+    fn is_deprecated_target_falls_back_to_security_md() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Active project, no deprecation language here\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("SECURITY.md"),
+            b"This repository is deprecated. Please report security issues to the upstream fork.\n",
+        )
+        .unwrap();
+        let verdict = is_deprecated_target(dir.path());
+        assert!(
+            verdict.is_some(),
+            "SECURITY.md must be scanned as a fallback"
+        );
+        let (filename, _) = verdict.unwrap();
+        assert_eq!(filename, "SECURITY.md");
+    }
+
+    #[test]
+    fn apply_deprecation_demotion_marks_findings_informational() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Deprecated Project\n\nThis project is deprecated.\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:react_xss_dangerous_html".to_string(),
+            severity: Some("Critical".to_string()),
+            remediation: Some("Sanitize input with DOMPurify".to_string()),
+            ..Default::default()
+        }];
+        apply_deprecation_demotion(dir.path(), &mut findings);
+        assert_eq!(findings[0].severity.as_deref(), Some("Informational"));
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            remediation.contains("deprecated_target"),
+            "remediation must annotate deprecation: {remediation}"
+        );
+        assert!(
+            remediation.contains("informational_only_per_scope_exclusion"),
+            "remediation must contain scope-exclusion reason: {remediation}"
+        );
+    }
+
+    #[test]
+    fn apply_deprecation_demotion_is_noop_on_fresh_target() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("README.md"),
+            b"# Active Project\n\nFirst-party supported library.\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:react_xss_dangerous_html".to_string(),
+            severity: Some("Critical".to_string()),
+            remediation: Some("Sanitize input".to_string()),
+            ..Default::default()
+        }];
+        apply_deprecation_demotion(dir.path(), &mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("Critical"),
+            "fresh target must not be demoted"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Sprint 142 — Concrete-typed Unmarshal demotion. Sprint 141 demoted the
+    // chainlink protobuf_any CANDIDATE because the cited Unmarshal target was
+    // a concrete typed message (sdkpb.CapabilityRequest), not anypb.Any. This
+    // post-filter catches the class structurally.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn concrete_typed_unmarshal_demotes_when_no_anypb_nearby() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let go_path = dir.path().join("handler.go");
+        std::fs::write(
+            &go_path,
+            b"package handler\n\nimport sdkpb \"example.com/sdkpb\"\n\nfunc Handle(payloadBytes []byte) error {\n    var sdkReq sdkpb.CapabilityRequest\n    if err := proto.Unmarshal(payloadBytes, &sdkReq); err != nil {\n        return err\n    }\n    return nil\n}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("handler.go".to_string()),
+            line: Some(7),
+            severity: Some("High".to_string()),
+            remediation: Some("Validate Any.type_url".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(findings[0].severity.as_deref(), Some("Informational"));
+        let remediation = findings[0].remediation.as_deref().unwrap_or("");
+        assert!(
+            remediation.contains("concrete_typed_unmarshal"),
+            "remediation must annotate: {remediation}"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_preserves_when_anypb_present_in_window() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let go_path = dir.path().join("genuine_any.go");
+        std::fs::write(
+            &go_path,
+            b"package handler\n\nimport \"google.golang.org/protobuf/types/known/anypb\"\n\nfunc Handle(payloadBytes []byte) error {\n    var msg anypb.Any\n    if err := proto.Unmarshal(payloadBytes, &msg); err != nil {\n        return err\n    }\n    return nil\n}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("genuine_any.go".to_string()),
+            line: Some(7),
+            severity: Some("High".to_string()),
+            remediation: Some("Validate Any.type_url".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("High"),
+            "anypb.Any presence must preserve upstream finding"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_unaffects_non_protobuf_findings() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("foo.go"),
+            b"package handler\n\nfunc Handle() {}\n",
+        )
+        .unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:sql_injection".to_string(),
+            file: Some("foo.go".to_string()),
+            line: Some(3),
+            severity: Some("High".to_string()),
+            remediation: Some("Parameterize query".to_string()),
+            ..Default::default()
+        }];
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(
+            findings[0].severity.as_deref(),
+            Some("High"),
+            "non-protobuf finding must be unaffected"
+        );
+    }
+
+    #[test]
+    fn concrete_typed_unmarshal_safe_on_missing_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut findings = vec![common::slop::StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("nonexistent.go".to_string()),
+            line: Some(1),
+            severity: Some("High".to_string()),
+            ..Default::default()
+        }];
+        // Must not panic, must not modify the finding.
+        apply_concrete_typed_unmarshal_demotion(dir.path(), &mut findings);
+        assert_eq!(findings[0].severity.as_deref(), Some("High"));
     }
 }
