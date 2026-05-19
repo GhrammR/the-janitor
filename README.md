@@ -46,7 +46,7 @@ finding that turned into a paid bounty.
 | PR review | None |
 | Feature requests | Not accepted |
 | Security reports | Not triaged — please report to upstream targets directly |
-| GitHub Action Marketplace listing | Being delisted |
+| GitHub Action Marketplace listing | Remains listed (use at your own risk; no support after sunset) |
 | Repository visibility | Public, read-only |
 | License | Unchanged; fork freely |
 
