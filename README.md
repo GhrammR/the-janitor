@@ -1,364 +1,64 @@
-# The Janitor: The Mathematical Firewall Against Autonomous AI
-**v10.2.2 — Rust-Native. Zero-Copy. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds.**
+# The Janitor
 
-![Integrity Status](.janitor/janitor_badge.svg)
+> **Status: features and support end 2026-06-01.** No new releases, no
+> issue triage, no PR review, and no further development after that
+> date. See the [HackerNews post-mortem](https://news.ycombinator.com/item?id=48176168)
+> for the long-form explanation.
 
-*Attested by The Janitor v10.2.2
+## What this is
 
+An AI-assisted static-analysis engine built in Rust over four months as
+a solo experiment to test whether current AI tooling could produce a
+viable vulnerability scanner. The validation test was a single confirmed
+bug-bounty payout. The validation test was not passed.
 
-## Research Foundation
+- 128,504 lines of Rust across 15 workspace crates
+- 1,407 deterministic unit tests
+- 15 tagged release builds
+- 194 bug-bounty programs hunted across Bugcrowd, HackerOne, Immunefi
+- 91 false positives archived in the LOW_YIELD ledger
+- 7 active candidate findings, none Tier-1 validated, all sub-$1K EV
+- 0 paid bounties
 
-> **For grant reviewers and academic collaborators**: The Janitor implements three formally verified layers — [IFDS interprocedural taint analysis](docs/grant-research-brief.md#1-ifds-backed-taint-analysis-across-23-language-grammars) across 23 language grammars, [Kani-proven Boolean predicates](docs/grant-research-brief.md#2-kani-proven-boolean-predicates-for-security-gate-correctness) for detection correctness, and [Z3 SMT exploit witness synthesis](docs/grant-research-brief.md#3-z3-smt-constraint-solving-for-exploit-witness-synthesis). Full research brief: [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
+## What actually happened
 
----
+The engine reliably produced findings that looked like vulnerabilities
+and reliably did not produce findings that were vulnerabilities. Seven
+of the highest-confidence candidates over the project's life failed
+Tier-1 static validation under approximately 20 minutes of human review
+per finding. The upstream detectors matched syntactic patterns but did
+not reason about surrounding context: auth decorators, sanitizer
+helpers, type bindings, scope rules, deprecation status, threat models,
+framework-specific auth idioms, or maintainer suppression annotations.
 
+Three structural detector modules (`forge::threat_model_oracle`,
+`forge::jwt_keyfunc_oracle`, `forge::sql_sanitizer_oracle`) shipped in
+the final two weeks to catch those false-positive classes structurally.
+They catch what they were built to catch. They did not surface a new
+finding that turned into a paid bounty.
 
+## Sunset terms
 
+| Item | Status after 2026-06-01 |
+| --- | --- |
+| New releases | None planned |
+| Issue triage | None |
+| PR review | None |
+| Feature requests | Not accepted |
+| Security reports | Not triaged — please report to upstream targets directly |
+| GitHub Action Marketplace listing | Being delisted |
+| Repository visibility | Public, read-only |
+| License | Unchanged; fork freely |
 
+Active work may continue against this repository between now and
+2026-06-01. After that date, the repository is permanently quiescent.
 
+## If you are considering building something like this
 
-
-
-
-
-
-
-
-
-
-: Zero-Upload, FIPS 204 + FIPS 205 Compliant.*
-
----
-
-> **Sonar finds style violations.**
-> **The Janitor enforces structural integrity.**
-
-> *82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.*
-
----
-
-## The Problem: Mythos-Class Autonomous Injection
-
-The Veracode 2025 State of Software Security report established the baseline: AI-assisted code contains **36% more high-severity vulnerabilities** than human-written equivalents. But the threat has evolved from Copilot assistance to 'Mythos-class' autonomous AI agents that inject vulnerabilities and orchestrate attack chains across microservices. Your linter passes agentic output. Your SAST tool uploads it to a cloud pipeline. By the time the report arrives, the PR is merged.
-
-The threat model has changed. Your enforcement layer has not. The Janitor is the only deterministic defense against 'Mythos-class' AI agents, mathematically verifying intent before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
-
-> **Researchers and grant reviewers**: The Janitor's formal methods foundation — IFDS taint analysis, Kani-proven Boolean predicates, and Z3 SMT exploit witness synthesis — is documented in [`docs/grant-research-brief.md`](docs/grant-research-brief.md).
-
-## Zero-Friction GitHub Integration
-
-![Janitor Sentinel Demo](docs/assets/sentinel_demo.webp)
-
-*Janitor Sentinel automatically downgrades vetoes when it detects safe patterns (e.g., Dependabot).*
-
-## The Enforcement Layer
-
-The Janitor is not a linter. It is a **structural firewall** that runs on your hardware, on every pull request — before the merge button is available.
-
-### Actuarial Risk Matrix
-
-The Janitor doesn't just find vulnerabilities — it generates a financial ledger. Every intercepted threat is categorized and billed:
-
-- **Critical Threat** (security antipattern or Swarm collision): **$150/incident** — CI pipeline poisoned, supply-chain injection vector, or coordinated Agentic Swarm clone.
-- **Necrotic GC** (dead-code ghost, bot-closeable): **$20/PR** — automated garbage collection, no human triage required.
-- **Total Economic Impact** = sum of all categorical billings across the audit window.
-
-Audited **33,000 PRs across 22 enterprise repositories on an 8 GB laptop.** The ledger is machine-generated, per-PR, and appended to `.janitor/bounce_log.ndjson` atomically on every merge event.
-
-### Integrity Dashboard (WOPR)
-
-```
-janitor dashboard <repo>
-```
-
-Visualize C/C++ compile-time blast radius and track structural Swarm clones in real-time. The WOPR (War Operations Plan Response) dashboard renders the top-10 `#include` dependency silos ranked by transitive reach — the files whose modification ripples furthest through the compile graph. Built from in-memory libgit2 tree walks; no filesystem checkout required.
-
-### The Vibe-Check Gate
-
-The Vibe-Check Gate compresses every patch blob via `zstd` and measures `compressed_len / raw_len`. Vibe-coded PRs — generated by prompting an AI without authoring the implementation — are statistically self-similar: the same scaffolding, the same docstring patterns, the same structural repetition. They compress below ratio `0.15`. Any blob crossing that threshold triggers `antipattern:ncd_anomaly` (+10 points) before tree-sitter parses a single node.
-
-Two complementary shields eliminate false positives on legitimate non-application content:
-
-- **Null-Vector Collision Shield** — IaC bypass (`.nix`, `.lock`, `.json`, `.toml`, `.yaml`, `.yml`, `.csv`) + 256-byte size guard + `DOMAIN_VENDORED` router. CVE vendor patches touching `thirdparty/` score zero by construction. No legitimate infrastructure change can produce a spurious non-zero score.
-- **Net-Negative Exemption** — All score multipliers act exclusively on *newly introduced* symbols and patterns. Deletion-dominant patches — boilerplate purges, dead API removal, deprecated-code cleanup — mathematically cannot trigger any scoring signal. Score=0 is a proof, not a heuristic.
-
-### Zero-Copy Execution
-
-Every analysis executes via **memory-mapped file access**. No network call is made during the dead-symbol pipeline.
-
-**Zero-Upload Guarantee — both deployment models:**
-
-| Model | Where analysis runs | Source code leaves your environment? |
-|---|---|---|
-| **CLI + GitHub Action** (`action.yml`) | Your GitHub Actions runner | **Never** |
-| **Janitor Sentinel** (GitHub App) | Your GitHub Actions runner | **Never** — Governor receives only the score |
-
-The Janitor engine runs entirely inside your own runner in both modes. The Governor (Sentinel's backend) receives a signed analysis result — not your source code. No server-side clone. No SAST upload.
-
-**Benchmark:** Sustained **6.7 seconds per Pull Request** on the 3.5M-line Godot Engine codebase (C++, C#, GDScript, Python) — featuring full Cross-File Taint Analysis and Wasm Governance. 58 MB peak RAM. On a standard CI runner. Zero panics.
-
-### Zombie Dependency Detection
-
-AI generators hallucinate package imports. The Janitor scans `package.json`, `Cargo.toml`, `requirements.txt`, `spin.toml`, and `wrangler.toml` against the live symbol reference graph. A package that appears in your manifest but never appears in a reachable import path is a zombie dependency — flagged before merge.
-
-### Cryptographic Integrity Bonds
-
-When a pull request clears the slop gate, **Janitor Sentinel** — our GitHub App — automatically issues a **CycloneDX v1.6 CBOM** (Cryptography Bill of Materials) for the merge event. The CBOM records every cryptographic operation performed during the scan: the **Dual-PQC** attestation signature (ML-DSA-65 NIST FIPS 204 + SLH-DSA NIST FIPS 205), the SHA-384 structural hashes, and the per-symbol audit entries covering `{timestamp}{file_path}{sha256_pre_cleanup}`. No token flag. No manual step. The proof is issued on a clean merge — a chain of custody for every line of code removed from production.
-
-### SLSA Level 4 Reproducible Builds
-
-Every release binary is built with deterministic compiler flags (`--build-id=none`, LTO, single codegen unit) and verified via Docker-based dual-build comparison. The `verify-reproducible` recipe proves bit-for-bit identity across independent build environments — satisfying SLSA Build Level 4 for supply chain integrity.
-
-### Jira ASPM Deduplication
-
-The Janitor integrates natively with Jira for Application Security Posture Management. Findings are synced as Jira issues with automatic deduplication — the first bounce creates a ticket; subsequent bounces with the same fingerprint skip creation. Credential preflight validates `JANITOR_JIRA_USER` and `JANITOR_JIRA_TOKEN` before attempting sync, gracefully degrading to local-only mode when credentials are absent.
-
-### Native SCM Support
-
-Commit-status publishing works out of the box for **GitHub**, **GitLab**, and **Azure DevOps**. The Janitor auto-detects your CI environment and publishes pass/fail verdicts to the correct API — no additional configuration beyond standard CI tokens.
+Please read the [HackerNews post-mortem](https://news.ycombinator.com/item?id=48176168)
+before you start. The next four months of your life are worth more than
+this.
 
 ---
 
-## Competitive Moat
-
-### On-Device vs. Cloud Fabric
-
-The market is filling with "AI Security Fabrics" — cloud-hosted LLM pipelines that ingest your source code, run probabilistic analysis, and return a verdict four minutes later. They are slow. They exfiltrate your code to a third-party inference cluster. Your diffs become training data.
-
-The Janitor is the opposite architecture: an **on-device structural firewall** — a Rust binary that memory-maps your diffs, applies deterministic analysis, and exits. No network call during the analysis path. Proven at **6.7 seconds per Pull Request on a 3.5M-line C++ codebase, on an 8 GB laptop**. Code never leaves your runner in either deployment model.
-
-### Deterministic vs. Heuristic
-
-LLM-based code review tools cannot *prove* anything. They emit confidence scores against training distributions. A novel adversarial input — well-structured but semantically dangerous — is invisible to a heuristic system trained on pre-AI codebases.
-
-The Janitor does not guess. It uses **tree-sitter ASTs to prove structural identity**, **SHA-384 hashing to prove audit integrity**, **BLAKE3 to prove clone equivalence**, and **Dual-PQC (ML-DSA-65 FIPS 204 + SLH-DSA FIPS 205) to prove chain of custody**. The gate passes or it blocks. There is no confidence interval. There is no false-positive budget. When a PR clears the gate, Janitor Sentinel issues a CycloneDX v1.6 CBOM: a cryptographically signed bond you can present to a SOC 2 auditor — not a report, a proof.
-
-### Air-Gap and Sovereign Deployment
-
-Veracode, Checkmarx, and SonarQube require cloud connectivity. Their analysis pipelines send your source to remote clusters. For IL5/IL6 environments — classified networks, air-gapped DoD infrastructure, sovereign cloud mandates — this is a hard disqualifier.
-
-The Janitor ships **Air-Gap Intel Transfer Capsules**: SHA-384-hashed, Ed25519-signed wisdom bundles that can be physically transported and cryptographically verified offline. Import a capsule, verify the signature chain, and the engine is operational with full threat intelligence — no network ever required.
-
-### Private Governance Modules (Wasm BYOR)
-
-Veracode and Checkmarx enforce their rule sets. You cannot mount your own.
-
-The Janitor supports **Wasm BYOR (Bring Your Own Rules)**: private governance modules compiled to WebAssembly, fuel-bounded, memory-limited, and executed with deterministic provenance receipts. Every Wasm rule is pinned with BLAKE3 (`janitor wasm-pin`) and verified at load time. Every execution is sealed into the CBOM — auditable, reproducible, offline-verifiable.
-
-### Hallucinated Package Detection (Slopsquatting)
-
-AI code generators hallucinate package names. `py-react-vsc`, `django-tailwind-fast`, `node-express-secure-template` — packages that do not exist in any registry but sound plausible enough to install if a threat actor registers them first.
-
-The Janitor maintains a **BLAKE3-seeded Bloom filter** (`SlopsquatFilter`) seeded from the wisdom feed. Every package import in a PR is checked against the filter before it can reach the merge gate. Slopsquatting is stopped before it reaches production.
-
-### Replayable Decision Capsules
-
-No tool in the SAST market can prove, offline and without network access, exactly why a PR was blocked. The Janitor can.
-
-Every bounce decision is sealed into a **`DecisionCapsule`** — a tamper-evident record of the exact CST mutation roots, Wasm rule receipts, and analysis score that produced the verdict. A CISO can replay the capsule 18 months later, on an air-gapped machine, and cryptographically verify the chain of custody to the original diff.
-
-### Agentic-Ready
-
-AI coding assistants are becoming autonomous agents — systems that open PRs without human authorship, coordinate across accounts, and submit structurally identical changes at a rate no human review queue can absorb. Current toolchains have no concept of a non-human contributor operating at machine velocity and no mechanism to detect coordinated structural injection.
-
-**The Janitor is the deterministic enforcement gate that applies your architectural rules to non-human developers.** The same rules, at the same threshold, whether the author is a human engineer, a Copilot agent, or an autonomous Swarm. The `janitor.toml` governance manifest is version-controlled policy-as-code: your rules, enforced at the diff level, before the merge button is available.
-
-When your team deploys AI engineers, the gate does not move.
-
-### Decadal Roadmap: The Next Frontier
-
-The current engine intercepts threats at the static structural level — provably, at machine speed, offline. The decadal horizon pushes the frontier into mathematically certified territory that no competitor can reach without rebuilding the entire stack:
-
-- **Zero-Knowledge AST Enclaves** — Proving that a codebase satisfies all 200 governance rules without revealing a single line of source. A zk-SNARK attests the engine's verdict; the auditor verifies the proof in milliseconds. No code exfiltration. No trust boundary. The compliance answer exists on-chain without the source ever leaving your environment.
-- **The Labyrinth Deception Plane** — A runtime honeypot layer that presents adversarial agents with a structurally valid but semantically poisoned codebase, trapping autonomous attackers mid-campaign and extracting their full attack graph before they know they have been detected.
-
-These are not roadmap promises — they are the logical next tier of a deterministic engine that already proves reachability via IFDS and path-feasibility via Z3. The mathematical foundation is live today.
-
----
-
-## PR Gate: Live Results
-
-```
-Repos audited         : 22 enterprise repositories (godot, nixpkgs, vscode,
-                        k8s, pytorch, kafka, rust-lang/rust, tauri, redis,
-                        next.js, home-assistant, ansible, workers-sdk,
-                        langchain, deno, rails, laravel, apple/swift,
-                        aspnetcore, okhttp, terraform, neovim)
-PRs analyzed          : 33,000+  (live production PRs — no synthetic benchmarks)
-Hardware              : 8 GB laptop
-Engine panics         : 0
-OOM events            : 0
-```
-
-*Godot Engine alone (50 PRs, Feb 2026): 82% unlinked, 20% antipatterns. Zero false positives.*
-
----
-
-## How It Works
-
-1. **Scan** — Static reference graph + 6-stage heuristic pipeline identifies every dead symbol.
-2. **Simulate** — Shadow Tree overlays links to dead files. Your test suite runs against simulated deletion.
-3. **Remove** — Tests pass? Byte-precise surgical removal, bottom-to-top. Tests fail? Full rollback, zero corruption.
-
-## Quick Start
-
-**[→ 30-Second Sentinel Setup (copy-paste guide)](docs/onboarding.md)**
-
-```bash
-# Detect dead code (free)
-janitor scan ./src
-
-# Find duplicate functions (free)
-janitor dedup ./src
-
-# PR enforcement gate — score a diff (free)
-janitor bounce ./src --patch diff.patch
-
-# Shadow-simulate + remove dead code (free)
-janitor clean ./src --force-purge
-```
-
-## Language Support
-
-| Language | Dead Functions | Dead Classes | Dead Files | Duplicate Logic |
-|----------|:---:|:---:|:---:|:---:|
-| Python | ✓ | ✓ | ✓ | ✓ |
-| Rust | ✓ | ✓ | ✓ | ✓ |
-| JavaScript / TypeScript | ✓ | ✓ | ✓ | ✓ |
-| C++ | ✓ | ✓ | ✓ | ✓ |
-| Go | ✓ | ✓ | ✓ | ✓ |
-| C# / Java | ✓ | ✓ | ✓ | ✓ |
-
-## Runtime Architecture
-
-| Subsystem | Technology | Property |
-|-----------|-----------|---------|
-| **AST Engine** | Tree-sitter (23 grammars) | O(n) CST construction; byte-range precision per token |
-| **Reference Graph** | Petgraph directed digraph | Topological dead-symbol filter; in-degree = 0 → candidate |
-| **Pattern Matching** | Aho-Corasick (single automaton per group) | O(n+m) multi-pattern scan; zero allocation in hot path |
-| **Registry Persistence** | rkyv + memmap2 | mmap-direct deserialization; no heap allocation for reads |
-| **Structural Hashing** | BLAKE3 (alpha-normalized AST) | Logic-clone detection across identifier rename boundaries |
-| **Audit Integrity** | SHA-384 (FIPS 180-4) | HMAC-SHA-384 ledger proving; release asset hashing |
-| **Fuzzy Dedup** | AstSimHasher (SimHash over CST tokens) | Classified as `Refactor`, `Zombie`, or `NewCode` |
-| **Vibe-Check Gate** | zstd level-3 compression ratio | O(N) vibe-code detector; fires before AST parse; ratio < 0.15 → `antipattern:ncd_anomaly` (+10 pts) |
-| **PR Quality Gate** | MinHash LSH (64 hashes, 8-band index) | Lock-free ArcSwap index; sub-linear collision detection |
-| **Deletion Engine** | Bottom-to-top byte-range splice | UTF-8 char-boundary hardened; zero re-parse overhead |
-| **Simulation Layer** | Symlink overlay (Shadow Tree) | Zero additional disk usage; tests run against simulated state |
-| **Audit Attestation** | Dual-PQC: ML-DSA-65 (FIPS 204) + SLH-DSA (FIPS 205) | CycloneDX v1.6 CBOMs — quantum-safe chain-of-custody provenance |
-| **Air-Gap Intel Transfer** | `IntelTransferCapsule` — SHA-384 + Ed25519 offline verify | Signed wisdom feed bundles for IL5/IL6 environments |
-| **Wasm BYOR Rules** | Wasmtime (fuel + memory bounded) | BLAKE3-pinned private governance modules; deterministic provenance receipts |
-| **Slopsquatting Filter** | BLAKE3-seeded Bloom filter (`SlopsquatFilter`) | Flags hallucinated package names; seeded from `update-wisdom` |
-| **Replayable Decision Capsules** | `DecisionCapsule` + `WasmPolicyReceipt` | Offline audit replay — CBOM-sealed, Ed25519 signed |
-| **Reproducible Builds** | SLSA Level 4 (lld + `--build-id=none` + LTO) | Bit-for-bit deterministic release binaries |
-| **ASPM Integration** | Jira dedup sync + credential preflight | Fingerprint-based dedup; graceful degradation without credentials |
-| **SCM Publishing** | GitHub + GitLab + Azure DevOps | Native commit-status verdicts; auto-detected from CI environment |
-
-## Enterprise Integrations
-
-Every `critical_threat` bounce fires an outbound webhook — HMAC-SHA256 signed, with `X-Janitor-Signature-256` and `X-Janitor-Event` headers. Wire to Slack, Microsoft Teams, Datadog, Splunk, or any HTTPS endpoint:
-
-```toml
-# janitor.toml
-[webhook]
-url    = "https://hooks.slack.com/services/..."
-secret = "env:JANITOR_WEBHOOK_SECRET"
-events = ["critical_threat", "necrotic_flag"]
-```
-
-Test without a live PR:
-
-```sh
-janitor webhook-test --repo .
-```
-
-## Commercial Utility
-
-### Bug Bounty Utility
-The Janitor accelerates offensive operations with Automated Exploit Generation (AEG). It synthesizes actionable, working Proof-of-Concepts—from AEG HTML harnesses to Z3 SMT minimal strings—empowering security researchers to prove impact without violating Terms of Service via automated network requests.
-
-### Enterprise Tiers
-
-**The enforcement is free. The attestation is the product.**
-
-| Tier | Cost | What You Get |
-|:-----|:-----|:-------------|
-| **Free (Community)** | $0 | Unlimited scan, clean, dedup, bounce, dashboard, report. 23 grammar spine. IFDS taint solver. Z3 SMT path feasibility. AEG curl synthesis. No signed logs. |
-| **Team Tier** | **$499/yr** | Unlimited Seats. All free features + Dual-PQC Integrity Bonds (ML-DSA-65 FIPS 204 + SLH-DSA FIPS 205) + CycloneDX v1.6 CBOMs + CI/CD Compliance Attestation + Janitor Sentinel GitHub App + Financial PII taint guard with regulatory regime annotations (GLBA, EU AI Act Art. 10, NYDFS 500.11). |
-| **Sovereign / Air-Gap Tier** | **Custom (Starting at $49,900/yr)** | SLSA L4 reproducible build verification, Offline PQC validation, Governor Control Plane, Wasm BYOR rule mounting, Air-Gap Intel Transfer Capsules, Mesh Topology Discovery (docker-compose + K8s service graph). |
-| **Industrial Tier** | **Custom** | OT/ICS/SCADA pack. On-Premises Token Server + Keypair Rotation Protocol + SOC 2 Audit Support + Enterprise SLA + Dedicated threat intelligence briefings. |
-
-### [→ Get Janitor Sentinel — $499/yr](https://thejanitor.lemonsqueezy.com/checkout/buy/cf4f5dbd-1354-4e97-8b55-0d4375ec9be7?enabled=1361348)
-
-*API token delivered by email within seconds of payment. No per-seat limits.*
-
-## CI Integration
-
-```yaml
-# PR slop gate — runs on every pull request (free)
-- id: janitor
-  uses: janitor-security/the-janitor@v10
-  with:
-    token: ${{ secrets.GITHUB_TOKEN }}
-
-# Outputs available downstream:
-# steps.janitor.outputs.slop_score
-# steps.janitor.outputs.antipatterns
-```
-
-## Commands
-
-```sh
-# Structural dead symbol audit
-janitor scan <path> [--library] [--format json]
-
-# PR enforcement gate
-janitor bounce <path> --patch <file> --pr-number <n> --author <handle> --pr-body "$BODY"
-
-# Zombie dependency detection (output includes zombie_deps)
-janitor scan <path> --format json
-
-# Structural clone detection
-janitor dedup <path>
-
-# Shadow-simulate → test → remove dead code
-janitor clean <path> --force-purge
-
-# Historical slop / clone / zombie intelligence report
-janitor report [--repo <path>] [--top <n>] [--format markdown|json]
-
-# Long-lived daemon (Unix socket, Physarum backpressure)
-janitor serve [--socket <path>] [--registry <file>]
-
-# Ratatui TUI dashboard
-janitor dashboard <path>
-```
-
-## Installation
-
-**From source (Rust 1.91+, `just` required):**
-
-```sh
-git clone https://github.com/janitor-security/the-janitor
-cd the-janitor
-just build
-# Binary: target/release/janitor
-```
-
-**Pre-built binary:**
-
-```sh
-# Download from Releases, then:
-chmod +x janitor && sudo mv janitor /usr/local/bin/
-```
-
-## The Proof
-
-> **3.5 million lines. 6.7 seconds per PR. 58 megabytes. Zero panics.**
->
-> [Read the Godot Engine Autopsy →](https://thejanitor.app/case-studies/godot/)
-
-## License
-
-**Business Source License 1.1 (BUSL-1.1)** — Source Available. Converts to MIT on 2030-02-15.
-
-Scan, cleanup, dedup, bounce, and dashboard are permanently free. Integrity attestation is issued by [Janitor Sentinel](https://thejanitor.lemonsqueezy.com/checkout/buy/cf4f5dbd-1354-4e97-8b55-0d4375ec9be7) (Team tier).
+*Built 2026-02 through 2026-05. Sunsetted 2026-06-01.*
