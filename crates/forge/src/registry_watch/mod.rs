@@ -22,6 +22,9 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod crates_io;
+pub mod npm;
+pub mod pypi;
 pub mod score;
 
 /// Identifies which package registry an upload came from.
