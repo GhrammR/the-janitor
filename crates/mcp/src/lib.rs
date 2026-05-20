@@ -93,8 +93,8 @@ fn scan_args_for_prompt_injection(args: &serde_json::Value) -> bool {
 /// Incoming JSON-RPC 2.0 request (method + optional params).
 #[derive(Debug, Deserialize)]
 struct Request {
-    #[allow(dead_code)]
-    jsonrpc: String,
+    #[serde(rename = "jsonrpc")]
+    _jsonrpc: String,
     id: serde_json::Value,
     method: String,
     #[serde(default)]
