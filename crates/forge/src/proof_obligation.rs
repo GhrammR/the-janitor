@@ -381,4 +381,14 @@ mod tests {
             ProofClass::ReachabilityProof
         );
     }
+
+    #[test]
+    fn raw_pointer_deref_no_null_guard_yields_lattice_gap() {
+        // Matches the ClickHouse PRQL FFI surface: *raw_ptr at line 9 with no .is_null() guard.
+        let source = "use prql_compiler::compile;\npub fn compile_prql(prql: *const u8, len: usize) -> *mut u8 {\n    let slice = unsafe { std::slice::from_raw_parts(*raw_ptr, len) };\n    let result = compile(std::str::from_utf8(slice).unwrap());\n    let s = result.unwrap_or_default();\n    let boxed = s.into_boxed_str().into_boxed_bytes();\n    Box::into_raw(boxed) as *mut u8\n}\n";
+        assert_eq!(
+            super::classify_ffi_deref_proof(source, 3),
+            ProofClass::LatticeGapProposal
+        );
+    }
 }

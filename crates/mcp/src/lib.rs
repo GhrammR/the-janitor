@@ -1620,7 +1620,7 @@ mod tests {
     #[test]
     fn test_dispatch_initialize() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(1),
             method: "initialize".into(),
             params: serde_json::Value::Null,
@@ -1634,7 +1634,7 @@ mod tests {
     #[test]
     fn test_dispatch_unknown_method() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(99),
             method: "nonexistent".into(),
             params: serde_json::Value::Null,
@@ -1647,7 +1647,7 @@ mod tests {
     #[test]
     fn test_janitor_clean_requires_token() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(10),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1702,7 +1702,7 @@ mod tests {
     #[test]
     fn test_janitor_clean_rejects_invalid_token() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(11),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1753,7 +1753,7 @@ mod tests {
     fn test_janitor_bounce_dispatch_with_explicit_path_ok() {
         // tools/call with an explicit absolute path and empty patch must succeed.
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(20),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1780,7 +1780,7 @@ mod tests {
     #[test]
     fn test_janitor_silo_audit_missing_path_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(21),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1796,7 +1796,7 @@ mod tests {
     #[test]
     fn test_janitor_silo_audit_nonexistent_path_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(22),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1812,7 +1812,7 @@ mod tests {
     #[test]
     fn test_janitor_provenance_missing_path_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(23),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1828,7 +1828,7 @@ mod tests {
     #[test]
     fn test_janitor_provenance_no_log_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(24),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1855,7 +1855,7 @@ mod tests {
     #[test]
     fn test_janitor_wopr_snapshot_missing_path_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(25),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1885,7 +1885,7 @@ mod tests {
     #[test]
     fn test_visualize_ledger_missing_path_error() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(30),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -1989,7 +1989,7 @@ mod tests {
     #[test]
     fn test_lint_file_missing_path_rejected() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(50),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -2005,7 +2005,7 @@ mod tests {
     #[test]
     fn test_lint_file_missing_contents_rejected() {
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(51),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -2082,7 +2082,7 @@ mod tests {
         // prompt injection payload must be rejected at the capability gate
         // before the handler runs — error code -32600.
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(60),
             method: "tools/call".into(),
             params: serde_json::json!({
@@ -2114,7 +2114,7 @@ mod tests {
         // Write capability bucket (fail-closed default). The capability gate
         // must reject it with -32600 before the unknown-tool path is reached.
         let req = Request {
-            jsonrpc: "2.0".into(),
+            _jsonrpc: "2.0".into(),
             id: serde_json::json!(61),
             method: "tools/call".into(),
             params: serde_json::json!({

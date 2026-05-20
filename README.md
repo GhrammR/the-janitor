@@ -1,41 +1,29 @@
 # The Janitor
 
-> **Status: features and support end 2026-06-01.** No new releases, no
-> issue triage, no PR review, and no further development after that
-> date. See the [HackerNews post-mortem](https://news.ycombinator.com/item?id=48176168)
-> for the long-form explanation.
+> **Research status (2026-06-01):** Commercial validation phase concluded.
+> Continuing as a public security-research artifact. See the
+> [post-mortem](https://news.ycombinator.com/item?id=48176168) for outcomes.
 
 ## What this is
 
-An AI-assisted static-analysis engine built in Rust over four months as
-a solo experiment to test whether current AI tooling could produce a
-viable vulnerability scanner. The validation test was a single confirmed
-bug-bounty payout. The validation test was not passed.
+A static-analysis security research platform built in Rust: interprocedural
+taint analysis (IFDS + Z3 SMT), post-quantum provenance attestation
+(ML-DSA-65 + SHA-384), and automated exploit-witness synthesis across 23
+grammars. Built as a solo experiment to measure how far current AI-assisted
+tooling can push the boundary of automated vulnerability discovery.
 
 - 128,504 lines of Rust across 15 workspace crates
-- 1,407 deterministic unit tests
-- 15 tagged release builds
+- 1,407 deterministic unit tests, 14 Kani formal-verification harnesses
+- 23 tree-sitter grammars, IFDS taint solver across 14 languages
 - 194 bug-bounty programs hunted across Bugcrowd, HackerOne, Immunefi
-- 91 false positives archived in the LOW_YIELD ledger
-- 7 active candidate findings, none Tier-1 validated, all sub-$1K EV
-- 0 paid bounties
 
-## What actually happened
+## Research Findings
 
-The engine reliably produced findings that looked like vulnerabilities
-and reliably did not produce findings that were vulnerabilities. Seven
-of the highest-confidence candidates over the project's life failed
-Tier-1 static validation under approximately 20 minutes of human review
-per finding. The upstream detectors matched syntactic patterns but did
-not reason about surrounding context: auth decorators, sanitizer
-helpers, type bindings, scope rules, deprecation status, threat models,
-framework-specific auth idioms, or maintainer suppression annotations.
+**Finding 1 — Syntactic pattern matching is insufficient for triage-quality results.** The engine reliably produced findings that matched vulnerability patterns and reliably failed Tier-1 validation. The gap: detectors matched syntax but did not reason about surrounding context — auth decorators, sanitizer helpers, framework middleware pipelines, and scope rules.
 
-Three structural detector modules (`forge::threat_model_oracle`,
-`forge::jwt_keyfunc_oracle`, `forge::sql_sanitizer_oracle`) shipped in
-the final two weeks to catch those false-positive classes structurally.
-They catch what they were built to catch. They did not surface a new
-finding that turned into a paid bounty.
+**Finding 2 — Structural context resolution requires interprocedural dataflow.** Three oracle modules (`forge::threat_model_oracle`, `forge::jwt_keyfunc_oracle`, `forge::sql_sanitizer_oracle`) shipped to catch the highest-volume false-positive classes with deterministic AST guards. The structural approach is necessary and sufficient for known FP patterns; it does not surface previously-unknown paths.
+
+**Finding 3 — Proof-class annotation is the critical missing layer.** Seven candidate findings failed because the engine could not provide a mandatory `ReachabilityProof`, `InvariantViolationProof`, or `LatticeGapProposal`. The proof-obligation framework (Sprint 148) addresses this gap systematically; the full IFDS + Z3 path-feasibility pipeline is the production-grade cure.
 
 ## Sunset terms
 

@@ -3089,10 +3089,10 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 /// source file contains a zero-auth provider indicator outside a test path;
 /// otherwise attaches `LatticeGapProposal`.
 ///
-/// For `security:ffi_unsafe_deref`: attaches `InvariantViolationProof` (and
-/// drops the finding as a FP) when a null guard is visible within ±5 lines;
-/// attaches `ReachabilityProof` when `extern "C"` is visible; otherwise
-/// attaches `LatticeGapProposal`.
+/// For `security:ffi_unsafe_deref` and `security:raw_pointer_deref`: attaches
+/// `InvariantViolationProof` (and drops the finding as a FP) when a null guard
+/// is visible within ±5 lines; attaches `ReachabilityProof` when `extern "C"`
+/// is visible; otherwise attaches `LatticeGapProposal`.
 fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>) {
     findings.retain_mut(|finding| {
         if finding.id.contains("intent_divergence") {
@@ -3104,7 +3104,7 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
             finding.proof_class = Some(
                 forge::proof_obligation::classify_intent_divergence_proof(finding, &source),
             );
-        } else if finding.id.contains("ffi_unsafe_deref") {
+        } else if finding.id.contains("ffi_unsafe_deref") || finding.id.contains("raw_pointer_deref") {
             let source = finding
                 .file
                 .as_deref()
