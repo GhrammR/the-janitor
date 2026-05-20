@@ -335,7 +335,8 @@ mod tests {
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
         ffi_deref_guard_classification, intent_divergence_is_reachable,
-        lcm_malloc_integer_truncation_is_exploitable, lcm_use_after_free_is_reachable,
+        lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
+        lcm_use_after_free_is_reachable, oauth_state_validation_is_missing,
         proof_obligation_missing,
     };
     use crate::slop_hunter::Severity;
@@ -507,6 +508,22 @@ mod tests {
         assert!(!lcm_malloc_integer_truncation_is_exploitable(false, true));
         assert!(!lcm_malloc_integer_truncation_is_exploitable(true, true));
     }
+
+    #[test]
+    fn lcm_off_by_one_loop_exploitability_is_exact_negation_conjunction() {
+        assert!(lcm_off_by_one_loop_is_exploitable(false, false));
+        assert!(!lcm_off_by_one_loop_is_exploitable(true, false));
+        assert!(!lcm_off_by_one_loop_is_exploitable(false, true));
+        assert!(!lcm_off_by_one_loop_is_exploitable(true, true));
+    }
+
+    #[test]
+    fn oauth_state_validation_missing_is_exact_conjunction() {
+        assert!(oauth_state_validation_is_missing(true, false));
+        assert!(!oauth_state_validation_is_missing(false, false));
+        assert!(!oauth_state_validation_is_missing(true, true));
+        assert!(!oauth_state_validation_is_missing(false, true));
+    }
 }
 
 // ── binary_diff Kani proofs ───────────────────────────────────────────────
@@ -603,7 +620,8 @@ mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
         lcm_double_free_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
-        lcm_use_after_free_is_reachable, timing_comparison_is_sensitive,
+        lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
+        oauth_state_validation_is_missing, timing_comparison_is_sensitive,
     };
     use common::slop::StructuredFinding;
 
@@ -673,6 +691,32 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (!has_guard && !in_bench),
             "lcm_malloc truncation exploitability must be exact negation-conjunction",
+        );
+    }
+
+    /// Prove `lcm_off_by_one_loop_is_exploitable` is the exact negation-conjunction
+    /// of its two boolean inputs.
+    #[kani::proof]
+    fn classify_lcm_off_by_one_loop_no_panic() {
+        let has_bounds: bool = kani::any();
+        let in_test: bool = kani::any();
+        let result = lcm_off_by_one_loop_is_exploitable(has_bounds, in_test);
+        kani::assert(
+            result == (!has_bounds && !in_test),
+            "lcm_off_by_one_loop exploitability must be exact negation-conjunction",
+        );
+    }
+
+    /// Prove `oauth_state_validation_is_missing` is the exact conjunction
+    /// of server-side flag and absence of state check.
+    #[kani::proof]
+    fn classify_oauth_state_validation_no_panic() {
+        let is_server_side: bool = kani::any();
+        let has_state_check: bool = kani::any();
+        let result = oauth_state_validation_is_missing(is_server_side, has_state_check);
+        kani::assert(
+            result == (is_server_side && !has_state_check),
+            "oauth state validation missing must be exact conjunction",
         );
     }
 }

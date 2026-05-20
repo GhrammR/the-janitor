@@ -383,6 +383,110 @@ pub fn classify_lcm_malloc_integer_truncation_proof(
     }
 }
 
+/// Pure boolean predicate for Kani verification of off-by-one loop proof logic.
+///
+/// Returns `true` when the loop boundary arithmetic is unguarded and the
+/// finding is NOT in a test or benchmark path.
+pub fn lcm_off_by_one_loop_is_exploitable(has_bounds_check: bool, in_test_or_bench: bool) -> bool {
+    !has_bounds_check && !in_test_or_bench
+}
+
+/// Classify proof class for `security:lcm_off_by_one_loop` findings.
+///
+/// 1. Bench/test path OR ±5-line bounds-check guard → `InvariantViolationProof` (suppress).
+/// 2. ±10-line C exported function signature (`int `, `void `, `SECP256K1_API`, etc.)
+///    → `ReachabilityProof`.
+/// 3. Otherwise → `LatticeGapProposal`.
+pub fn classify_lcm_off_by_one_loop_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let finding_line = finding.line.unwrap_or(1) as usize;
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.is_empty() {
+        return ProofClass::LatticeGapProposal;
+    }
+    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let guard_start = target.saturating_sub(5);
+    let guard_end = (target + 6).min(lines.len());
+    let has_bounds_check = lines[guard_start..guard_end].iter().any(|l| {
+        let t = l.trim();
+        (t.contains("if (")
+            && (t.contains("< len")
+                || t.contains("<= len")
+                || t.contains("< size")
+                || t.contains("BLOCK_SIZE")))
+            || t.contains("assert(")
+            || t.contains("ASSERT(")
+    });
+    let in_test_or_bench = finding
+        .file
+        .as_deref()
+        .map(|p| p.contains("test") || p.contains("bench") || p.contains("Test"))
+        .unwrap_or(false);
+    if has_bounds_check || in_test_or_bench {
+        return ProofClass::InvariantViolationProof;
+    }
+    let ext_start = target.saturating_sub(10);
+    let ext_end = (target + 11).min(lines.len());
+    let has_extern = lines[ext_start..ext_end].iter().any(|l| {
+        let t = l.trim();
+        t.starts_with("static ")
+            || t.contains("SECP256K1_API")
+            || t.contains("secp256k1_")
+            || t.starts_with("int ")
+            || t.starts_with("void ")
+    });
+    if has_extern {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of OAuth state-validation proof logic.
+///
+/// Returns `true` when the callback is server-side AND no state check is present.
+pub fn oauth_state_validation_is_missing(is_server_side: bool, has_state_check: bool) -> bool {
+    is_server_side && !has_state_check
+}
+
+/// Classify proof class for `security:oauth_missing_state_validation` findings.
+///
+/// 1. Non-server-side file (TypeScript/JavaScript) → `LatticeGapProposal` (client-side
+///    CSRF is not a real SSRF/CSRF surface without an SSR path).
+/// 2. Server-side file (Python/Go/Ruby/Java) with a visible state-check → `InvariantViolationProof` (suppress).
+/// 3. Server-side file with NO state check → `ReachabilityProof`.
+pub fn classify_oauth_state_validation_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let is_server_side = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.ends_with(".py")
+                || p.ends_with(".go")
+                || p.ends_with(".rb")
+                || p.ends_with(".java")
+        })
+        .unwrap_or(false);
+    if !is_server_side {
+        return ProofClass::LatticeGapProposal;
+    }
+    let has_state_check = source.contains("session.get(\"oauth_state\")")
+        || source.contains("session.get('oauth_state')")
+        || source.contains("state_parameter")
+        || source.contains("verify_state(")
+        || source.contains("oauth_state")
+        || source.contains("state == session");
+    if has_state_check {
+        ProofClass::InvariantViolationProof
+    } else {
+        ProofClass::ReachabilityProof
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -712,6 +816,100 @@ mod tests {
         let source = "void process(unsigned char *buf, size_t len) {\n    free(buf);\n    memcpy(dst, buf, len);\n}";
         assert_eq!(
             super::classify_lcm_use_after_free_proof(source, 3),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    // --- lcm_off_by_one_loop classifier tests ---
+
+    #[test]
+    fn lcm_off_by_one_loop_assert_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:lcm_off_by_one_loop".to_string(),
+            file: Some("trezor-crypto/crypto/aes/aes_modes.c".to_string()),
+            line: Some(5),
+            ..Default::default()
+        };
+        let source = "static void cbc_encrypt(const uint8_t *in, uint8_t *out, size_t len) {\n    size_t b_pos = 0;\n    assert(b_pos == 0);\n    while (b_pos < len) {\n        b_pos += AES_BLOCK_SIZE;\n    }\n}";
+        assert_eq!(
+            super::classify_lcm_off_by_one_loop_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn lcm_off_by_one_loop_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:lcm_off_by_one_loop".to_string(),
+            file: Some("crypto/secp256k1/libsecp256k1/src/tests.c".to_string()),
+            line: Some(2156),
+            ..Default::default()
+        };
+        let source = "void test_loop(void) { for (int i = 0; i <= len; i++) {} }";
+        assert_eq!(
+            super::classify_lcm_off_by_one_loop_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn lcm_off_by_one_loop_production_c_no_guard_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:lcm_off_by_one_loop".to_string(),
+            file: Some("trezor-crypto/crypto/pbkdf2.c".to_string()),
+            line: Some(5),
+            ..Default::default()
+        };
+        let source = "void pbkdf2_hmac_sha256(const uint8_t *pass, int passlen,\n    const uint8_t *salt, int saltlen,\n    uint32_t iterations, uint8_t *key, int keylen) {\n    uint32_t f[SHA256_DIGEST_LENGTH / 4];\n    for (int i = 0; i <= keylen; i++) {\n        f[i] ^= g[i];\n    }\n}";
+        assert_eq!(
+            super::classify_lcm_off_by_one_loop_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // --- oauth_state_validation classifier tests ---
+
+    #[test]
+    fn oauth_state_server_side_python_no_check_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("querybook/server/app/auth/oauth_auth.py".to_string()),
+            line: Some(80),
+            ..Default::default()
+        };
+        let source = "def callback():\n    code = request.args.get('code')\n    _fetch_access_token(code)\n";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn oauth_state_server_side_python_with_check_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("server/app/auth/oauth_auth.py".to_string()),
+            line: Some(55),
+            ..Default::default()
+        };
+        let source = "def callback():\n    state = session.get('oauth_state')\n    code = request.args.get('code')\n    if state == request.args.get('state'):\n        _fetch_access_token(code)\n";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_state_client_side_typescript_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("lib/oidc/endpoints/token.ts".to_string()),
+            line: Some(34),
+            ..Default::default()
+        };
+        let source = "export async function exchangeCode(code: string) { return fetch('/token', { body: JSON.stringify({ code }) }); }";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
             ProofClass::LatticeGapProposal
         );
     }
