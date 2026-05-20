@@ -1494,28 +1494,28 @@ async fn main() -> anyhow::Result<()> {
             let timeout_pr_number = pr_number.or(scm_context.pr_number);
 
             let task = tokio::task::spawn_blocking(move || {
-                cmd_bounce(
-                    &path,
-                    patch.as_deref(),
-                    registry.as_deref(),
-                    &format,
-                    repo.as_deref(),
-                    base.as_deref(),
-                    head.as_deref(),
+                cmd_bounce(BounceConfig {
+                    project_root: &path,
+                    patch_file: patch.as_deref(),
+                    registry_override: registry.as_deref(),
+                    format: &format,
+                    repo: repo.as_deref(),
+                    base: base.as_deref(),
+                    head: head.as_deref(),
                     pr_number,
-                    author.as_deref(),
-                    pr_body.as_deref(),
-                    repo_slug.as_deref(),
-                    pr_state.as_str(),
-                    governor_url.as_deref(),
-                    analysis_token.as_deref(),
-                    head_sha.as_deref(),
-                    soft_fail,
-                    deep_scan,
-                    pqc_key.as_deref(),
-                    &wasm_rules,
-                    &execution_tier,
-                )
+                    author: author.as_deref(),
+                    pr_body: pr_body.as_deref(),
+                    repo_slug: repo_slug.as_deref(),
+                    pr_state_str: pr_state.as_str(),
+                    governor_url: governor_url.as_deref(),
+                    analysis_token: analysis_token.as_deref(),
+                    head_sha: head_sha.as_deref(),
+                    soft_fail_flag: soft_fail,
+                    deep_scan_flag: deep_scan,
+                    pqc_key: pqc_key.as_deref(),
+                    wasm_rules_flag: &wasm_rules,
+                    execution_tier: &execution_tier,
+                })
             });
 
             match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), task).await {
@@ -3816,29 +3816,52 @@ fn enforce_pqc_key_age(
 /// from the git pack index via `shadow_git::simulate_merge`, no diff file needed.
 ///
 /// Loads the symbol registry from `registry_override` or `.janitor/symbols.rkyv`.
-#[allow(clippy::too_many_arguments)]
-fn cmd_bounce(
-    project_root: &Path,
-    patch_file: Option<&Path>,
-    registry_override: Option<&Path>,
-    format: &str,
-    repo: Option<&Path>,
-    base: Option<&str>,
-    head: Option<&str>,
+struct BounceConfig<'a> {
+    project_root: &'a Path,
+    patch_file: Option<&'a Path>,
+    registry_override: Option<&'a Path>,
+    format: &'a str,
+    repo: Option<&'a Path>,
+    base: Option<&'a str>,
+    head: Option<&'a str>,
     pr_number: Option<u64>,
-    author: Option<&str>,
-    pr_body: Option<&str>,
-    repo_slug: Option<&str>,
-    pr_state_str: &str,
-    governor_url: Option<&str>,
-    analysis_token: Option<&str>,
-    head_sha: Option<&str>,
+    author: Option<&'a str>,
+    pr_body: Option<&'a str>,
+    repo_slug: Option<&'a str>,
+    pr_state_str: &'a str,
+    governor_url: Option<&'a str>,
+    analysis_token: Option<&'a str>,
+    head_sha: Option<&'a str>,
     soft_fail_flag: bool,
     deep_scan_flag: bool,
-    pqc_key: Option<&str>,
-    wasm_rules_flag: &[String],
-    execution_tier: &str,
-) -> anyhow::Result<()> {
+    pqc_key: Option<&'a str>,
+    wasm_rules_flag: &'a [String],
+    execution_tier: &'a str,
+}
+
+fn cmd_bounce(cfg: BounceConfig<'_>) -> anyhow::Result<()> {
+    let BounceConfig {
+        project_root,
+        patch_file,
+        registry_override,
+        format,
+        repo,
+        base,
+        head,
+        pr_number,
+        author,
+        pr_body,
+        repo_slug,
+        pr_state_str,
+        governor_url,
+        analysis_token,
+        head_sha,
+        soft_fail_flag,
+        deep_scan_flag,
+        pqc_key,
+        wasm_rules_flag,
+        execution_tier,
+    } = cfg;
     use common::policy::JanitorPolicy;
     use common::registry::{MappedRegistry, SymbolRegistry};
     use forge::slop_filter::{bounce_git, PRBouncer, PatchBouncer};
@@ -7038,7 +7061,7 @@ mod replay_receipt_tests {
 
 #[cfg(test)]
 mod governor_routing_tests {
-    use super::cmd_bounce;
+    use super::{cmd_bounce, BounceConfig};
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
@@ -7114,28 +7137,28 @@ mod governor_routing_tests {
         .expect("write patch");
 
         let governor_url = format!("http://{addr}");
-        let result = cmd_bounce(
-            &temp_root,
-            Some(&patch_path),
-            None,
-            "json",
-            None,
-            None,
-            None,
-            Some(42),
-            Some("operator"),
-            None,
-            Some("acme/repo"),
-            "open",
-            Some(&governor_url),
-            Some("stub-token"),
-            Some("deadbeef"),
-            false,
-            false,
-            None,
-            &[],
-            "Community",
-        );
+        let result = cmd_bounce(BounceConfig {
+            project_root: &temp_root,
+            patch_file: Some(&patch_path),
+            registry_override: None,
+            format: "json",
+            repo: None,
+            base: None,
+            head: None,
+            pr_number: Some(42),
+            author: Some("operator"),
+            pr_body: None,
+            repo_slug: Some("acme/repo"),
+            pr_state_str: "open",
+            governor_url: Some(&governor_url),
+            analysis_token: Some("stub-token"),
+            head_sha: Some("deadbeef"),
+            soft_fail_flag: false,
+            deep_scan_flag: false,
+            pqc_key: None,
+            wasm_rules_flag: &[],
+            execution_tier: "Community",
+        });
         assert!(result.is_ok(), "cmd_bounce should POST to custom governor");
 
         let (request_line, authorization, body) = rx

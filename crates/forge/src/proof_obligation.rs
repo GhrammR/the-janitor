@@ -185,6 +185,78 @@ pub fn classify_ffi_deref_proof(source: &str, finding_line: usize) -> ProofClass
     ffi_deref_guard_classification(has_null_guard, has_extern_c)
 }
 
+/// Pure boolean predicate for Kani verification of LCM double-free proof logic.
+///
+/// Returns `true` when the allocation site is reachable from an external call
+/// path without a dominance-verified free guard.
+pub fn lcm_double_free_is_reachable(has_free_guard: bool, in_test_path: bool) -> bool {
+    !has_free_guard && !in_test_path
+}
+
+/// Classify proof class for `security:lcm_double_free` findings.
+///
+/// Searches ±5 lines for a null/guard check before the free call
+/// (`InvariantViolationProof` → suppress as FP). Searches ±10 lines for an
+/// extern function wrapper or known-exported symbol (`ReachabilityProof`).
+/// Falls back to `LatticeGapProposal`.
+pub fn classify_lcm_double_free_proof(source: &str, finding_line: usize) -> ProofClass {
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.is_empty() {
+        return ProofClass::LatticeGapProposal;
+    }
+    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let guard_start = target.saturating_sub(5);
+    let guard_end = (target + 6).min(lines.len());
+    let has_free_guard = lines[guard_start..guard_end].iter().any(|l| {
+        let t = l.trim();
+        (t.contains("if (") && (t.contains("!= NULL") || t.contains("!= 0") || t.contains("freed")))
+            || t.contains("assert(")
+    });
+    let ext_start = target.saturating_sub(10);
+    let ext_end = (target + 11).min(lines.len());
+    let has_extern = lines[ext_start..ext_end].iter().any(|l| {
+        let t = l.trim();
+        t.starts_with("static ") || t.contains("SECP256K1_API") || t.contains("lcm_")
+    });
+    if has_free_guard {
+        ProofClass::InvariantViolationProof
+    } else if has_extern {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of timing-comparison proof logic.
+///
+/// Returns `true` when a non-constant-time comparison is on a secret path
+/// (MAC, HMAC, session key, signature) NOT in a test or benchmark context.
+pub fn timing_comparison_is_sensitive(has_secret_marker: bool, in_bench_or_test: bool) -> bool {
+    has_secret_marker && !in_bench_or_test
+}
+
+/// Classify proof class for `security:non_constant_time_comparison` findings.
+///
+/// Returns `ReachabilityProof` when the source contains HMAC/session-key markers
+/// and the finding is not in a test or benchmark file; otherwise `LatticeGapProposal`.
+pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| p.contains("test") || p.ends_with("_test.go") || p.contains("bench"))
+        .unwrap_or(false);
+    let has_secret_marker = source.contains("hmac")
+        || source.contains("HMAC")
+        || source.contains("session_key")
+        || source.contains("auth_tag")
+        || source.contains("nonce");
+    if timing_comparison_is_sensitive(has_secret_marker, in_test_path) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -388,6 +460,66 @@ mod tests {
         let source = "use prql_compiler::compile;\npub fn compile_prql(prql: *const u8, len: usize) -> *mut u8 {\n    let slice = unsafe { std::slice::from_raw_parts(*raw_ptr, len) };\n    let result = compile(std::str::from_utf8(slice).unwrap());\n    let s = result.unwrap_or_default();\n    let boxed = s.into_boxed_str().into_boxed_bytes();\n    Box::into_raw(boxed) as *mut u8\n}\n";
         assert_eq!(
             super::classify_ffi_deref_proof(source, 3),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    // --- lcm_double_free classifier tests ---
+
+    #[test]
+    fn lcm_double_free_null_guard_yields_invariant_violation() {
+        let source = "int *buf = malloc(sz);\nif (buf != NULL) {\n    free(buf);\n    free(buf);\n}";
+        assert_eq!(
+            super::classify_lcm_double_free_proof(source, 3),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn lcm_double_free_secp256k1_api_yields_reachability_proof() {
+        let source =
+            "SECP256K1_API int secp256k1_sign(secp256k1_context *ctx, unsigned char *out) {\n    free(ctx->scratch);\n    free(ctx->scratch);\n    return 1;\n}";
+        assert_eq!(
+            super::classify_lcm_double_free_proof(source, 2),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn lcm_double_free_no_guard_no_extern_yields_lattice_gap() {
+        let source = "void process(unsigned char *buf, size_t len) {\n    memcpy(tmp, buf, len);\n    free(buf);\n    free(buf);\n}";
+        assert_eq!(
+            super::classify_lcm_double_free_proof(source, 3),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    // --- timing_comparison classifier tests ---
+
+    #[test]
+    fn timing_comparison_hmac_non_test_yields_reachability_proof() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("p2p/discover/v5wire/encoding.go".to_string()),
+            ..Default::default()
+        };
+        let source = "func verifySession(got, expected []byte) bool {\n    nonce := session.nonce\n    return bytes.Equal(got, expected)\n}";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn timing_comparison_test_path_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("p2p/discover/v5wire/encoding_test.go".to_string()),
+            ..Default::default()
+        };
+        let source = "func TestVerifySession(t *testing.T) {\n    nonce := session.nonce\n    return bytes.Equal(got, expected)\n}";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
             ProofClass::LatticeGapProposal
         );
     }

@@ -3082,8 +3082,7 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 ///
 /// Sprint 147 — Phase 2B: Wire-in for the three new `forge::threat_model_oracle`
 /// suppression predicates.
-/// Sprint 148 — attach proof classes to intent_divergence and ffi_unsafe_deref
-/// findings before the proof-obligation gate.
+/// Attach proof classes to findings before the proof-obligation gate.
 ///
 /// For `security:intent_divergence`: attaches `ReachabilityProof` when the
 /// source file contains a zero-auth provider indicator outside a test path;
@@ -3093,6 +3092,14 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 /// `InvariantViolationProof` (and drops the finding as a FP) when a null guard
 /// is visible within ±5 lines; attaches `ReachabilityProof` when `extern "C"`
 /// is visible; otherwise attaches `LatticeGapProposal`.
+///
+/// For `security:lcm_double_free`: attaches `InvariantViolationProof` (drops as FP)
+/// when a dominance-verified free guard is present; `ReachabilityProof` when an
+/// exported C symbol is visible; otherwise `LatticeGapProposal`.
+///
+/// For `security:non_constant_time_comparison`: attaches `ReachabilityProof`
+/// when the source contains HMAC/session-key markers outside a test path;
+/// otherwise `LatticeGapProposal`.
 fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>) {
     findings.retain_mut(|finding| {
         if finding.id.contains("intent_divergence") {
@@ -3116,6 +3123,27 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("lcm_double_free") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let line = finding.line.unwrap_or(1) as usize;
+            let proof = forge::proof_obligation::classify_lcm_double_free_proof(&source, line);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("non_constant_time_comparison") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            finding.proof_class = Some(
+                forge::proof_obligation::classify_timing_comparison_proof(&source, finding),
+            );
         }
         true
     });

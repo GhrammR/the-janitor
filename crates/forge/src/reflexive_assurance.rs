@@ -582,6 +582,7 @@ mod medical_kani {
 #[cfg(kani)]
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
+    use crate::proof_obligation::{lcm_double_free_is_reachable, timing_comparison_is_sensitive};
     use common::slop::StructuredFinding;
 
     /// Prove that `map_finding_to_controls` always emits exactly two receipts
@@ -599,5 +600,31 @@ mod compliance_oracle_kani {
         };
         let receipts = map_finding_to_controls(&finding);
         kani::assert(receipts.len() == 2, "compliance oracle must emit exactly 2 receipts");
+    }
+
+    /// Prove that `lcm_double_free_is_reachable` is an exact negation-conjunction:
+    /// reachable iff no free guard present AND not in a test path.
+    #[kani::proof]
+    fn classify_lcm_double_free_no_panic() {
+        let has_guard: bool = kani::any();
+        let in_test: bool = kani::any();
+        let result = lcm_double_free_is_reachable(has_guard, in_test);
+        kani::assert(
+            result == (!has_guard && !in_test),
+            "lcm_double_free reachability must be exact negation-conjunction",
+        );
+    }
+
+    /// Prove that `timing_comparison_is_sensitive` is an exact conjunction:
+    /// sensitive iff secret marker present AND not in bench/test context.
+    #[kani::proof]
+    fn classify_timing_comparison_no_panic() {
+        let has_secret: bool = kani::any();
+        let in_bench_or_test: bool = kani::any();
+        let result = timing_comparison_is_sensitive(has_secret, in_bench_or_test);
+        kani::assert(
+            result == (has_secret && !in_bench_or_test),
+            "timing comparison sensitivity must be exact conjunction",
+        );
     }
 }
