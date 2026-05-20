@@ -110,6 +110,12 @@ pub fn classify_jwt_finding(file_path: &Path, finding_line: Option<u32>) -> JwtK
     if window.contains("*jwt.SigningMethod") || window.contains("*SigningMethod") {
         return JwtKeyfuncVerdict::Guarded;
     }
+    // Pattern 4: WithValidMethods option passed to ParseWithClaims.
+    // go-ethereum / golang-jwt v5 pattern: jwt.WithValidMethods([]string{"HS256"}).
+    // Explicitly pins the algorithm set; alg-confusion bypass is blocked by the library.
+    if window.contains("WithValidMethods(") {
+        return JwtKeyfuncVerdict::Guarded;
+    }
 
     JwtKeyfuncVerdict::Unguarded
 }
@@ -224,5 +230,24 @@ mod tests {
         fs::write(&path, b"package foo\n").unwrap();
         let result = classify_jwt_finding(&path, None);
         assert_eq!(result, JwtKeyfuncVerdict::Unguarded);
+    }
+
+    #[test]
+    fn with_valid_methods_option_is_guarded() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("jwt_handler.go");
+        fs::write(
+            &path,
+            b"package node\n\nfunc (h *jwtHandler) verify(out http.ResponseWriter, r *http.Request) {\n\
+              token, err := jwt.ParseWithClaims(strToken, &claims, h.keyFunc,\n\
+              \t\t\tjwt.WithValidMethods([]string{\"HS256\"}),\n\
+              \t\t\tjwt.WithoutClaimsValidation())\n\
+              }\n",
+        )
+        .unwrap();
+        assert_eq!(
+            classify_jwt_finding(&path, Some(4)),
+            JwtKeyfuncVerdict::Guarded
+        );
     }
 }

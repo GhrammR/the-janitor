@@ -237,9 +237,24 @@ pub fn timing_comparison_is_sensitive(has_secret_marker: bool, in_bench_or_test:
 
 /// Classify proof class for `security:non_constant_time_comparison` findings.
 ///
-/// Returns `ReachabilityProof` when the source contains HMAC/session-key markers
-/// and the finding is not in a test or benchmark file; otherwise `LatticeGapProposal`.
+/// Priority order:
+/// 1. If `subtle.ConstantTimeCompare` or `hmac.Equal(` is visible in a ±10-line
+///    window → `InvariantViolationProof` (guard present, suppress as FP).
+/// 2. Else if HMAC/session-key markers present and not in a test/bench path →
+///    `ReachabilityProof`.
+/// 3. Otherwise → `LatticeGapProposal`.
 pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let finding_line = finding.line.unwrap_or(1) as usize;
+    let lines: Vec<&str> = source.lines().collect();
+    if !lines.is_empty() {
+        let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+        let start = target.saturating_sub(10);
+        let end = (target + 11).min(lines.len());
+        let window: String = lines[start..end].join("\n");
+        if window.contains("subtle.ConstantTimeCompare") || window.contains("hmac.Equal(") {
+            return ProofClass::InvariantViolationProof;
+        }
+    }
     let in_test_path = finding
         .file
         .as_deref()
@@ -495,6 +510,28 @@ mod tests {
     }
 
     // --- timing_comparison classifier tests ---
+
+    #[test]
+    fn timing_comparison_subtle_constant_time_guard_suppresses() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("crypto/ecies/ecies.go".to_string()),
+            line: Some(319),
+            ..Default::default()
+        };
+        let source = "func Decrypt(prv *PrivateKey, c []byte) (m []byte, err error) {\n\
+            Ke, Km := deriveKeys(hash, z, s1, params.KeyLen)\n\
+            d := messageTag(params.Hash, Km, c[mStart:mEnd], s2)\n\
+            if subtle.ConstantTimeCompare(c[mEnd:], d) != 1 {\n\
+                return nil, ErrInvalidMessage\n\
+            }\n\
+            return symDecrypt(params, Ke, c[mStart:mEnd])\n\
+            }";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
 
     #[test]
     fn timing_comparison_hmac_non_test_yields_reachability_proof() {

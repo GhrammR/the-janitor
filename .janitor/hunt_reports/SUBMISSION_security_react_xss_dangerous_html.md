@@ -1,16 +1,16 @@
-# Bugcrowd Submission — https://github.com/vercel/next.js
+# Bugcrowd Submission — https://github.com/supabase/supabase
 
 ## Target
-`https://github.com/vercel/next.js`
+`https://github.com/supabase/supabase`
 
 ## Title
-Critical — security:react_xss_dangerous_html in packages/next/src/client/components/builtin/app-error.tsx
+Critical — security:react_xss_dangerous_html in apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx
 
 ## Severity
 Critical
 
 ## Description
-`security:react_xss_dangerous_html` was detected at `packages/next/src/client/components/builtin/app-error.tsx:11`. Structural deduplication collapsed all equivalent instances into this single submission. Risk classification: Deterministic security finding.
+`security:react_xss_dangerous_html` was detected at `apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx:30`. Structural deduplication collapsed all equivalent instances into this single submission. Risk classification: Deterministic security finding.
 
 ## Reproduction Steps
 ```
@@ -27,22 +27,51 @@ body: JSON.stringify({content:
 ```
 
 ### Affected Occurrences
-- `packages/next/src/client/components/builtin/app-error.tsx`:11
-- `packages/next/src/client/components/builtin/global-error.tsx`:26
-- `packages/next/src/client/components/errors/graceful-degrade-boundary.tsx`:66
-- `packages/next/src/pages/_document.tsx`:210
-- `packages/next/src/pages/_document.tsx`:551
-- `packages/next/src/pages/_document.tsx`:914
-- `packages/third-parties/src/ThirdPartyScriptEmbed.tsx`:45
+- `apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx`:30
+- `apps/studio/components/interfaces/Reports/renderers/ApiRenderers.tsx`:385
+- `apps/ui-library/registry/default/components/ui/chart.tsx`:75
+- `apps/www/app/blog/[slug]/page.tsx`:184
+- `apps/www/app/blog/[slug]/page.tsx`:188
+- `apps/www/app/blog/page.tsx`:47
+- `apps/www/app/events/page.tsx`:23
+- `apps/www/app/pricing/page.tsx`:34
+- `apps/www/pages/auth.tsx`:63
+- `apps/www/pages/auth.tsx`:76
+- `apps/www/pages/careers.tsx`:118
+- `apps/www/pages/company.tsx`:48
+- `apps/www/pages/customers.tsx`:104
+- `apps/www/pages/customers/[slug].tsx`:125
+- `apps/www/pages/database.tsx`:81
+- `apps/www/pages/database.tsx`:94
+- `apps/www/pages/edge-functions.tsx`:55
+- `apps/www/pages/edge-functions.tsx`:68
+- `apps/www/pages/events/[slug].tsx`:230
+- `apps/www/pages/features.tsx`:127
+- `apps/www/pages/index.tsx`:30
+- `apps/www/pages/modules/cron.tsx`:40
+- `apps/www/pages/modules/queues.tsx`:41
+- `apps/www/pages/modules/vector.tsx`:54
+- `apps/www/pages/modules/vector.tsx`:67
+- `apps/www/pages/realtime.tsx`:75
+- `apps/www/pages/realtime.tsx`:88
+- `apps/www/pages/storage.tsx`:62
+- `apps/www/pages/storage.tsx`:75
+- `packages/marketing/src/go/sections/CodeBlockSection.tsx`:65
+- `packages/marketing/src/go/sections/CodeBlockSection.tsx`:73
+- `packages/marketing/src/go/sections/CodeBlockSection.tsx`:77
+- `packages/marketing/src/go/sections/CodeBlockTabs.tsx`:34
+- `packages/marketing/src/go/sections/CodeBlockTabs.tsx`:38
+- `packages/ui-patterns/src/Mermaid/Mermaid.tsx`:190
+- `packages/ui/src/components/shadcn/ui/chart.tsx`:75
 
 
 ### Web Proof Artifact
-- WebProofArtifact: `user_input:stored` -> `security:react_xss_dangerous_html` | IFDS: `user_input:stored -> packages/next/src/client/components/builtin/app-error.tsx:11 -> dangerouslySetInnerHTML -> sink:innerHTML -> security:react_xss_dangerous_html` | proof=`ReachabilityProof` | marker=`schema_taint:proven stored:cross_user_render`
+- WebProofArtifact: `user_input:stored` -> `security:react_xss_dangerous_html` | IFDS: `user_input:stored -> apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx:30 -> dangerouslySetInnerHTML -> sink:innerHTML -> security:react_xss_dangerous_html` | proof=`ReachabilityProof` | marker=`schema_taint:proven stored:cross_user_render`
 
 ### Witness Context
-- Source: `user_input:stored` in `packages/next/src/client/components/builtin/app-error.tsx`
-- Sink: `security:react_xss_dangerous_html` in `packages/next/src/client/components/builtin/app-error.tsx`
-- Call chain: `packages/next/src/client/components/builtin/app-error.tsx:11 -> dangerouslySetInnerHTML -> sink:innerHTML`
+- Source: `user_input:stored` in `apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx`
+- Sink: `security:react_xss_dangerous_html` in `apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx`
+- Call chain: `apps/studio/components/interfaces/Realtime/Inspector/SelectedRealtimeMessagePanel.tsx:30 -> dangerouslySetInnerHTML -> sink:innerHTML`
 
 ## Impact
 Full compromise of affected system or protocol. Exploitation enables attacker to exfiltrate sensitive data, execute arbitrary code, or drain protocol funds.

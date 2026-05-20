@@ -3141,9 +3141,11 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 .as_deref()
                 .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
                 .unwrap_or_default();
-            finding.proof_class = Some(
-                forge::proof_obligation::classify_timing_comparison_proof(&source, finding),
-            );
+            let proof = forge::proof_obligation::classify_timing_comparison_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         }
         true
     });
