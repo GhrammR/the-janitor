@@ -2920,6 +2920,11 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // Suppresses SSRF on admin-intentional URL-test functions, TLS bypass
     // when config-gated, and dom_xss_innerHTML on zero-caller helpers.
     apply_phase2b_suppression(dir, &mut deduped);
+    // Sprint 148 — proof-class annotation for intent_divergence and
+    // ffi_unsafe_deref findings. Attaches a ProofClass before the proof
+    // obligation gate so critical findings carry evidence rather than being
+    // suppressed as unprovable.
+    apply_proof_classification(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
@@ -3077,6 +3082,45 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 ///
 /// Sprint 147 — Phase 2B: Wire-in for the three new `forge::threat_model_oracle`
 /// suppression predicates.
+/// Sprint 148 — attach proof classes to intent_divergence and ffi_unsafe_deref
+/// findings before the proof-obligation gate.
+///
+/// For `security:intent_divergence`: attaches `ReachabilityProof` when the
+/// source file contains a zero-auth provider indicator outside a test path;
+/// otherwise attaches `LatticeGapProposal`.
+///
+/// For `security:ffi_unsafe_deref`: attaches `InvariantViolationProof` (and
+/// drops the finding as a FP) when a null guard is visible within ±5 lines;
+/// attaches `ReachabilityProof` when `extern "C"` is visible; otherwise
+/// attaches `LatticeGapProposal`.
+fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>) {
+    findings.retain_mut(|finding| {
+        if finding.id.contains("intent_divergence") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            finding.proof_class = Some(
+                forge::proof_obligation::classify_intent_divergence_proof(finding, &source),
+            );
+        } else if finding.id.contains("ffi_unsafe_deref") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let line = finding.line.unwrap_or(1) as usize;
+            let proof = forge::proof_obligation::classify_ffi_deref_proof(&source, line);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        }
+        true
+    });
+}
+
 ///
 /// - `security:ssrf_dynamic_url`: suppresses when the enclosing function name
 ///   matches the admin-tooling pattern (Test/Validate/Ping/Health + URL/Site)

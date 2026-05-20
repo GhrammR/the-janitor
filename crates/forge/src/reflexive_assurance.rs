@@ -34,8 +34,11 @@ mod kani_proofs {
     use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
-    use crate::proof_obligation::proof_obligation_missing;
+    use crate::proof_obligation::{
+        ffi_deref_guard_classification, intent_divergence_is_reachable, proof_obligation_missing,
+    };
     use crate::slop_hunter::Severity;
+    use common::slop::ProofClass;
 
     /// Prove that `Severity::points()` never panics and always returns a value
     /// within the declared range [0, 150] for any symbolic `Severity` variant.
@@ -272,6 +275,45 @@ mod kani_proofs {
             "llm_provenance_missing must be true only when sink present and provenance absent",
         );
     }
+
+    /// Prove that `intent_divergence_is_reachable` is an exact conjunction:
+    /// reachable iff zero-auth indicator present AND path is not test-only.
+    #[kani::proof]
+    fn classify_intent_divergence_no_panic() {
+        let has_unauth: bool = kani::any();
+        let in_test: bool = kani::any();
+        let result = intent_divergence_is_reachable(has_unauth, in_test);
+        kani::assert(
+            result == (has_unauth && !in_test),
+            "intent divergence reachability must be exact conjunction",
+        );
+    }
+
+    /// Prove that `ffi_deref_guard_classification` is a total, panic-free function
+    /// returning exactly one of the three documented variants for all input pairs.
+    #[kani::proof]
+    fn classify_ffi_deref_no_panic() {
+        let has_null_guard: bool = kani::any();
+        let has_extern_c: bool = kani::any();
+        let result = ffi_deref_guard_classification(has_null_guard, has_extern_c);
+        // When null guard present, always InvariantViolationProof regardless of extern "C".
+        if has_null_guard {
+            kani::assert(
+                result == ProofClass::InvariantViolationProof,
+                "null guard must always produce InvariantViolationProof",
+            );
+        } else if has_extern_c {
+            kani::assert(
+                result == ProofClass::ReachabilityProof,
+                "no guard + extern C must produce ReachabilityProof",
+            );
+        } else {
+            kani::assert(
+                result == ProofClass::LatticeGapProposal,
+                "no guard + no extern C must produce LatticeGapProposal",
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -290,8 +332,39 @@ mod tests {
     use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
-    use crate::proof_obligation::proof_obligation_missing;
+    use crate::proof_obligation::{
+        ffi_deref_guard_classification, intent_divergence_is_reachable, proof_obligation_missing,
+    };
     use crate::slop_hunter::Severity;
+    use common::slop::ProofClass;
+
+    #[test]
+    fn intent_divergence_reachable_when_unauth_and_non_test() {
+        assert!(intent_divergence_is_reachable(true, false));
+        assert!(!intent_divergence_is_reachable(false, false));
+        assert!(!intent_divergence_is_reachable(true, true));
+        assert!(!intent_divergence_is_reachable(false, true));
+    }
+
+    #[test]
+    fn ffi_deref_guard_classification_table() {
+        assert_eq!(
+            ffi_deref_guard_classification(true, false),
+            ProofClass::InvariantViolationProof
+        );
+        assert_eq!(
+            ffi_deref_guard_classification(true, true),
+            ProofClass::InvariantViolationProof
+        );
+        assert_eq!(
+            ffi_deref_guard_classification(false, true),
+            ProofClass::ReachabilityProof
+        );
+        assert_eq!(
+            ffi_deref_guard_classification(false, false),
+            ProofClass::LatticeGapProposal
+        );
+    }
 
     #[test]
     fn severity_points_exhaustive_match() {

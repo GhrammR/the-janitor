@@ -109,6 +109,82 @@ preservation-with-proof.\n"
     )
 }
 
+/// Pure boolean predicate for Kani verification of intent-divergence proof logic.
+///
+/// Returns `true` iff the zero-auth indicator is present in a non-test path,
+/// meaning the `UnauthenticatedAuthProvider` path is production-reachable.
+pub fn intent_divergence_is_reachable(has_unauth_indicator: bool, in_test_path: bool) -> bool {
+    has_unauth_indicator && !in_test_path
+}
+
+/// Pure boolean predicate for Kani verification of FFI deref proof classification.
+///
+/// | `has_null_guard` | `has_extern_c` | returns                    |
+/// |---|---|---|
+/// | `true`  | any    | `InvariantViolationProof`  |
+/// | `false` | `true` | `ReachabilityProof`        |
+/// | `false` | `false`| `LatticeGapProposal`       |
+pub fn ffi_deref_guard_classification(has_null_guard: bool, has_extern_c: bool) -> ProofClass {
+    if has_null_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+    if has_extern_c {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Classify the proof state for a `security:intent_divergence` finding.
+///
+/// Inspects the source file for zero-auth provider indicators outside test
+/// contexts. Returns [`ProofClass::ReachabilityProof`] when production-reachable
+/// indicators are present, [`ProofClass::LatticeGapProposal`] otherwise.
+pub fn classify_intent_divergence_proof(finding: &StructuredFinding, source: &str) -> ProofClass {
+    let has_unauth_indicator = source.contains("requires_openai_auth: false")
+        || source.contains("UnauthenticatedAuthProvider");
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| p.contains("test") || p.ends_with("_test.rs") || p.contains("spec"))
+        .unwrap_or(false);
+    if intent_divergence_is_reachable(has_unauth_indicator, in_test_path) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Classify the proof state for a `security:ffi_unsafe_deref_unguarded` finding.
+///
+/// Scans a ±5-line window around `finding_line` for a null-guard pattern and a
+/// ±10-line window for `extern "C"` reachability. See [`ffi_deref_guard_classification`]
+/// for the classification table. When `InvariantViolationProof` is returned, the
+/// caller should suppress the finding (null guard makes it safe).
+pub fn classify_ffi_deref_proof(source: &str, finding_line: usize) -> ProofClass {
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.is_empty() {
+        return ProofClass::LatticeGapProposal;
+    }
+    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+
+    let guard_start = target.saturating_sub(5);
+    let guard_end = (target + 6).min(lines.len());
+    let has_null_guard = lines[guard_start..guard_end].iter().any(|l| {
+        let t = l.trim();
+        t.contains(".is_null()") || t.contains("is_null(ptr") || t.contains("ptr::null()")
+    });
+
+    let ext_start = target.saturating_sub(10);
+    let ext_end = (target + 11).min(lines.len());
+    let has_extern_c = lines[ext_start..ext_end].iter().any(|l| {
+        let t = l.trim();
+        t.contains("extern \"C\"") || t.starts_with("pub extern")
+    });
+
+    ffi_deref_guard_classification(has_null_guard, has_extern_c)
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -249,5 +325,60 @@ mod tests {
 
         let filtered = enforce_false_positive_proof_obligation(&findings);
         assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn intent_divergence_non_test_path_yields_reachability_proof() {
+        let finding = StructuredFinding {
+            id: "security:intent_divergence".to_string(),
+            file: Some("codex-rs/model-provider/src/auth.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "pub struct UnauthenticatedAuthProvider; fn build() { requires_openai_auth: false }";
+        assert_eq!(
+            super::classify_intent_divergence_proof(&finding, source),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn intent_divergence_test_path_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:intent_divergence".to_string(),
+            file: Some("codex-rs/model-provider/src/auth_test.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "pub struct UnauthenticatedAuthProvider;";
+        assert_eq!(
+            super::classify_intent_divergence_proof(&finding, source),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn ffi_deref_null_guard_present_yields_invariant_violation_proof() {
+        let source = "let ptr = qdb_read(key);\nif ptr.is_null() { return Err(e); }\nCStr::from_ptr(ptr)";
+        assert_eq!(
+            super::classify_ffi_deref_proof(source, 3),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ffi_deref_unguarded_no_extern_yields_lattice_gap() {
+        let source = "let ptr = qdb_read(key);\nlet value = CStr::from_ptr(ptr);\n";
+        assert_eq!(
+            super::classify_ffi_deref_proof(source, 2),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn ffi_deref_unguarded_with_extern_c_yields_reachability_proof() {
+        let source = "extern \"C\" pub fn get_config(key: *const c_char) -> *const c_char {\nlet ptr = qdb_read(key);\nCStr::from_ptr(ptr)\n}";
+        assert_eq!(
+            super::classify_ffi_deref_proof(source, 3),
+            ProofClass::ReachabilityProof
+        );
     }
 }
