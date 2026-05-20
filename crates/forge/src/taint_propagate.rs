@@ -626,16 +626,16 @@ fn walk_python_exports(
         return;
     }
     if node.kind() == "function_definition" && is_python_export_boundary(node, source) {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_python,
-            find_tainted_call_params_python,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_python,
+            taint_finder: find_tainted_call_params_python,
+        }) {
             records.push(record);
         }
     }
@@ -685,16 +685,16 @@ fn walk_javascript_exports(
         return;
     }
     if node.kind() == "function_declaration" && is_javascript_export_boundary(node) {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_generic_identifiers,
-            find_tainted_call_params_js,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_generic_identifiers,
+            taint_finder: find_tainted_call_params_js,
+        }) {
             records.push(record);
         }
     }
@@ -728,16 +728,16 @@ fn walk_java_exports(
         return;
     }
     if node.kind() == "method_declaration" && has_public_modifier(node, source) {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_java,
-            find_tainted_call_params_java,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_java,
+            taint_finder: find_tainted_call_params_java,
+        }) {
             records.push(record);
         }
     }
@@ -766,16 +766,16 @@ fn walk_go_exports(
     if matches!(node.kind(), "function_declaration" | "method_declaration")
         && is_go_export_boundary(node, source)
     {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_go,
-            find_tainted_call_params_go,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_go,
+            taint_finder: find_tainted_call_params_go,
+        }) {
             records.push(record);
         }
     }
@@ -814,16 +814,16 @@ fn walk_csharp_exports(
         return;
     }
     if node.kind() == "method_declaration" && has_public_modifier(node, source) {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_csharp,
-            find_tainted_call_params_csharp,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_csharp,
+            taint_finder: find_tainted_call_params_csharp,
+        }) {
             records.push(record);
         }
     }
@@ -833,17 +833,28 @@ fn walk_csharp_exports(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_record_from_function_like(
-    node: Node<'_>,
-    source: &[u8],
-    file_path: &str,
-    params_field: &str,
-    body_field: &str,
-    name_field: &str,
-    param_collector: fn(Node<'_>, &[u8]) -> Vec<String>,
-    taint_finder: fn(Node<'_>, &[u8], &[String]) -> Vec<String>,
-) -> Option<TaintExportRecord> {
+struct BuildRecordConfig<'a> {
+    node: Node<'a>,
+    source: &'a [u8],
+    file_path: &'a str,
+    params_field: &'a str,
+    body_field: &'a str,
+    name_field: &'a str,
+    param_collector: fn(Node<'a>, &'a [u8]) -> Vec<String>,
+    taint_finder: fn(Node<'a>, &'a [u8], &[String]) -> Vec<String>,
+}
+
+fn build_record_from_function_like(cfg: BuildRecordConfig<'_>) -> Option<TaintExportRecord> {
+    let BuildRecordConfig {
+        node,
+        source,
+        file_path,
+        params_field,
+        body_field,
+        name_field,
+        param_collector,
+        taint_finder,
+    } = cfg;
     let symbol_name = node
         .child_by_field_name(name_field)
         .and_then(|n| n.utf8_text(source).ok())
@@ -1524,16 +1535,16 @@ fn walk_rust_exports(
         return;
     }
     if node.kind() == "function_item" && is_rust_pub(node, source) {
-        if let Some(record) = build_record_from_function_like(
+        if let Some(record) = build_record_from_function_like(BuildRecordConfig {
             node,
             source,
             file_path,
-            "parameters",
-            "body",
-            "name",
-            collect_param_names_rust,
-            find_tainted_call_params_rust,
-        ) {
+            params_field: "parameters",
+            body_field: "body",
+            name_field: "name",
+            param_collector: collect_param_names_rust,
+            taint_finder: find_tainted_call_params_rust,
+        }) {
             records.push(record);
         }
     }

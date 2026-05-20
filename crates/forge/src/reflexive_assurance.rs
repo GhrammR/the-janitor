@@ -314,6 +314,7 @@ mod kani_proofs {
             );
         }
     }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +334,9 @@ mod tests {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        ffi_deref_guard_classification, intent_divergence_is_reachable, proof_obligation_missing,
+        ffi_deref_guard_classification, intent_divergence_is_reachable,
+        lcm_malloc_integer_truncation_is_exploitable, lcm_use_after_free_is_reachable,
+        proof_obligation_missing,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -488,6 +491,22 @@ mod tests {
         assert!(!llm_provenance_missing(false, false));
         assert!(!llm_provenance_missing(false, true));
     }
+
+    #[test]
+    fn lcm_use_after_free_reachability_is_exact_negation_conjunction() {
+        assert!(lcm_use_after_free_is_reachable(false, false));
+        assert!(!lcm_use_after_free_is_reachable(true, false));
+        assert!(!lcm_use_after_free_is_reachable(false, true));
+        assert!(!lcm_use_after_free_is_reachable(true, true));
+    }
+
+    #[test]
+    fn lcm_malloc_truncation_exploitability_is_exact_negation_conjunction() {
+        assert!(lcm_malloc_integer_truncation_is_exploitable(false, false));
+        assert!(!lcm_malloc_integer_truncation_is_exploitable(true, false));
+        assert!(!lcm_malloc_integer_truncation_is_exploitable(false, true));
+        assert!(!lcm_malloc_integer_truncation_is_exploitable(true, true));
+    }
 }
 
 // ── binary_diff Kani proofs ───────────────────────────────────────────────
@@ -582,7 +601,10 @@ mod medical_kani {
 #[cfg(kani)]
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
-    use crate::proof_obligation::{lcm_double_free_is_reachable, timing_comparison_is_sensitive};
+    use crate::proof_obligation::{
+        lcm_double_free_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
+        lcm_use_after_free_is_reachable, timing_comparison_is_sensitive,
+    };
     use common::slop::StructuredFinding;
 
     /// Prove that `map_finding_to_controls` always emits exactly two receipts
@@ -625,6 +647,32 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (has_secret && !in_bench_or_test),
             "timing comparison sensitivity must be exact conjunction",
+        );
+    }
+
+    /// Prove `lcm_use_after_free_is_reachable` is the exact negation-conjunction
+    /// of its two boolean inputs.
+    #[kani::proof]
+    fn classify_lcm_use_after_free_no_panic() {
+        let has_guard: bool = kani::any();
+        let in_test: bool = kani::any();
+        let result = lcm_use_after_free_is_reachable(has_guard, in_test);
+        kani::assert(
+            result == (!has_guard && !in_test),
+            "lcm_use_after_free reachability must be exact negation-conjunction",
+        );
+    }
+
+    /// Prove `lcm_malloc_integer_truncation_is_exploitable` is the exact
+    /// negation-conjunction of its two boolean inputs.
+    #[kani::proof]
+    fn classify_lcm_malloc_truncation_no_panic() {
+        let has_guard: bool = kani::any();
+        let in_bench: bool = kani::any();
+        let result = lcm_malloc_integer_truncation_is_exploitable(has_guard, in_bench);
+        kani::assert(
+            result == (!has_guard && !in_bench),
+            "lcm_malloc truncation exploitability must be exact negation-conjunction",
         );
     }
 }

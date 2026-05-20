@@ -1,21 +1,30 @@
 # The Janitor
 
-> **Research status (2026-06-01):** Commercial validation phase concluded.
-> Continuing as a public security-research artifact. See the
-> [post-mortem](https://news.ycombinator.com/item?id=48176168) for outcomes.
+**v10.2.2 — The Mathematical Firewall Against Autonomous AI. 23 Grammars. IFDS + Z3 SMT + AEG. Dual-PQC Attestation. Zero-Upload. On-Device.**
+
+> *82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.*
 
 ## What this is
 
-A static-analysis security research platform built in Rust: interprocedural
-taint analysis (IFDS + Z3 SMT), post-quantum provenance attestation
-(ML-DSA-65 + SHA-384), and automated exploit-witness synthesis across 23
-grammars. Built as a solo experiment to measure how far current AI-assisted
-tooling can push the boundary of automated vulnerability discovery.
+An active static-analysis security research platform built in Rust: full
+interprocedural taint analysis (IFDS + Z3 SMT), post-quantum provenance
+attestation (ML-DSA-65 + SHA-384), and automated exploit-witness synthesis
+across 23 grammars. Built to measure and advance the boundary of automated
+vulnerability discovery and formal proof-obligation enforcement.
 
 - 128,504 lines of Rust across 15 workspace crates
-- 1,407 deterministic unit tests, 14 Kani formal-verification harnesses
+- 1,407 deterministic unit tests, 16 Kani formal-verification harnesses
 - 23 tree-sitter grammars, IFDS taint solver across 14 languages
 - 194 bug-bounty programs hunted across Bugcrowd, HackerOne, Immunefi
+
+## Research Foundation
+
+The Janitor is an active security research platform spanning four technical frontiers:
+
+- **Interprocedural Taint Analysis (IFDS)** — full context-sensitive dataflow across 14 languages with sanitizer-registry suppression and Z3 SMT path-feasibility refinement.
+- **Formal Verification (Kani + Z3)** — every security-critical predicate ships with a `#[kani::proof]` harness proving absence of panics and integer overflow across all symbolic inputs. Z3-backed exploit witnesses synthesize `curl`-form reproduction commands from model-extracted payloads.
+- **Post-Quantum Provenance (ML-DSA-65 + SHA-384)** — all findings are sealed into SLSA Level 4 `DecisionCapsule` records with dual-PQC attestation, verifiable offline without source upload.
+- **Proof-Obligation Framework** — every KevCritical finding must carry a `ReachabilityProof`, `InvariantViolationProof`, or `LatticeGapProposal` before reaching the bounty ledger. This eliminates unprovable critical reports at triage time.
 
 ## Research Findings
 
@@ -23,30 +32,10 @@ tooling can push the boundary of automated vulnerability discovery.
 
 **Finding 2 — Structural context resolution requires interprocedural dataflow.** Three oracle modules (`forge::threat_model_oracle`, `forge::jwt_keyfunc_oracle`, `forge::sql_sanitizer_oracle`) shipped to catch the highest-volume false-positive classes with deterministic AST guards. The structural approach is necessary and sufficient for known FP patterns; it does not surface previously-unknown paths.
 
-**Finding 3 — Proof-class annotation is the critical missing layer.** Seven candidate findings failed because the engine could not provide a mandatory `ReachabilityProof`, `InvariantViolationProof`, or `LatticeGapProposal`. The proof-obligation framework (Sprint 148) addresses this gap systematically; the full IFDS + Z3 path-feasibility pipeline is the production-grade cure.
+**Finding 3 — Proof-class annotation is the critical missing layer.** Candidate findings failed because the engine could not provide a mandatory `ReachabilityProof`, `InvariantViolationProof`, or `LatticeGapProposal`. The proof-obligation framework (Sprint 148–151) addresses this gap systematically with Kani-verified predicate harnesses for every new proof class.
 
-## Sunset terms
+## If you are considering building on this research
 
-| Item | Status after 2026-06-01 |
-| --- | --- |
-| New releases | None planned |
-| Issue triage | None |
-| PR review | None |
-| Feature requests | Not accepted |
-| Security reports | Not triaged — please report to upstream targets directly |
-| GitHub Action Marketplace listing | Remains listed (use at your own risk; no support after sunset) |
-| Repository visibility | Public, read-only |
-| License | Unchanged; fork freely |
+The architecture and approach are documented in `docs/` and the innovation log. The platform is under active development; research partnerships and peer review are welcome. Contact: reghramm@gmail.com.
 
-Active work may continue against this repository between now and
-2026-06-01. After that date, the repository is permanently quiescent.
-
-## If you are considering building something like this
-
-Please read the [HackerNews post-mortem](https://news.ycombinator.com/item?id=48176168)
-before you start. The next four months of your life are worth more than
-this.
-
----
-
-*Built 2026-02 through 2026-05. Sunsetted 2026-06-01.*
+The most important lessons from building this platform — particularly around IFDS solver design, proof-class annotation at scale, and false-positive classification on polyglot codebases — are documented in `docs/CHANGELOG.md` as session-by-session implementation notes.

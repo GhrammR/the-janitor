@@ -251,7 +251,11 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
         let start = target.saturating_sub(10);
         let end = (target + 11).min(lines.len());
         let window: String = lines[start..end].join("\n");
-        if window.contains("subtle.ConstantTimeCompare") || window.contains("hmac.Equal(") {
+        if window.contains("subtle.ConstantTimeCompare")
+            || window.contains("hmac.Equal(")
+            || window.contains("check_password_hash(")
+            || window.contains("hmac.compare_digest(")
+        {
             return ProofClass::InvariantViolationProof;
         }
     }
@@ -266,6 +270,113 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
         || source.contains("auth_tag")
         || source.contains("nonce");
     if timing_comparison_is_sensitive(has_secret_marker, in_test_path) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of use-after-free proof logic.
+///
+/// Returns `true` when the allocation site is reachable from an external call
+/// path and no lifetime guard dominates the reuse point.
+pub fn lcm_use_after_free_is_reachable(has_lifetime_guard: bool, in_test_path: bool) -> bool {
+    !has_lifetime_guard && !in_test_path
+}
+
+/// Classify proof class for `security:lcm_use_after_free` findings.
+///
+/// 1. ±5-line window: presence of a null/validity check or `secp256k1_ec_pubkey_tweak`
+///    guard → `InvariantViolationProof` (suppress as FP).
+/// 2. ±10-line window: `SECP256K1_API`, `secp256k1_` symbol, or `static` linkage
+///    → `ReachabilityProof`.
+/// 3. Otherwise → `LatticeGapProposal`.
+pub fn classify_lcm_use_after_free_proof(source: &str, finding_line: usize) -> ProofClass {
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.is_empty() {
+        return ProofClass::LatticeGapProposal;
+    }
+    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let guard_start = target.saturating_sub(5);
+    let guard_end = (target + 6).min(lines.len());
+    let has_lifetime_guard = lines[guard_start..guard_end].iter().any(|l| {
+        let t = l.trim();
+        (t.contains("if (") && (t.contains("!= NULL") || t.contains("freed") || t.contains("is_valid")))
+            || t.contains("assert(")
+            || t.contains("secp256k1_ec_pubkey_tweak")
+    });
+    let ext_start = target.saturating_sub(10);
+    let ext_end = (target + 11).min(lines.len());
+    let has_extern = lines[ext_start..ext_end].iter().any(|l| {
+        let t = l.trim();
+        t.starts_with("static ") || t.contains("SECP256K1_API") || t.contains("secp256k1_")
+    });
+    if has_lifetime_guard {
+        ProofClass::InvariantViolationProof
+    } else if has_extern {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of malloc integer-truncation
+/// proof logic.
+///
+/// Returns `true` when the allocation size computation is unguarded and the
+/// finding is NOT in a benchmark or precompute-table path.
+pub fn lcm_malloc_integer_truncation_is_exploitable(
+    has_size_guard: bool,
+    in_bench_path: bool,
+) -> bool {
+    !has_size_guard && !in_bench_path
+}
+
+/// Classify proof class for `security:lcm_malloc_integer_truncation` findings.
+///
+/// 1. Bench/precompute path OR ±5-line overflow guard → `InvariantViolationProof`
+///    (suppress as FP).
+/// 2. ±10-line `SECP256K1_API` / `secp256k1_` / `static` linkage →
+///    `ReachabilityProof`.
+/// 3. Otherwise → `LatticeGapProposal`.
+pub fn classify_lcm_malloc_integer_truncation_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let finding_line = finding.line.unwrap_or(1) as usize;
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.is_empty() {
+        return ProofClass::LatticeGapProposal;
+    }
+    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let guard_start = target.saturating_sub(5);
+    let guard_end = (target + 6).min(lines.len());
+    let has_size_guard = lines[guard_start..guard_end].iter().any(|l| {
+        let t = l.trim();
+        (t.contains("if (")
+            && (t.contains("size >")
+                || t.contains("len >")
+                || t.contains("overflow")
+                || t.contains("UINT_MAX")))
+            || t.contains("assert(")
+            || t.contains("checked_mul")
+            || t.contains("safe_mul")
+    });
+    let in_bench_path = finding
+        .file
+        .as_deref()
+        .map(|p| p.contains("bench") || p.contains("precompute"))
+        .unwrap_or(false);
+    if has_size_guard || in_bench_path {
+        return ProofClass::InvariantViolationProof;
+    }
+    let ext_start = target.saturating_sub(10);
+    let ext_end = (target + 11).min(lines.len());
+    let has_extern = lines[ext_start..ext_end].iter().any(|l| {
+        let t = l.trim();
+        t.starts_with("static ") || t.contains("SECP256K1_API") || t.contains("secp256k1_")
+    });
+    if has_extern {
         ProofClass::ReachabilityProof
     } else {
         ProofClass::LatticeGapProposal
@@ -557,6 +668,97 @@ mod tests {
         let source = "func TestVerifySession(t *testing.T) {\n    nonce := session.nonce\n    return bytes.Equal(got, expected)\n}";
         assert_eq!(
             super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn timing_comparison_check_password_hash_suppresses() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("querybook/server/models/user.py".to_string()),
+            line: Some(55),
+            ..Default::default()
+        };
+        let source = "@password.setter\ndef password(self, plaintext):\n    if plaintext is not None:\n        self._password = generate_password_hash(plaintext)\n    else:\n        self._password = None\n\ndef check_password(self, plaintext):\n    return check_password_hash(self._password or \"\", plaintext)\n";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    // --- lcm_use_after_free classifier tests ---
+
+    #[test]
+    fn lcm_use_after_free_null_guard_yields_invariant_violation() {
+        let source = "void secp256k1_context_destroy(secp256k1_context *ctx) {\n    if (ctx != NULL) {\n        secp256k1_scalar_clear(&ctx->blind);\n        free(ctx);\n    }\n    ctx->extra_entropy = NULL;\n}";
+        assert_eq!(
+            super::classify_lcm_use_after_free_proof(source, 6),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn lcm_use_after_free_secp256k1_api_yields_reachability() {
+        let source = "SECP256K1_API int secp256k1_ecdsa_verify(\n    const secp256k1_context *ctx,\n    const secp256k1_ecdsa_signature *sig,\n    const unsigned char *msghash32,\n    const secp256k1_pubkey *pubkey\n) {\n    free(ctx->scratch);\n    return ctx->scratch->data;\n}";
+        assert_eq!(
+            super::classify_lcm_use_after_free_proof(source, 7),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn lcm_use_after_free_no_context_yields_lattice_gap() {
+        let source = "void process(unsigned char *buf, size_t len) {\n    free(buf);\n    memcpy(dst, buf, len);\n}";
+        assert_eq!(
+            super::classify_lcm_use_after_free_proof(source, 3),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    // --- lcm_malloc_integer_truncation classifier tests ---
+
+    #[test]
+    fn lcm_malloc_trunc_bench_path_suppressed() {
+        let finding = StructuredFinding {
+            id: "security:lcm_malloc_integer_truncation".to_string(),
+            file: Some("crypto/secp256k1/libsecp256k1/src/bench_ecmult.c".to_string()),
+            line: Some(42),
+            ..Default::default()
+        };
+        let source = "void *scratch = malloc(n * sizeof(secp256k1_gej));\n";
+        assert_eq!(
+            super::classify_lcm_malloc_integer_truncation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn lcm_malloc_trunc_secp256k1_api_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:lcm_malloc_integer_truncation".to_string(),
+            file: Some("crypto/secp256k1/libsecp256k1/src/secp256k1.c".to_string()),
+            line: Some(3),
+            ..Default::default()
+        };
+        let source = "SECP256K1_API secp256k1_scratch_space *secp256k1_scratch_create(\n    const secp256k1_context *ctx,\n    size_t size\n) {\n    void *buf = malloc(size * 2);\n    return buf;\n}";
+        assert_eq!(
+            super::classify_lcm_malloc_integer_truncation_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn lcm_malloc_trunc_no_context_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:lcm_malloc_integer_truncation".to_string(),
+            file: Some("utils/alloc.c".to_string()),
+            line: Some(2),
+            ..Default::default()
+        };
+        let source = "void *alloc_buf(size_t n, size_t m) {\n    return malloc(n * m);\n}";
+        assert_eq!(
+            super::classify_lcm_malloc_integer_truncation_proof(source, &finding),
             ProofClass::LatticeGapProposal
         );
     }

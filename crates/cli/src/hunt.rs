@@ -3146,6 +3146,30 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("lcm_use_after_free") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let line = finding.line.unwrap_or(1) as usize;
+            let proof = forge::proof_obligation::classify_lcm_use_after_free_proof(&source, line);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("lcm_malloc_integer_truncation") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof =
+                forge::proof_obligation::classify_lcm_malloc_integer_truncation_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         }
         true
     });
