@@ -84,7 +84,6 @@ impl Default for NpmAdapter {
 struct ChangesResponse {
     results: Vec<ChangeRecord>,
     #[serde(default)]
-    #[allow(dead_code)]
     last_seq: serde_json::Value,
 }
 
@@ -96,7 +95,7 @@ struct ChangeRecord {
 }
 
 impl RegistryAdapter for NpmAdapter {
-    fn poll_recent_uploads(&self) -> anyhow::Result<Vec<PackageUpload>> {
+    fn poll_recent_uploads(&mut self) -> anyhow::Result<Vec<PackageUpload>> {
         // Phase 1a: name-only poll (no include_docs — rejected with HTTP 400).
         let url = format!(
             "{NPM_CHANGES_URL}?since={}&limit={}",
@@ -111,6 +110,13 @@ impl RegistryAdapter for NpmAdapter {
             .body_mut()
             .read_json()
             .context("npm _changes feed: response body is not valid JSON")?;
+
+        // Advance the sequence cursor so the next call fetches only new uploads.
+        if let Some(seq) = body.last_seq.as_str() {
+            self.since = seq.to_string();
+        } else if let Some(seq) = body.last_seq.as_u64() {
+            self.since = seq.to_string();
+        }
 
         let names = parse_names_response(body);
 

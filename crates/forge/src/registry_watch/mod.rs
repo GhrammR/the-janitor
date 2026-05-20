@@ -74,7 +74,12 @@ pub trait RegistryAdapter {
     /// must honour the rate limits documented in
     /// `tools/campaign/REGISTRY_WATCH_GUIDE.md` and use exponential
     /// backoff on 429 / 503 responses.
-    fn poll_recent_uploads(&self) -> anyhow::Result<Vec<PackageUpload>>;
+    ///
+    /// `&mut self` allows adapters (e.g. [`npm::NpmAdapter`]) to advance
+    /// their internal sequence cursor after each successful poll so
+    /// subsequent calls return only new uploads rather than re-fetching
+    /// from the same starting position.
+    fn poll_recent_uploads(&mut self) -> anyhow::Result<Vec<PackageUpload>>;
 }
 
 #[cfg(test)]

@@ -57,7 +57,7 @@ struct NewCrateRecord {
 }
 
 impl RegistryAdapter for CratesIoAdapter {
-    fn poll_recent_uploads(&self) -> anyhow::Result<Vec<PackageUpload>> {
+    fn poll_recent_uploads(&mut self) -> anyhow::Result<Vec<PackageUpload>> {
         let mut resp = self
             .agent
             .get(CRATES_SUMMARY_URL)

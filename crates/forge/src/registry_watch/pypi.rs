@@ -73,7 +73,7 @@ impl Default for PyPiAdapter {
 }
 
 impl RegistryAdapter for PyPiAdapter {
-    fn poll_recent_uploads(&self) -> anyhow::Result<Vec<PackageUpload>> {
+    fn poll_recent_uploads(&mut self) -> anyhow::Result<Vec<PackageUpload>> {
         let mut resp = self
             .agent
             .get(PYPI_RSS_URL)
