@@ -75,6 +75,7 @@ pub mod llm_decompile;
 pub mod llm_prompt_injection;
 pub mod malware_genome;
 pub mod mcp_dispatch_guard;
+pub mod medical;
 pub mod memory_bomb;
 pub mod memory_proof;
 pub mod mesh_taint;

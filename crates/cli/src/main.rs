@@ -686,6 +686,14 @@ enum Commands {
         /// Optional newline-separated popular-packages override file.
         #[arg(long)]
         popular_list: Option<PathBuf>,
+        /// Print findings to stdout as NDJSON without writing to the queue.
+        /// Safe for CI pipelines where side-effects are forbidden.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+        /// Skip packages with a `published_at` timestamp older than this many
+        /// hours. Prevents re-triaging already-seen packages on repeated CI runs.
+        #[arg(long, default_value_t = 24)]
+        max_age_hours: u64,
     },
     /// Read `.janitor/registry_watch_queue.ndjson` and render entries
     /// above `--min-score` as text or markdown.
@@ -1632,11 +1640,15 @@ async fn main() -> anyhow::Result<()> {
             once,
             project_root,
             popular_list,
+            dry_run,
+            max_age_hours,
         } => registry_watch_cmd::cmd_watch_registries(
             registry,
             *once,
             project_root,
             popular_list.as_deref(),
+            *dry_run,
+            *max_age_hours,
         )?,
         Commands::TriageRegistryQueue {
             min_score,

@@ -120,7 +120,7 @@ pub fn score_upload(
 
 /// Parse a `YYYY-MM-DDTHH:MM:SSZ` ISO 8601 string to UNIX timestamp.
 /// Returns `None` on parse failure. Pure-Rust, no chrono.
-fn parse_iso8601_to_unix(ts: &str) -> Option<i64> {
+pub fn parse_iso8601_to_unix(ts: &str) -> Option<i64> {
     // Expected format: 2026-05-18T00:00:00Z (length 20).
     let bytes = ts.as_bytes();
     if bytes.len() < 19 {

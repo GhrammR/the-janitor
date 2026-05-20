@@ -45,15 +45,10 @@ struct SummaryResponse {
 
 #[derive(Debug, Deserialize)]
 struct NewCrateRecord {
-    #[allow(dead_code)]
-    id: Option<String>,
     name: String,
     max_version: Option<String>,
     description: Option<String>,
     updated_at: Option<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    downloads: u64,
 }
 
 impl RegistryAdapter for CratesIoAdapter {

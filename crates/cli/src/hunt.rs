@@ -2916,6 +2916,10 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // //nolint:gosec annotation / test-fixture function). Closes the
     // chainlink SQLi FP class (Sprint 141 Tier-1 disposition).
     apply_sql_sanitizer_demotion(dir, &mut deduped);
+    // Sprint 147 — Phase 2B threat-model oracle extensions.
+    // Suppresses SSRF on admin-intentional URL-test functions, TLS bypass
+    // when config-gated, and dom_xss_innerHTML on zero-caller helpers.
+    apply_phase2b_suppression(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
@@ -3071,6 +3075,67 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 /// finding is demoted to `Informational` severity with an annotation
 /// citing the guard.
 ///
+/// Sprint 147 — Phase 2B: Wire-in for the three new `forge::threat_model_oracle`
+/// suppression predicates.
+///
+/// - `security:ssrf_dynamic_url`: suppresses when the enclosing function name
+///   matches the admin-tooling pattern (Test/Validate/Ping/Health + URL/Site)
+///   and no user-request taint is present in the file.
+/// - `security:tls_verification_bypass`: suppresses when `InsecureSkipVerify: true`
+///   is inside an `if`-branch conditional on a struct-field access.
+/// - `security:dom_xss_innerHTML`: suppresses when the sink helper function has
+///   no callers in the same file (zero-caller helper → no attacker-reachable path).
+fn apply_phase2b_suppression(dir: &Path, findings: &mut Vec<StructuredFinding>) {
+    findings.retain_mut(|finding| {
+        let Some(rel_path) = finding.file.as_deref() else {
+            return true;
+        };
+        let abs_path = dir.join(rel_path);
+        let Ok(source) = std::fs::read_to_string(&abs_path) else {
+            return true;
+        };
+        let line = finding.line.unwrap_or(0) as usize;
+
+        if finding.id.contains("ssrf_dynamic_url") {
+            let fn_name = extract_enclosing_fn_name(&source, line);
+            if forge::threat_model_oracle::is_admin_intentional_url_fetch(&fn_name, &source) {
+                return false;
+            }
+        }
+        if finding.id.contains("tls_verification_bypass") || finding.id.contains("InsecureSkipVerify") {
+            if forge::threat_model_oracle::is_config_gated_tls_bypass(&source, line) {
+                return false;
+            }
+        }
+        if finding.id.contains("dom_xss_innerHTML") {
+            let fn_name = extract_enclosing_fn_name(&source, line);
+            if !fn_name.is_empty() && !forge::threat_model_oracle::has_external_caller(&source, &fn_name) {
+                return false;
+            }
+        }
+        true
+    });
+}
+
+/// Extract the name of the function enclosing the given 1-based line by
+/// scanning backwards for a Go/Python/TypeScript/JavaScript function definition.
+fn extract_enclosing_fn_name(source: &str, line: usize) -> String {
+    let lines: Vec<&str> = source.lines().collect();
+    let target = line.saturating_sub(1).min(lines.len());
+    for i in (0..=target).rev() {
+        let t = lines[i].trim();
+        for prefix in &["func ", "def ", "function ", "async function "] {
+            if let Some(rest) = t.strip_prefix(prefix) {
+                let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                if !name.is_empty() {
+                    return name;
+                }
+            }
+        }
+    }
+    String::new()
+}
+
 /// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
 /// detector emitted a 36% approval CANDIDATE for `core/utils/jwt.go:230`
 /// without inspecting the keyfunc body at lines 258-266, which contains
@@ -3992,6 +4057,13 @@ fn scan_buffer(
     findings.extend(forge::automotive::detect_can_bus_unvalidated_actuation(
         ext, source, label,
     ));
+    // P8-3: Medical Device Pack — PHI-to-LLM taint + FDA audit-log absence.
+    // Wired for Python, JavaScript, TypeScript, Java, Kotlin, C#.
+    if matches!(ext, "py" | "js" | "ts" | "java" | "kt" | "cs") {
+        let src_str = std::str::from_utf8(source).unwrap_or("");
+        findings.extend(forge::medical::emit_phi_sink_findings(src_str, label));
+        findings.extend(forge::medical::emit_audit_log_absence_findings(src_str, label));
+    }
     let filename = std::path::Path::new(label)
         .file_name()
         .and_then(|n| n.to_str())

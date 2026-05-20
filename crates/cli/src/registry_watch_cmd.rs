@@ -96,11 +96,13 @@ pub fn cmd_watch_registries(
     once: bool,
     project_root: &Path,
     popular_list: Option<&Path>,
+    dry_run: bool,
+    max_age_hours: u64,
 ) -> anyhow::Result<()> {
     let queue_path = project_root
         .join(".janitor")
         .join("registry_watch_queue.ndjson");
-    let mut queue = WatchQueue::load(queue_path)?;
+    let mut queue = WatchQueue::load(queue_path.clone())?;
 
     let override_popular = load_popular_list_override(popular_list)?;
     let osv_known = load_osv_corpus(project_root);
@@ -130,17 +132,32 @@ pub fn cmd_watch_registries(
             };
             let now = now_unix();
             let captured = now_iso8601();
+            let max_age_secs = max_age_hours as i64 * 3600;
             let mut enqueued = 0_usize;
             for upload in uploads {
+                // Skip packages older than max_age_hours.
+                if max_age_hours > 0 {
+                    if let Some(ref published) = upload.published_at {
+                        if let Some(ts) = parse_published_at(published) {
+                            if now - ts > max_age_secs {
+                                continue;
+                            }
+                        }
+                    }
+                }
                 let score = score_upload(&upload, &popular, &osv_known, now);
                 if score <= MIN_SCORE {
                     continue;
                 }
-                if queue.append_if_new(upload, score, captured.clone())? {
+                if dry_run {
+                    println!("{}", serde_json::to_string(&upload).unwrap_or_default());
+                    enqueued += 1;
+                } else if queue.append_if_new(upload, score, captured.clone())? {
                     enqueued += 1;
                 }
             }
-            eprintln!("[watch-registries] {reg}: enqueued {enqueued} new candidates");
+            eprintln!("[watch-registries] {reg}: {} {enqueued} new candidates",
+                if dry_run { "dry-run found" } else { "enqueued" });
             // Per /goal rate limits: ≤1 req/sec npm, ≤2 req/sec crates, ≤1 req/sec pypi.
             // We do one poll per registry per cycle, so a 1-second sleep between
             // registries comfortably honours all three.
@@ -224,6 +241,11 @@ fn load_osv_corpus(project_root: &Path) -> std::collections::HashSet<String> {
         Ok(corpus) => corpus.package_names.into_iter().collect(),
         Err(_) => std::collections::HashSet::new(),
     }
+}
+
+/// Thin wrapper around score.rs's ISO 8601 parser for use in the max-age filter.
+fn parse_published_at(ts: &str) -> Option<i64> {
+    forge::registry_watch::score::parse_iso8601_to_unix(ts)
 }
 
 fn now_unix() -> i64 {
@@ -345,6 +367,32 @@ fn truncate(s: &str, n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn max_age_filter_excludes_old_packages() {
+        // Timestamp far in the past (2020-01-01) should be filtered when max_age_hours = 24.
+        let old_ts = "2020-01-01T00:00:00Z";
+        let ts_unix = parse_published_at(old_ts).expect("parseable timestamp");
+        let now = now_unix();
+        let max_age_secs: i64 = 24 * 3600;
+        assert!(
+            now - ts_unix > max_age_secs,
+            "2020 timestamp should be older than 24 hours"
+        );
+    }
+
+    #[test]
+    fn max_age_filter_passes_recent_packages() {
+        // A package published in the future (2099) is always within any max_age window.
+        let future_ts = "2099-12-31T23:59:59Z";
+        let ts_unix = parse_published_at(future_ts).expect("parseable timestamp");
+        let now = now_unix();
+        let max_age_secs: i64 = 24 * 3600;
+        assert!(
+            now - ts_unix < max_age_secs,
+            "2099 timestamp should be within 24 hours of now"
+        );
+    }
 
     #[test]
     fn iso8601_format_produces_expected_date_prefix() {

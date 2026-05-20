@@ -24,10 +24,12 @@ jobs:
     # Job-level: read PR diff + write step summary.
     # statuses:write is required for local-only mode to post the bounce
     # verdict as a named commit status when no Governor URL is configured.
+    # security-events:write is required for the SARIF upload step.
     permissions:
       contents: read
       pull-requests: read
       statuses: write
+      security-events: write
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
@@ -84,6 +86,14 @@ jobs:
           if-no-files-found: ignore
           compression-level: 0
           retention-days: 30
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .janitor/janitor-results.sarif
+          category: janitor
+        continue-on-error: true
 
       - name: sccache stats
         if: always()

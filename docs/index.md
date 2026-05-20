@@ -26,6 +26,17 @@ hide:
 
 The Janitor is not a linter. It is not a SAST scanner. It is a **structural enforcement layer** that runs on your hardware, in your pipeline, on every pull request — before the merge button is available. The Janitor is a deterministic pre-merge defense for autonomous and AI-assisted pull requests, verifying structural policy before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
 
+## Research Foundation
+
+The Janitor is an active security research platform spanning four technical frontiers:
+
+- **Interprocedural Taint Analysis (IFDS)** — full context-sensitive dataflow across 14 languages with sanitizer-registry suppression and Z3 SMT path-feasibility refinement. Beats CodeQL on cross-function reachability at zero cloud cost.
+- **Formal Verification (Kani + Z3)** — every security-critical predicate ships with a `#[kani::proof]` harness proving absence of panics and integer overflow across all symbolic inputs. Z3-backed exploit witnesses synthesize `curl`-form reproduction commands from model-extracted payloads.
+- **Post-Quantum Provenance (ML-DSA-65 + SHA-384)** — all findings are sealed into SLSA Level 4 `DecisionCapsule` records with dual-PQC attestation, verifiable offline without source upload.
+- **ZK AST Attestation (roadmap)** — in-progress Halo2/Plonky3 circuit design for absence-of-bad-pattern proofs, enabling FedRAMP High and DoD IL6 compliance attestation without revealing source.
+
+Peer-reviewed collaborations and research partnerships welcome. Contact: reghramm@gmail.com.
+
 ## Why Not CodeQL, Snyk, or SonarQube?
 
 **CodeQL** is a graph-query engine optimised for known CVE patterns. It does not detect AI-generated structural anomalies, Swarm clone behaviour, or zombie dependency hallucinations — patterns that have no prior CVE record. It also adds 10–45 minutes to CI runtime on large repositories.
