@@ -416,3 +416,52 @@ mod tests {
         assert!(!llm_provenance_missing(false, true));
     }
 }
+
+// ── binary_diff Kani proofs ───────────────────────────────────────────────
+#[cfg(kani)]
+mod binary_diff_kani {
+    use crate::binary_diff::{compute_urgency_score, diff_binaries};
+
+    #[kani::proof]
+    fn no_oob_on_malformed_elf() {
+        let len: usize = kani::any();
+        kani::assume(len <= 512);
+        let bytes: Vec<u8> = (0..len).map(|_| kani::any()).collect();
+        // diff_binaries must not panic regardless of input shape.
+        let r = diff_binaries(&bytes, &[]);
+        kani::assert(r.patch_urgency_score <= 100, "score out of range");
+    }
+
+    #[kani::proof]
+    fn urgency_score_never_exceeds_100() {
+        let count: usize = kani::any();
+        let has_class: bool = kani::any();
+        kani::assume(count <= 1024);
+        let score = compute_urgency_score(count, has_class);
+        kani::assert(score <= 100, "urgency score exceeds 100");
+    }
+}
+
+// ── compliance_oracle Kani proofs ────────────────────────────────────────────
+#[cfg(kani)]
+mod compliance_oracle_kani {
+    use crate::compliance_oracle::map_finding_to_controls;
+    use common::slop::StructuredFinding;
+
+    /// Prove that `map_finding_to_controls` always emits exactly two receipts
+    /// and never panics, for both credential-leak and dead-code finding classes.
+    #[kani::proof]
+    fn compliance_oracle_always_two_receipts() {
+        let is_cred: bool = kani::any();
+        let finding = StructuredFinding {
+            id: if is_cred {
+                "security:credential_leak".to_string()
+            } else {
+                "dead_symbol".to_string()
+            },
+            ..Default::default()
+        };
+        let receipts = map_finding_to_controls(&finding);
+        kani::assert(receipts.len() == 2, "compliance oracle must emit exactly 2 receipts");
+    }
+}

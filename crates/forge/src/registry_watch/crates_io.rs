@@ -74,6 +74,7 @@ impl RegistryAdapter for CratesIoAdapter {
 
 /// Convert a parsed summary into the canonical [`PackageUpload`] vec.
 /// Exposed so tests can supply fixture JSON without network I/O.
+#[cfg(test)]
 pub(crate) fn parse_summary_response_from_value(body: serde_json::Value) -> Vec<PackageUpload> {
     let Ok(parsed) = serde_json::from_value::<SummaryResponse>(body) else {
         return Vec::new();

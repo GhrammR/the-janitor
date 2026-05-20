@@ -21,6 +21,7 @@ mod git_drive;
 mod hunt;
 mod jira;
 mod nuclei_templates;
+mod registry_watch_cmd;
 mod report;
 mod sarif_enterprise;
 mod submit_formatter;
@@ -669,6 +670,35 @@ enum Commands {
     UpdateSlopsquat {
         /// Project root (writes .janitor/slopsquat_corpus.rkyv).
         path: PathBuf,
+    },
+    /// Poll live registry feeds (npm / crates.io / pypi) and append scored
+    /// candidates to `.janitor/registry_watch_queue.ndjson`.
+    WatchRegistries {
+        /// Which registry to poll: `npm`, `crates`, `pypi`, or `all`.
+        #[arg(long, default_value = "all")]
+        registry: String,
+        /// Run a single poll cycle and exit (no continuous loop).
+        #[arg(long, default_value_t = false)]
+        once: bool,
+        /// Project root (writes .janitor/registry_watch_queue.ndjson).
+        #[arg(long, default_value = ".")]
+        project_root: PathBuf,
+        /// Optional newline-separated popular-packages override file.
+        #[arg(long)]
+        popular_list: Option<PathBuf>,
+    },
+    /// Read `.janitor/registry_watch_queue.ndjson` and render entries
+    /// above `--min-score` as text or markdown.
+    TriageRegistryQueue {
+        /// Minimum score to include in output.
+        #[arg(long, default_value_t = 60)]
+        min_score: i32,
+        /// Output format: `text` or `markdown`.
+        #[arg(long, default_value = "text")]
+        render: String,
+        /// Project root (reads .janitor/registry_watch_queue.ndjson).
+        #[arg(long, default_value = ".")]
+        project_root: PathBuf,
     },
     /// Parse offline campaign markdown into a ranked target ledger.
     IngestCampaigns {
@@ -1597,6 +1627,22 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::UpdateSlopsquat { path } => cmd_update_slopsquat(path, &execution_tier)?,
+        Commands::WatchRegistries {
+            registry,
+            once,
+            project_root,
+            popular_list,
+        } => registry_watch_cmd::cmd_watch_registries(
+            registry,
+            *once,
+            project_root,
+            popular_list.as_deref(),
+        )?,
+        Commands::TriageRegistryQueue {
+            min_score,
+            render,
+            project_root,
+        } => registry_watch_cmd::cmd_triage_registry_queue(*min_score, render, project_root)?,
         Commands::IngestCampaigns { dir } => campaign_ingest::cmd_ingest_campaigns(dir)?,
         Commands::Export {
             repo,

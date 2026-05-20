@@ -51,9 +51,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
         curr[0] = i + 1;
         for (j, cb) in b.iter().enumerate() {
             let cost = if ca == cb { 0 } else { 1 };
-            curr[j + 1] = (curr[j] + 1)
-                .min(prev[j + 1] + 1)
-                .min(prev[j] + cost);
+            curr[j + 1] = (curr[j] + 1).min(prev[j + 1] + 1).min(prev[j] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -143,8 +141,12 @@ fn parse_iso8601_to_unix(ts: &str) -> Option<i64> {
 
     // Days in each month (non-leap).
     const DAYS_IN_MONTH: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for m in 0..(month - 1) as usize {
-        days += DAYS_IN_MONTH[m];
+    for (m, &month_days) in DAYS_IN_MONTH
+        .iter()
+        .enumerate()
+        .take((month - 1) as usize)
+    {
+        days += month_days;
         if m == 1 && is_leap_year(year) {
             days += 1;
         }

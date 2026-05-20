@@ -52,7 +52,11 @@ impl PyPiAdapter {
         let mut resp = match self.agent.get(&url).call() {
             Ok(r) => r,
             Err(ureq::Error::StatusCode(404)) => return Ok(None),
-            Err(e) => return Err(anyhow::anyhow!("pypi metadata fetch failed for {name}: {e}")),
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "pypi metadata fetch failed for {name}: {e}"
+                ))
+            }
         };
         let body: serde_json::Value = resp
             .body_mut()
