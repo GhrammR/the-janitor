@@ -336,8 +336,8 @@ mod tests {
     use crate::proof_obligation::{
         ffi_deref_guard_classification, intent_divergence_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
-        lcm_use_after_free_is_reachable, oauth_state_validation_is_missing,
-        proof_obligation_missing,
+        lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
+        oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -524,6 +524,22 @@ mod tests {
         assert!(!oauth_state_validation_is_missing(true, true));
         assert!(!oauth_state_validation_is_missing(false, true));
     }
+
+    #[test]
+    fn oauth_account_fusion_email_guard_missing_is_exact_conjunction() {
+        assert!(oauth_account_fusion_is_missing_email_guard(true, false));
+        assert!(!oauth_account_fusion_is_missing_email_guard(false, false));
+        assert!(!oauth_account_fusion_is_missing_email_guard(true, true));
+        assert!(!oauth_account_fusion_is_missing_email_guard(false, true));
+    }
+
+    #[test]
+    fn protobuf_any_unguarded_is_exact_conjunction() {
+        assert!(protobuf_any_is_unguarded(true, false));
+        assert!(!protobuf_any_is_unguarded(false, false));
+        assert!(!protobuf_any_is_unguarded(true, true));
+        assert!(!protobuf_any_is_unguarded(false, true));
+    }
 }
 
 // ── binary_diff Kani proofs ───────────────────────────────────────────────
@@ -621,7 +637,8 @@ mod compliance_oracle_kani {
     use crate::proof_obligation::{
         lcm_double_free_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
         lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
-        oauth_state_validation_is_missing, timing_comparison_is_sensitive,
+        oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
+        protobuf_any_is_unguarded, timing_comparison_is_sensitive,
     };
     use common::slop::StructuredFinding;
 
@@ -717,6 +734,32 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (is_server_side && !has_state_check),
             "oauth state validation missing must be exact conjunction",
+        );
+    }
+
+    /// Prove `oauth_account_fusion_is_missing_email_guard` is the exact conjunction
+    /// of server-side flag and absence of email-verified guard.
+    #[kani::proof]
+    fn classify_oauth_account_fusion_no_panic() {
+        let is_server: bool = kani::any();
+        let has_check: bool = kani::any();
+        let result = oauth_account_fusion_is_missing_email_guard(is_server, has_check);
+        kani::assert(
+            result == (is_server && !has_check),
+            "oauth fusion guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `protobuf_any_is_unguarded` is the exact conjunction of
+    /// deprecated-API usage and absence of a test path.
+    #[kani::proof]
+    fn classify_protobuf_any_no_panic() {
+        let uses_deprecated: bool = kani::any();
+        let in_test: bool = kani::any();
+        let result = protobuf_any_is_unguarded(uses_deprecated, in_test);
+        kani::assert(
+            result == (uses_deprecated && !in_test),
+            "protobuf_any guard must be exact conjunction",
         );
     }
 }

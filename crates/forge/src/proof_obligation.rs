@@ -255,6 +255,10 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
             || window.contains("hmac.Equal(")
             || window.contains("check_password_hash(")
             || window.contains("hmac.compare_digest(")
+            || window.contains("MessageDigest.isEqual(")
+            || window.contains("Arrays.constantTimeAreEqual(")
+            || window.contains("constantTimeCompare(")
+            || window.contains("MessageDigest.equals(")
         {
             return ProofClass::InvariantViolationProof;
         }
@@ -484,6 +488,105 @@ pub fn classify_oauth_state_validation_proof(
         ProofClass::InvariantViolationProof
     } else {
         ProofClass::ReachabilityProof
+    }
+}
+
+/// Pure boolean predicate for Kani verification of OAuth account-fusion proof logic.
+///
+/// Returns `true` when the OAuth merge callback is server-side AND no
+/// `email_verified` guard is visible in the surrounding code.
+pub fn oauth_account_fusion_is_missing_email_guard(
+    is_server_side: bool,
+    has_email_verified_check: bool,
+) -> bool {
+    is_server_side && !has_email_verified_check
+}
+
+/// Classify proof class for `security:oauth_account_fusion_pretakeover` findings.
+///
+/// 1. Non-server-side file (TypeScript/JavaScript SDK resource wrapper) →
+///    `LatticeGapProposal` (client-side SDK method wrappers are not server-side
+///    OAuth account-merge handlers).
+/// 2. Server-side file (Python/Go/Ruby/Java) with visible `email_verified`
+///    guard → `InvariantViolationProof` (suppress).
+/// 3. Server-side file with NO email-guard → `ReachabilityProof`.
+pub fn classify_oauth_account_fusion_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let is_server_side = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.ends_with(".py")
+                || p.ends_with(".go")
+                || p.ends_with(".rb")
+                || p.ends_with(".java")
+        })
+        .unwrap_or(false);
+    if !is_server_side {
+        return ProofClass::LatticeGapProposal;
+    }
+    let has_email_check = source.contains("email_verified")
+        || source.contains("emailVerified")
+        || source.contains("verify_email(")
+        || source.contains("is_email_verified");
+    if has_email_check {
+        ProofClass::InvariantViolationProof
+    } else {
+        ProofClass::ReachabilityProof
+    }
+}
+
+/// Pure boolean predicate for Kani verification of protobuf Any unguarded-decode proof logic.
+///
+/// Returns `true` when the deprecated `ptypes.UnmarshalAny` API is used AND
+/// the file is NOT in a test/mock/fixture/mirage path.
+pub fn protobuf_any_is_unguarded(uses_deprecated_api: bool, in_test_path: bool) -> bool {
+    uses_deprecated_api && !in_test_path
+}
+
+/// Classify proof class for `security:protobuf_any_unguarded_decode` findings.
+///
+/// 1. Test/mock/fixture/mirage path → `InvariantViolationProof` (suppress).
+/// 2. Deprecated `ptypes.UnmarshalAny` or `proto.UnmarshalAny` → `ReachabilityProof`
+///    (type registry not enforced; remote type injection possible).
+/// 3. Modern `anypb.UnmarshalTo`/`anypb.UnmarshalNew` WITH type-URL allow-list
+///    check → `InvariantViolationProof` (suppress).
+/// 4. Modern API without type-URL check → `ReachabilityProof`.
+/// 5. Neither pattern detected → `LatticeGapProposal`.
+pub fn classify_protobuf_any_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("mock")
+                || p.contains("fixture")
+                || p.contains("mirage")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+    let uses_deprecated = source.contains("ptypes.UnmarshalAny")
+        || source.contains("proto.UnmarshalAny");
+    let uses_modern = source.contains("anypb.UnmarshalTo")
+        || source.contains("anypb.UnmarshalNew");
+    if uses_deprecated {
+        ProofClass::ReachabilityProof
+    } else if uses_modern {
+        let has_type_check = source.contains("typeURL")
+            || source.contains("TypeUrl")
+            || source.contains("RegisterType")
+            || source.contains("type_url_prefix");
+        if has_type_check {
+            ProofClass::InvariantViolationProof
+        } else {
+            ProofClass::ReachabilityProof
+        }
+    } else {
+        ProofClass::LatticeGapProposal
     }
 }
 
@@ -958,6 +1061,94 @@ mod tests {
         assert_eq!(
             super::classify_lcm_malloc_integer_truncation_proof(source, &finding),
             ProofClass::LatticeGapProposal
+        );
+    }
+
+    // --- oauth_account_fusion classifier tests ---
+
+    #[test]
+    fn oauth_account_fusion_typescript_sdk_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:oauth_account_fusion_pretakeover".to_string(),
+            file: Some("src/resources/AccountLinks.ts".to_string()),
+            ..Default::default()
+        };
+        let source = "export const AccountLinks = StripeResource.extend({ create: stripeMethod({ method: 'POST', fullPath: '/v1/account_links' }) });";
+        assert_eq!(
+            super::classify_oauth_account_fusion_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn oauth_account_fusion_python_no_check_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:oauth_account_fusion_pretakeover".to_string(),
+            file: Some("server/app/auth/oauth_auth.py".to_string()),
+            ..Default::default()
+        };
+        let source = "def oauth_callback():\n    code = request.args.get('code')\n    token = _fetch_access_token(code)\n    user = get_or_create_user(token)\n    login_user(user)\n";
+        assert_eq!(
+            super::classify_oauth_account_fusion_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn oauth_account_fusion_python_with_check_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_account_fusion_pretakeover".to_string(),
+            file: Some("server/app/auth/oauth_auth.py".to_string()),
+            ..Default::default()
+        };
+        let source = "def oauth_callback():\n    code = request.args.get('code')\n    token = _fetch_access_token(code)\n    if not token.get('email_verified'):\n        abort(403)\n    user = get_or_create_user(token)\n    login_user(user)\n";
+        assert_eq!(
+            super::classify_oauth_account_fusion_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    // --- protobuf_any classifier tests ---
+
+    #[test]
+    fn protobuf_any_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("vault/identity/mock/store_test.go".to_string()),
+            ..Default::default()
+        };
+        let source = "ptypes.UnmarshalAny(entity.Metadata, &meta)";
+        assert_eq!(
+            super::classify_protobuf_any_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn protobuf_any_deprecated_api_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("vault/identity_store.go".to_string()),
+            ..Default::default()
+        };
+        let source = "if err := ptypes.UnmarshalAny(entity.Metadata, &meta); err != nil { return err }";
+        assert_eq!(
+            super::classify_protobuf_any_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn protobuf_any_modern_with_type_check_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:protobuf_any_unguarded_decode".to_string(),
+            file: Some("api/types/role.go".to_string()),
+            ..Default::default()
+        };
+        let source = "if msg.TypeUrl != allowedTypeURL { return ErrInvalidType }\nanypb.UnmarshalTo(msg, proto.MessageV2(out), proto.UnmarshalOptions{})";
+        assert_eq!(
+            super::classify_protobuf_any_proof(source, &finding),
+            ProofClass::InvariantViolationProof
         );
     }
 }

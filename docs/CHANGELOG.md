@@ -3,6 +3,19 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-20 — Sprint 153: oauth_account_fusion + protobuf_any Proof Cures + Auth0/Kong/Keycloak Sweep + Vault Timing PoC
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `oauth_account_fusion_is_missing_email_guard` + `classify_oauth_account_fusion_proof` (TypeScript SDK files → LatticeGapProposal; .py/.go/.rb/.java with `email_verified` → InvariantViolationProof; without → ReachabilityProof). **Phase 2**: `protobuf_any_is_unguarded` + `classify_protobuf_any_proof` (test/mock/fixture → InvariantViolationProof; `ptypes.UnmarshalAny`/`proto.UnmarshalAny` → ReachabilityProof; modern `anypb.UnmarshalTo` with typeURL → InvariantViolationProof; without → ReachabilityProof). 6 deterministic tests (3 per classifier).
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification`: `oauth_account_fusion` and `protobuf_any_unguarded_decode` branches wired after `oauth_missing_state_validation`.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `compliance_oracle_kani` gains 2 Kani harnesses (`classify_oauth_account_fusion_no_panic`, `classify_protobuf_any_no_panic`); `tests` module gains 2 regression tests (`oauth_account_fusion_email_guard_missing_is_exact_conjunction`, `protobuf_any_unguarded_is_exact_conjunction`) + updated imports.
+* `.INNOVATION_LOG.md` *(modified)* — Hard-deleted P17-3A `oauth_account_fusion_pretakeover` block.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — Vault `protobuf_any_unguarded_decode` upgraded 30%→50% (`ptypes.UnmarshalAny` at identity_store.go:1172,1188,1194,1271,1289 confirmed `reachability_proof` on re-hunt). Added 2 new CANDIDATE rows: keycloak `non_constant_time_comparison` Argon2 `encoded.equals()` (25%), Kong `swarm_context_exfiltration` LLM driver (30%).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 14 new LOW_YIELD rows: auth0-node (2 oauth+3 config), Kong (26 test fixture creds + 2 doc-comment creds + 7 command/unpinned/curl/protobuf), keycloak (29 oauth_account_fusion + 9 ssrf/sqli + 2 ECDH-name FP + 6 model/proto), vault AppRole timing PoC result (0.598ms delta < 5ms threshold).
+* **Phase 4**: Vault AppRole timing PoC — Docker loopback N=200; valid=1.796ms±3.4ms; invalid=1.198ms±0.7ms; delta=0.598ms; sigma=3.4. Below 5ms threshold → retained at CANDIDATE 35%. Re-run on Unix socket required for promotion.
+* **Phase 5**: `frontend_state.rs` Oracle audit — 10 `.clone()` calls, all mandatory (HashMap `entry()` API; `enclosing_function()` returns `String`). No actionable fix < 50 LOC. Reported for Sprint 154.
+
+**Verification**: `cargo test -p forge -j2 -- --test-threads=2` → 1248 passed ✓ | 2 Kani harnesses in compliance_oracle_kani ✓ | vault re-hunt: identity_store.go 6 sites `reachability_proof` ✓ | stripe-node re-hunt: 38 TypeScript SDK findings `lattice_gap_proposal` ✓ | 3-org hunt sweep complete ✓
+
 ## 2026-05-20 — Sprint 152: lcm_off_by_one_loop + OAuth State Proof Cures + Hunt Sweep + Platform Gate + XSS PoC
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `lcm_off_by_one_loop_is_exploitable` + `classify_lcm_off_by_one_loop_proof` (±5-line assert/bounds-check → InvariantViolationProof; test/bench path → InvariantViolationProof; ±10-line C export → ReachabilityProof). **Phase 2**: `oauth_state_validation_is_missing` + `classify_oauth_state_validation_proof` (.ts/.js → LatticeGapProposal; .py/.go/.rb/.java with state check → InvariantViolationProof; no state check → ReachabilityProof). 6 deterministic tests added (3 per classifier).
