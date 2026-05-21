@@ -485,41 +485,117 @@ pub fn classify_lcm_off_by_one_loop_proof(source: &str, finding: &StructuredFind
 
 /// Pure boolean predicate for Kani verification of OAuth state-validation proof logic.
 ///
-/// Returns `true` when the callback is server-side AND no state check is present.
-pub fn oauth_state_validation_is_missing(is_server_side: bool, has_state_check: bool) -> bool {
-    is_server_side && !has_state_check
+/// Returns `true` when a browser callback is visible, no state check is present,
+/// and the path is not a known non-callback OAuth context.
+pub fn oauth_state_validation_is_missing(
+    has_browser_callback: bool,
+    has_state_check: bool,
+    in_non_callback_context: bool,
+) -> bool {
+    has_browser_callback && !has_state_check && !in_non_callback_context
 }
 
 /// Classify proof class for `security:oauth_missing_state_validation` findings.
 ///
-/// 1. Non-server-side file (TypeScript/JavaScript) → `LatticeGapProposal` (client-side
-///    CSRF is not a real SSRF/CSRF surface without an SSR path).
-/// 2. Server-side file (Python/Go/Ruby/Java) with a visible state-check → `InvariantViolationProof` (suppress).
-/// 3. Server-side file with NO state check → `ReachabilityProof`.
+/// 1. Test/script/generated/migration/token/provider/storage context →
+///    `InvariantViolationProof` (suppress).
+/// 2. Non-server-side file → `LatticeGapProposal` (client-only code exchange
+///    is not a server-side OAuth callback without an SSR route proof).
+/// 3. Server-side browser callback with a visible state check →
+///    `InvariantViolationProof` (suppress).
+/// 4. Server-side browser callback with NO state check → `ReachabilityProof`.
+/// 5. Server-side code exchange without a callback marker → `LatticeGapProposal`.
 pub fn classify_oauth_state_validation_proof(
     source: &str,
     finding: &StructuredFinding,
 ) -> ProofClass {
+    let path = finding.file.as_deref().unwrap_or_default();
+    let path_lower = path.to_ascii_lowercase();
+    let in_non_callback_context = path_lower.contains("test")
+        || path_lower.contains("scripts/")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("generated")
+        || path_lower.contains("migrations/")
+        || path_lower.contains("migration")
+        || path_lower.contains("/token")
+        || path_lower.contains("tokenapi")
+        || path_lower.contains("token_api")
+        || path_lower.contains("token_")
+        || path_lower.contains("token-")
+        || path_lower.contains("token.")
+        || path_lower.contains("provider")
+        || path_lower.contains("/client")
+        || path_lower.contains("sdk")
+        || path_lower.contains("storage")
+        || path_lower.contains("/model")
+        || path_lower.contains("/models");
+    if in_non_callback_context {
+        return ProofClass::InvariantViolationProof;
+    }
+
     let is_server_side = finding
         .file
         .as_deref()
         .map(|p| {
-            p.ends_with(".py") || p.ends_with(".go") || p.ends_with(".rb") || p.ends_with(".java")
+            p.ends_with(".py")
+                || p.ends_with(".go")
+                || p.ends_with(".rb")
+                || p.ends_with(".java")
+                || p.ends_with(".php")
+                || p.ends_with(".kt")
         })
         .unwrap_or(false);
     if !is_server_side {
         return ProofClass::LatticeGapProposal;
     }
-    let has_state_check = source.contains("session.get(\"oauth_state\")")
-        || source.contains("session.get('oauth_state')")
-        || source.contains("state_parameter")
-        || source.contains("verify_state(")
-        || source.contains("oauth_state")
-        || source.contains("state == session");
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_browser_callback = source_lower.contains("request.args.get(\"code\")")
+        || source_lower.contains("request.args.get('code')")
+        || source_lower.contains("request.values.get(\"code\")")
+        || source_lower.contains("request.values.get('code')")
+        || source_lower.contains("request.getparameter(\"code\")")
+        || source_lower.contains("getparameter(\"code\")")
+        || source_lower.contains("r.url.query().get(\"code\")")
+        || source_lower.contains(".url.query().get(\"code\")")
+        || source_lower.contains("query().get(\"code\")")
+        || source_lower.contains("query.get(\"code\")")
+        || source_lower.contains("query.get('code')")
+        || source_lower.contains("params[:code]")
+        || source_lower.contains("params[\"code\"]")
+        || source_lower.contains("params['code']");
+    let has_session_state_binding = (source_lower.contains("session")
+        || source_lower.contains("cookie")
+        || source_lower.contains("csrf")
+        || source_lower.contains("nonce"))
+        && source_lower.contains("state")
+        && (source_lower.contains("==")
+            || source_lower.contains("!=")
+            || source_lower.contains(".equals(")
+            || source_lower.contains("compare_digest")
+            || source_lower.contains("secure_compare"));
+    let has_state_check = source_lower.contains("session.get(\"oauth_state\")")
+        || source_lower.contains("session.get('oauth_state')")
+        || source_lower.contains("state_parameter")
+        || source_lower.contains("verify_state(")
+        || source_lower.contains("validate_state(")
+        || source_lower.contains("check_state(")
+        || source_lower.contains("oauth_state")
+        || source_lower.contains("csrf_token")
+        || source_lower.contains("request_verifier")
+        || source_lower.contains("pkce_verifier")
+        || has_session_state_binding;
     if has_state_check {
         ProofClass::InvariantViolationProof
-    } else {
+    } else if oauth_state_validation_is_missing(
+        has_browser_callback,
+        has_state_check,
+        in_non_callback_context,
+    ) {
         ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
     }
 }
 
@@ -830,6 +906,70 @@ pub fn classify_debug_endpoint_proof(source: &str, finding: &StructuredFinding) 
         || source.contains("/internal/")
         || source.contains("/admin/");
     if debug_endpoint_is_unguarded(has_debug_surface, has_auth_guard) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when SAML/XML parsing is visible without XXE hardening.
+pub fn xxe_saml_parser_is_unguarded(
+    has_saml_xml_parser: bool,
+    has_xxe_hardening: bool,
+    in_test_path: bool,
+) -> bool {
+    has_saml_xml_parser && !has_xxe_hardening && !in_test_path
+}
+
+/// Classifies a `security:xxe_saml_parser` finding into a `ProofClass`.
+///
+/// - Test/mock/fixture path -> `InvariantViolationProof` (suppress)
+/// - Parser hardening marker -> `InvariantViolationProof` (suppress)
+/// - SAML/XML parser marker without hardening -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_xxe_saml_parser_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec");
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_xxe_hardening = source_lower.contains("disallow-doctype-decl")
+        || source_lower.contains("external-general-entities")
+        || source_lower.contains("external-parameter-entities")
+        || source_lower.contains("load-external-dtd")
+        || source_lower.contains("feature_secure_processing")
+        || source_lower.contains("resolveentities:false")
+        || source_lower.contains("resolve_entities=false")
+        || source_lower.contains("no_network=true")
+        || source_lower.contains("disable_external_entities")
+        || source_lower.contains("forbid_dtd")
+        || source_lower.contains("defusedxml");
+    if has_xxe_hardening {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_saml = source_lower.contains("saml")
+        || source_lower.contains("samlresponse")
+        || source_lower.contains("assertion")
+        || source_lower.contains("urn:oasis:names:tc:saml");
+    let has_xml_parser = source_lower.contains("xmldom")
+        || source_lower.contains("xml2js")
+        || source_lower.contains("documentbuilderfactory.newinstance(")
+        || source_lower.contains("saxparserfactory.newinstance(")
+        || source_lower.contains("lxml.etree.fromstring")
+        || source_lower.contains("xml.etree.elementtree.fromstring")
+        || source_lower.contains("xml.dom.minidom.parse")
+        || source_lower.contains("xml.newdecoder(");
+    if xxe_saml_parser_is_unguarded(has_saml && has_xml_parser, has_xxe_hardening, in_test_path) {
         ProofClass::ReachabilityProof
     } else {
         ProofClass::LatticeGapProposal
@@ -1295,7 +1435,7 @@ mod tests {
     fn oauth_state_client_side_typescript_yields_lattice_gap() {
         let finding = StructuredFinding {
             id: "security:oauth_missing_state_validation".to_string(),
-            file: Some("lib/oidc/endpoints/token.ts".to_string()),
+            file: Some("lib/oidc/callback.ts".to_string()),
             line: Some(34),
             ..Default::default()
         };
@@ -1303,6 +1443,53 @@ mod tests {
         assert_eq!(
             super::classify_oauth_state_validation_proof(source, &finding),
             ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn oauth_state_hydra_fosite_token_handler_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("fosite/handler/oauth2/token_handler.go".to_string()),
+            line: Some(42),
+            ..Default::default()
+        };
+        let source = "func HandleToken(r *http.Request) {\n    grant := r.FormValue(\"grant_type\")\n    code := r.FormValue(\"code\")\n    _ = grant\n    _ = code\n}";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_state_supertokens_oauth_token_api_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some(
+                "src/main/java/io/supertokens/webserver/api/oauth/OAuthTokenAPI.java".to_string(),
+            ),
+            line: Some(77),
+            ..Default::default()
+        };
+        let source = "class OAuthTokenAPI { void handle(Request request) { String code = request.getParameter(\"code\"); } }";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_state_authentik_generated_migration_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("authentik/providers/oauth2/migrations/0001_generated.py".to_string()),
+            line: Some(12),
+            ..Default::default()
+        };
+        let source = "class Migration(migrations.Migration):\n    field = models.CharField(default='authorization_code')\n";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
         );
     }
 
@@ -1561,6 +1748,48 @@ mod tests {
         let source = "router.get('/internal/metrics', metrics_handler);";
         assert_eq!(
             super::classify_debug_endpoint_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn xxe_saml_parser_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:xxe_saml_parser".to_string(),
+            file: Some("internal/idp/providers/saml/saml_test.go".to_string()),
+            ..Default::default()
+        };
+        let source = "func TestSAML(t *testing.T) { xml.NewDecoder(bytes.NewReader(assertion)) }";
+        assert_eq!(
+            super::classify_xxe_saml_parser_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn xxe_saml_parser_hardened_java_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:xxe_saml_parser".to_string(),
+            file: Some("src/main/java/idp/SamlParser.java".to_string()),
+            ..Default::default()
+        };
+        let source = "DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();\nf.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);\nparseSamlAssertion(f);";
+        assert_eq!(
+            super::classify_xxe_saml_parser_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn xxe_saml_parser_unguarded_go_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:xxe_saml_parser".to_string(),
+            file: Some("internal/idp/providers/saml/saml.go".to_string()),
+            ..Default::default()
+        };
+        let source = "func ParseSAMLResponse(body io.Reader) { decoder := xml.NewDecoder(body); var assertion Assertion; decoder.Decode(&assertion) }";
+        assert_eq!(
+            super::classify_xxe_saml_parser_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

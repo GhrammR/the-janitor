@@ -36,7 +36,7 @@ mod kani_proofs {
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
         debug_endpoint_is_unguarded, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, proof_obligation_missing,
+        intent_divergence_is_reachable, proof_obligation_missing, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -207,6 +207,21 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the XXE SAML parser predicate is exact:
+    /// it fires iff a SAML XML parser is visible, hardening is absent, and path is not test-only.
+    #[kani::proof]
+    fn xxe_saml_parser_unguarded_is_exact_conjunction() {
+        let has_saml_xml_parser: bool = kani::any();
+        let has_xxe_hardening: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let fired =
+            xxe_saml_parser_is_unguarded(has_saml_xml_parser, has_xxe_hardening, in_test_path);
+        kani::assert(
+            fired == (has_saml_xml_parser && !has_xxe_hardening && !in_test_path),
+            "XXE SAML parser predicate must be exact conjunction",
+        );
+    }
+
     /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
     /// fires iff a decoder is present AND an allowlist suppressor is absent.
     #[kani::proof]
@@ -352,7 +367,7 @@ mod tests {
         lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
         oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
         proof_obligation_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
-        sqli_concat_is_injectable,
+        sqli_concat_is_injectable, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -542,10 +557,19 @@ mod tests {
 
     #[test]
     fn oauth_state_validation_missing_is_exact_conjunction() {
-        assert!(oauth_state_validation_is_missing(true, false));
-        assert!(!oauth_state_validation_is_missing(false, false));
-        assert!(!oauth_state_validation_is_missing(true, true));
-        assert!(!oauth_state_validation_is_missing(false, true));
+        assert!(oauth_state_validation_is_missing(true, false, false));
+        assert!(!oauth_state_validation_is_missing(false, false, false));
+        assert!(!oauth_state_validation_is_missing(true, true, false));
+        assert!(!oauth_state_validation_is_missing(false, true, false));
+        assert!(!oauth_state_validation_is_missing(true, false, true));
+    }
+
+    #[test]
+    fn xxe_saml_parser_unguarded_requires_parser_and_missing_hardening() {
+        assert!(xxe_saml_parser_is_unguarded(true, false, false));
+        assert!(!xxe_saml_parser_is_unguarded(false, false, false));
+        assert!(!xxe_saml_parser_is_unguarded(true, true, false));
+        assert!(!xxe_saml_parser_is_unguarded(true, false, true));
     }
 
     #[test]
@@ -686,7 +710,7 @@ mod compliance_oracle_kani {
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
-        sqli_concat_is_injectable, timing_comparison_is_sensitive,
+        sqli_concat_is_injectable, timing_comparison_is_sensitive, xxe_saml_parser_is_unguarded,
     };
     use common::slop::StructuredFinding;
 
@@ -776,15 +800,35 @@ mod compliance_oracle_kani {
     }
 
     /// Prove `oauth_state_validation_is_missing` is the exact conjunction
-    /// of server-side flag and absence of state check.
+    /// of browser-callback marker, absence of state check, and non-callback context absence.
     #[kani::proof]
     fn classify_oauth_state_validation_no_panic() {
-        let is_server_side: bool = kani::any();
+        let has_browser_callback: bool = kani::any();
         let has_state_check: bool = kani::any();
-        let result = oauth_state_validation_is_missing(is_server_side, has_state_check);
+        let in_non_callback_context: bool = kani::any();
+        let result = oauth_state_validation_is_missing(
+            has_browser_callback,
+            has_state_check,
+            in_non_callback_context,
+        );
         kani::assert(
-            result == (is_server_side && !has_state_check),
+            result == (has_browser_callback && !has_state_check && !in_non_callback_context),
             "oauth state validation missing must be exact conjunction",
+        );
+    }
+
+    /// Prove `xxe_saml_parser_is_unguarded` is the exact conjunction of
+    /// SAML parser visibility, missing XXE hardening, and production path.
+    #[kani::proof]
+    fn classify_xxe_saml_parser_no_panic() {
+        let has_saml_xml_parser: bool = kani::any();
+        let has_xxe_hardening: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result =
+            xxe_saml_parser_is_unguarded(has_saml_xml_parser, has_xxe_hardening, in_test_path);
+        kani::assert(
+            result == (has_saml_xml_parser && !has_xxe_hardening && !in_test_path),
+            "xxe SAML parser guard must be exact conjunction",
         );
     }
 

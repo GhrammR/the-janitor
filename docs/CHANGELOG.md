@@ -3,6 +3,16 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 157: OAuth Context Gate + XXE SAML Proof Cure + Hunt Sweep
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `classify_oauth_state_validation_proof` now requires a real browser callback marker plus missing session-bound state comparison before emitting `ReachabilityProof`; token/provider/generated/migration/storage/test/script paths suppress as `InvariantViolationProof`. Added Hydra/Fosite, SuperTokens `OAuthTokenAPI.java`, and Authentik generated-migration fixtures. Added `xxe_saml_parser_is_unguarded` + `classify_xxe_saml_parser_proof` with test-path and XXE-hardening suppression.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:xxe_saml_parser` through the proof classifier.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Kani harnesses and deterministic tests updated for the stricter OAuth callback predicate and new XXE SAML parser predicate.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3B OAuth callback context gate and P17-3A `security:xxe_saml_parser` blocks hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — Sprint 157 hunt sweep rows added for Chainlink and Immutable SDK. Uniswap v3-periphery produced zero findings.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 62 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` → 27 passed; `cargo test -p cli -- hunt --test-threads=2` → 89 passed; target sweep complete (`Uniswap/v3-periphery` 0 findings, `smartcontractkit/chainlink` 62 Informational, `immutable/ts-immutable-sdk` 121 Informational).
+
 ## 2026-05-21 — Sprint 156: Debug Endpoint Proof Cure + JWT Guard + Hunt Sweep
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — `debug_endpoint_is_unguarded` + `classify_debug_endpoint_proof`: test/script/dev-server paths and auth/middleware markers suppress as `InvariantViolationProof`; unguarded `debug`/`pprof`/`metrics`/`/internal/`/`/admin/` surfaces emit `ReachabilityProof`. 3 deterministic classifier tests added.
