@@ -291,15 +291,10 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
         return ProofClass::ReachabilityProof;
     }
     // Go: bytes.Equal on secret material without a constant-time guard.
+    // Narrow to bytes.Equal only — broad == + keyword checks FP on algorithm
+    // name constants (e.g., zitadel passwap.go HashNameArgon2 = "argon2").
     if !in_test_path {
-        let has_go_timing_sink = source.contains("bytes.Equal(")
-            || (source.contains("==")
-                && (source.contains("password")
-                    || source.contains("secret")
-                    || source.contains("token")
-                    || source.contains("key")
-                    || source.contains("hash")
-                    || source.contains("digest")));
+        let has_go_timing_sink = source.contains("bytes.Equal(");
         let has_go_constant_time_guard = source.contains("subtle.ConstantTimeCompare(")
             || source.contains("hmac.Equal(")
             || source.contains("subtle.ConstantTimeByteEq(");

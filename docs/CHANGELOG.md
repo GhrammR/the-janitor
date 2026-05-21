@@ -3,6 +3,20 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-20 — Sprint 155: react_xss + Go Timing FP Fix + SARIF Upload + Timestamped Submissions + Hunt Sweep (oauth2-proxy/casdoor/zitadel)
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `react_xss_is_unguarded` + `classify_react_xss_proof` (DOMPurify/sanitizeHtml/xss() guard → InvariantViolationProof; test path → InvariantViolationProof; dangerouslySetInnerHTML + user-input props → ReachabilityProof). **Phase 2 (Go timing)**: `classify_timing_comparison_proof` extended with Go-specific `bytes.Equal(` check (no `subtle.ConstantTimeCompare`/`hmac.Equal` guard → ReachabilityProof). **Sprint 155 FP fix**: `has_go_timing_sink` narrowed from broad `== + hash/key/token/secret/digest` keyword check to `source.contains("bytes.Equal(")` only — eradicates FP on algorithm-name constant files (zitadel `passwap.go`, keycloak ECDH-ES). 53 proof_obligation tests pass.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `compliance_oracle_kani`: `react_xss_unguarded_is_exact_conjunction` Kani harness added; `tests`: regression test `react_xss_unguarded_is_exact_conjunction` added. 25 reflexive_assurance tests pass.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification`: `react_xss_dangerous_html` branch wired (reads source, calls `classify_react_xss_proof`, InvariantViolationProof → suppress). Hot-path clone elimination: `report.clone()` at line 246 → move; `rule_id.clone()` at lines 3971+4452 → `.to_string()`.
+* `crates/cli/src/submit_formatter.rs` *(modified)* — **Phase 5**: `write_submissions` now names output files `{unix_secs}_{program_slug}_SUBMISSION_{rule_id}.md` (collision-free, sortable). `std::time::SystemTime` used (chrono not in cli deps). 2 existing tests updated to `read_dir` + pattern match.
+* `.github/workflows/registry-watch.yml` *(modified)* — **Phase 4**: `security-events: write` permission added; `github/codeql-action/upload-sarif@v3` step appended to upload `rw_report.sarif` to GitHub Security tab on every run.
+* `tools/campaign/SPRINT_OUTCOMES.md` *(created)* — **Phase 0**: Empirical sprint outcome tracker. Sprint 151–155 seeded.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — 5 new CANDIDATE rows: oauth2-proxy `jwt_validation_bypass` (30%), oauth2-proxy `ssrf_dynamic_url` (20%), casdoor `react_xss_dangerous_html` ×30 (40%), casdoor `jwt_validation_bypass` ×4 (40%), zitadel `oauth_account_fusion_pretakeover` ×3 (10%).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 16 new LOW_YIELD rows: oauth2-proxy unpinned_asset×3 + oauth_missing_state×5; casdoor non_constant_time×12 + ssrf×263 + oauth_missing_state×35; zitadel non_constant_time×23 (FP fix) + oauth_missing_state×9 + ssrf×2 + config_taint×11 + protobuf_any×4 + credential_leak×1 + model_weight×2 + debug_endpoint×2 + dom_xss×1 + tls_bypass×1 + clock_skew+sql_migration×3.
+* `.INNOVATION_LOG.md` *(modified)* — Hard-deleted two P17-3A blocks: `react_xss_dangerous_html` and `non_constant_time_comparison`.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 53 passed ✓ | 3-org hunt sweep complete (oauth2-proxy 11 findings, casdoor 393, zitadel 67) ✓ | Go timing FP eradicated (23 passwap.go findings eliminated post-fix) ✓
+
 ## 2026-05-20 — Sprint 153: oauth_account_fusion + protobuf_any Proof Cures + Auth0/Kong/Keycloak Sweep + Vault Timing PoC
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `oauth_account_fusion_is_missing_email_guard` + `classify_oauth_account_fusion_proof` (TypeScript SDK files → LatticeGapProposal; .py/.go/.rb/.java with `email_verified` → InvariantViolationProof; without → ReachabilityProof). **Phase 2**: `protobuf_any_is_unguarded` + `classify_protobuf_any_proof` (test/mock/fixture → InvariantViolationProof; `ptypes.UnmarshalAny`/`proto.UnmarshalAny` → ReachabilityProof; modern `anypb.UnmarshalTo` with typeURL → InvariantViolationProof; without → ReachabilityProof). 6 deterministic tests (3 per classifier).
