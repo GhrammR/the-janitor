@@ -288,10 +288,26 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
         || source.contains("PasswordHash")
         || source.contains("passwordHash");
     if timing_comparison_is_sensitive(has_secret_marker, in_test_path) {
-        ProofClass::ReachabilityProof
-    } else {
-        ProofClass::LatticeGapProposal
+        return ProofClass::ReachabilityProof;
     }
+    // Go: bytes.Equal on secret material without a constant-time guard.
+    if !in_test_path {
+        let has_go_timing_sink = source.contains("bytes.Equal(")
+            || (source.contains("==")
+                && (source.contains("password")
+                    || source.contains("secret")
+                    || source.contains("token")
+                    || source.contains("key")
+                    || source.contains("hash")
+                    || source.contains("digest")));
+        let has_go_constant_time_guard = source.contains("subtle.ConstantTimeCompare(")
+            || source.contains("hmac.Equal(")
+            || source.contains("subtle.ConstantTimeByteEq(");
+        if has_go_timing_sink && !has_go_constant_time_guard {
+            return ProofClass::ReachabilityProof;
+        }
+    }
+    ProofClass::LatticeGapProposal
 }
 
 /// Pure boolean predicate for Kani verification of use-after-free proof logic.
@@ -721,6 +737,58 @@ pub fn classify_financial_pii_proof(source: &str, finding: &StructuredFinding) -
         || source.contains("ws.WriteMessage(")
         || source.contains("sendToLLM");
     if has_pii && has_llm_sink {
+        return ProofClass::ReachabilityProof;
+    }
+    ProofClass::LatticeGapProposal
+}
+
+/// Returns `true` when a React XSS finding is genuinely unguarded:
+/// `dangerouslySetInnerHTML` present and NOT sanitized.
+pub fn react_xss_is_unguarded(has_dangerous_html: bool, has_sanitizer: bool) -> bool {
+    has_dangerous_html && !has_sanitizer
+}
+
+/// Classifies a `security:react_xss_dangerous_html` finding into a `ProofClass`.
+///
+/// - Test/spec file path → `InvariantViolationProof` (suppress)
+/// - Sanitizer present (DOMPurify, sanitizeHtml, etc.) → `InvariantViolationProof` (suppress)
+/// - `dangerouslySetInnerHTML` / `innerHTML` sink + user-input indicator → `ReachabilityProof`
+/// - Otherwise → `LatticeGapProposal`
+pub fn classify_react_xss_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("__tests__")
+                || p.contains(".spec.")
+                || p.contains(".test.")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+    let has_sanitizer = source.contains("DOMPurify.sanitize(")
+        || source.contains("sanitizeHtml(")
+        || source.contains("purify.sanitize(")
+        || source.contains("escapeHtml(")
+        || source.contains("stripHtml(")
+        || source.contains("xss(")
+        || source.contains("sanitize(");
+    if has_sanitizer {
+        return ProofClass::InvariantViolationProof;
+    }
+    let has_dangerous_html = source.contains("dangerouslySetInnerHTML")
+        || source.contains("innerHTML =")
+        || source.contains("__html:");
+    let has_user_input = source.contains("props.")
+        || source.contains("state.")
+        || source.contains("useState")
+        || source.contains("useSelector")
+        || source.contains("message")
+        || source.contains("content")
+        || source.contains("body");
+    if has_dangerous_html && has_user_input {
         return ProofClass::ReachabilityProof;
     }
     ProofClass::LatticeGapProposal
@@ -1362,6 +1430,80 @@ mod tests {
         let source = r#"rows, err := db.Prepare("SELECT * FROM users WHERE id = $1")"#;
         assert_eq!(
             super::classify_sqli_concatenation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn react_xss_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:react_xss_dangerous_html".to_string(),
+            file: Some("webapp/channels/src/components/__tests__/latex_block.test.tsx".to_string()),
+            ..Default::default()
+        };
+        let source = "el.dangerouslySetInnerHTML({ __html: props.content })";
+        assert_eq!(
+            super::classify_react_xss_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn react_xss_dompurify_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:react_xss_dangerous_html".to_string(),
+            file: Some("webapp/channels/src/components/latex_block/latex_block.tsx".to_string()),
+            ..Default::default()
+        };
+        let source = "const safe = DOMPurify.sanitize(props.content);\nel.dangerouslySetInnerHTML({ __html: safe })";
+        assert_eq!(
+            super::classify_react_xss_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn react_xss_unguarded_prop_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:react_xss_dangerous_html".to_string(),
+            file: Some("webapp/channels/src/components/post/post_body.tsx".to_string()),
+            ..Default::default()
+        };
+        let source = "return <div dangerouslySetInnerHTML={{ __html: props.content }} />;";
+        assert_eq!(
+            super::classify_react_xss_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn go_bytes_equal_without_subtle_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("server/channels/app/user.go".to_string()),
+            line: Some(1669),
+            ..Default::default()
+        };
+        let source =
+            "func (a *App) CheckPasswordAndAllCriteria(user *model.User, password string) *model.AppError {\n    if !bytes.Equal([]byte(user.Password), []byte(password)) {\n        return model.NewAppError()\n    }\n}";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn go_bytes_equal_with_subtle_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some("server/channels/app/user.go".to_string()),
+            line: Some(1669),
+            ..Default::default()
+        };
+        let source =
+            "func (a *App) CheckPasswordAndAllCriteria(user *model.User, password string) *model.AppError {\n    if subtle.ConstantTimeCompare([]byte(user.Password), []byte(password)) != 1 {\n        return model.NewAppError()\n    }\n}";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
             ProofClass::InvariantViolationProof
         );
     }

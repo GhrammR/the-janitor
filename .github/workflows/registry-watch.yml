@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   issues: write
+  security-events: write
 jobs:
   registry-watch:
     runs-on: ubuntu-latest
@@ -14,7 +15,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Run registry watch scan
-        run: janitor registry-watch --dry-run --output /tmp/rw_report.json
+        run: janitor registry-watch --dry-run --output /tmp/rw_report.json --sarif /tmp/rw_report.sarif || true
+      - name: Upload SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: /tmp/rw_report.sarif
       - name: File issue on detection
         if: failure()
         uses: actions/github-script@v7

@@ -338,7 +338,7 @@ mod tests {
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
-        sqli_concat_is_injectable,
+        react_xss_is_unguarded, sqli_concat_is_injectable,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -557,6 +557,14 @@ mod tests {
         assert!(!financial_pii_is_unguarded(true, true));
         assert!(!financial_pii_is_unguarded(false, true));
     }
+
+    #[test]
+    fn react_xss_unguarded_is_exact_conjunction() {
+        assert!(react_xss_is_unguarded(true, false));
+        assert!(!react_xss_is_unguarded(false, false));
+        assert!(!react_xss_is_unguarded(true, true));
+        assert!(!react_xss_is_unguarded(false, true));
+    }
 }
 
 // ── binary_diff Kani proofs ───────────────────────────────────────────────
@@ -656,7 +664,7 @@ mod compliance_oracle_kani {
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, protobuf_any_is_unguarded,
-        sqli_concat_is_injectable, timing_comparison_is_sensitive,
+        react_xss_is_unguarded, sqli_concat_is_injectable, timing_comparison_is_sensitive,
     };
     use common::slop::StructuredFinding;
 
@@ -804,6 +812,19 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (has_sink && !has_mask),
             "financial_pii guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `react_xss_is_unguarded` is the exact conjunction of
+    /// dangerous-html presence and absence of a sanitizer.
+    #[kani::proof]
+    fn react_xss_unguarded_is_exact_conjunction() {
+        let has_dangerous: bool = kani::any();
+        let has_sanitizer: bool = kani::any();
+        let result = react_xss_is_unguarded(has_dangerous, has_sanitizer);
+        kani::assert(
+            result == (has_dangerous && !has_sanitizer),
+            "react_xss guard must be exact conjunction",
         );
     }
 }

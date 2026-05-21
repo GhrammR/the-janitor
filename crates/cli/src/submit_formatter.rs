@@ -233,7 +233,12 @@ pub fn write_submissions(
             continue;
         }
         let safe_id = finding.finding.id.replace([':', '/'], "_");
-        let filename = format!("SUBMISSION_{safe_id}.md");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let safe_prog = program_name.replace(['/', '\\', ':', ' '], "_");
+        let filename = format!("{ts}_{safe_prog}_SUBMISSION_{safe_id}.md");
         let dest = output_dir.join(&filename);
         let content = generate_bugcrowd_submission_package(finding, program_name);
         std::fs::write(&dest, content.as_bytes())
@@ -789,12 +794,15 @@ mod tests {
         let annotated = vec![(finding, verdict)];
         let count = write_submissions(&annotated, dir.path(), "test_program").unwrap();
         assert_eq!(count, 1, "in-scope finding with repro must produce 1 file");
-        let expected = dir
-            .path()
-            .join(".janitor")
-            .join("hunt_reports")
-            .join("SUBMISSION_security_rce.md");
-        assert!(expected.exists(), "SUBMISSION file must be created");
+        let reports_dir = dir.path().join(".janitor").join("hunt_reports");
+        let found = std::fs::read_dir(&reports_dir)
+            .unwrap()
+            .flatten()
+            .any(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.contains("SUBMISSION_security_rce") && name.ends_with(".md")
+            });
+        assert!(found, "SUBMISSION file must be created");
     }
 
     #[test]
@@ -829,12 +837,16 @@ mod tests {
             count, 1,
             "same structural finding class must produce one Bugcrowd submission"
         );
-        let expected = dir
-            .path()
-            .join(".janitor")
-            .join("hunt_reports")
-            .join("SUBMISSION_security_rce.md");
-        let content = std::fs::read_to_string(expected).unwrap();
+        let reports_dir = dir.path().join(".janitor").join("hunt_reports");
+        let submission = std::fs::read_dir(&reports_dir)
+            .unwrap()
+            .flatten()
+            .find(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.contains("SUBMISSION_security_rce") && name.ends_with(".md")
+            })
+            .expect("SUBMISSION file must be created");
+        let content = std::fs::read_to_string(submission.path()).unwrap();
         assert!(content.contains("`src/a.py`"));
         assert!(content.contains("`src/b.py`"));
     }

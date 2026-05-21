@@ -243,7 +243,7 @@ pub fn cmd_hunt(args: HuntArgs<'_>) -> anyhow::Result<()> {
             let submission = common::receipt::BountySubmission {
                 title: format!("{top_rule} findings in {target_label}"),
                 target: target_label.to_string(),
-                markdown_body: report.clone(),
+                markdown_body: report,
                 custom_field_vrt: findings
                     .first()
                     .map(|f| vrt_category(&f.id))
@@ -3238,6 +3238,17 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("react_xss_dangerous_html") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_react_xss_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         }
         true
     });
@@ -3968,7 +3979,7 @@ fn scan_buffer(
                 || rule_id.contains("flash_loan_callback")
                 || rule_id == "security:react_xss_dangerous_html";
             let mut structured = StructuredFinding {
-                id: rule_id.clone(),
+                id: rule_id.to_string(),
                 file: Some(label.to_string()),
                 line: Some(line),
                 fingerprint: fingerprint_finding(source, finding.start_byte, finding.end_byte),
@@ -4449,7 +4460,7 @@ fn scan_buffer(
             let line = byte_to_line(source, f.start_byte);
             let rule_id = extract_rule_id(&f.description);
             let mut structured = StructuredFinding {
-                id: rule_id.clone(),
+                id: rule_id.to_string(),
                 file: Some(label.to_string()),
                 line: Some(line),
                 fingerprint: fingerprint_finding(source, f.start_byte, f.end_byte),
