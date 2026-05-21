@@ -11,19 +11,19 @@ jobs:
   registry-watch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
       - name: Run registry watch scan
         run: janitor registry-watch --dry-run --output /tmp/rw_report.json --sarif /tmp/rw_report.sarif || true
       - name: Upload SARIF to Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@78ed0c7291d93e40c51b085850dc669a4c3ab73b # v3
         if: always()
         with:
           sarif_file: /tmp/rw_report.sarif
       - name: File issue on detection
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             github.rest.issues.create({

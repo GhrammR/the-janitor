@@ -35,7 +35,8 @@ mod kani_proofs {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        ffi_deref_guard_classification, intent_divergence_is_reachable, proof_obligation_missing,
+        debug_endpoint_is_unguarded, ffi_deref_guard_classification,
+        intent_divergence_is_reachable, proof_obligation_missing,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -193,6 +194,19 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the proof-obligation debug-endpoint classifier predicate is exact:
+    /// it fires iff a debug surface is visible and no auth guard is visible.
+    #[kani::proof]
+    fn debug_endpoint_unguarded_is_exact_conjunction() {
+        let has_debug_surface: bool = kani::any();
+        let has_auth_guard: bool = kani::any();
+        let fired = debug_endpoint_is_unguarded(has_debug_surface, has_auth_guard);
+        kani::assert(
+            fired == (has_debug_surface && !has_auth_guard),
+            "debug endpoint proof classifier predicate must be exact conjunction",
+        );
+    }
+
     /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
     /// fires iff a decoder is present AND an allowlist suppressor is absent.
     #[kani::proof]
@@ -314,7 +328,6 @@ mod kani_proofs {
             );
         }
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -334,11 +347,12 @@ mod tests {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        ffi_deref_guard_classification, financial_pii_is_unguarded, intent_divergence_is_reachable,
-        lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
-        lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
-        react_xss_is_unguarded, sqli_concat_is_injectable,
+        debug_endpoint_is_unguarded, ffi_deref_guard_classification, financial_pii_is_unguarded,
+        intent_divergence_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
+        lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
+        oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
+        proof_obligation_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
+        sqli_concat_is_injectable,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -442,6 +456,14 @@ mod tests {
         assert!(!debug_endpoint_missing_auth(true, true));
         assert!(!debug_endpoint_missing_auth(false, false));
         assert!(!debug_endpoint_missing_auth(false, true));
+    }
+
+    #[test]
+    fn debug_endpoint_unguarded_requires_debug_surface_and_missing_auth() {
+        assert!(debug_endpoint_is_unguarded(true, false));
+        assert!(!debug_endpoint_is_unguarded(true, true));
+        assert!(!debug_endpoint_is_unguarded(false, false));
+        assert!(!debug_endpoint_is_unguarded(false, true));
     }
 
     #[test]
@@ -663,8 +685,8 @@ mod compliance_oracle_kani {
         financial_pii_is_unguarded, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, protobuf_any_is_unguarded,
-        react_xss_is_unguarded, sqli_concat_is_injectable, timing_comparison_is_sensitive,
+        oauth_state_validation_is_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
+        sqli_concat_is_injectable, timing_comparison_is_sensitive,
     };
     use common::slop::StructuredFinding;
 
@@ -682,7 +704,10 @@ mod compliance_oracle_kani {
             ..Default::default()
         };
         let receipts = map_finding_to_controls(&finding);
-        kani::assert(receipts.len() == 2, "compliance oracle must emit exactly 2 receipts");
+        kani::assert(
+            receipts.len() == 2,
+            "compliance oracle must emit exactly 2 receipts",
+        );
     }
 
     /// Prove that `lcm_double_free_is_reachable` is an exact negation-conjunction:

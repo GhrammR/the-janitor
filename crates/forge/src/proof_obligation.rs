@@ -166,7 +166,9 @@ pub fn classify_ffi_deref_proof(source: &str, finding_line: usize) -> ProofClass
     if lines.is_empty() {
         return ProofClass::LatticeGapProposal;
     }
-    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let target = finding_line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
 
     let guard_start = target.saturating_sub(5);
     let guard_end = (target + 6).min(lines.len());
@@ -204,7 +206,9 @@ pub fn classify_lcm_double_free_proof(source: &str, finding_line: usize) -> Proo
     if lines.is_empty() {
         return ProofClass::LatticeGapProposal;
     }
-    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let target = finding_line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
     let guard_start = target.saturating_sub(5);
     let guard_end = (target + 6).min(lines.len());
     let has_free_guard = lines[guard_start..guard_end].iter().any(|l| {
@@ -247,7 +251,9 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
     let finding_line = finding.line.unwrap_or(1) as usize;
     let lines: Vec<&str> = source.lines().collect();
     if !lines.is_empty() {
-        let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+        let target = finding_line
+            .saturating_sub(1)
+            .min(lines.len().saturating_sub(1));
         let start = target.saturating_sub(10);
         let end = (target + 11).min(lines.len());
         let window: String = lines[start..end].join("\n");
@@ -325,12 +331,15 @@ pub fn classify_lcm_use_after_free_proof(source: &str, finding_line: usize) -> P
     if lines.is_empty() {
         return ProofClass::LatticeGapProposal;
     }
-    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let target = finding_line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
     let guard_start = target.saturating_sub(5);
     let guard_end = (target + 6).min(lines.len());
     let has_lifetime_guard = lines[guard_start..guard_end].iter().any(|l| {
         let t = l.trim();
-        (t.contains("if (") && (t.contains("!= NULL") || t.contains("freed") || t.contains("is_valid")))
+        (t.contains("if (")
+            && (t.contains("!= NULL") || t.contains("freed") || t.contains("is_valid")))
             || t.contains("assert(")
             || t.contains("secp256k1_ec_pubkey_tweak")
     });
@@ -377,7 +386,9 @@ pub fn classify_lcm_malloc_integer_truncation_proof(
     if lines.is_empty() {
         return ProofClass::LatticeGapProposal;
     }
-    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let target = finding_line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
     let guard_start = target.saturating_sub(5);
     let guard_end = (target + 6).min(lines.len());
     let has_size_guard = lines[guard_start..guard_end].iter().any(|l| {
@@ -426,16 +437,15 @@ pub fn lcm_off_by_one_loop_is_exploitable(has_bounds_check: bool, in_test_or_ben
 /// 2. ±10-line C exported function signature (`int `, `void `, `SECP256K1_API`, etc.)
 ///    → `ReachabilityProof`.
 /// 3. Otherwise → `LatticeGapProposal`.
-pub fn classify_lcm_off_by_one_loop_proof(
-    source: &str,
-    finding: &StructuredFinding,
-) -> ProofClass {
+pub fn classify_lcm_off_by_one_loop_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
     let finding_line = finding.line.unwrap_or(1) as usize;
     let lines: Vec<&str> = source.lines().collect();
     if lines.is_empty() {
         return ProofClass::LatticeGapProposal;
     }
-    let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+    let target = finding_line
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1));
     let guard_start = target.saturating_sub(5);
     let guard_end = (target + 6).min(lines.len());
     let has_bounds_check = lines[guard_start..guard_end].iter().any(|l| {
@@ -494,10 +504,7 @@ pub fn classify_oauth_state_validation_proof(
         .file
         .as_deref()
         .map(|p| {
-            p.ends_with(".py")
-                || p.ends_with(".go")
-                || p.ends_with(".rb")
-                || p.ends_with(".java")
+            p.ends_with(".py") || p.ends_with(".go") || p.ends_with(".rb") || p.ends_with(".java")
         })
         .unwrap_or(false);
     if !is_server_side {
@@ -543,10 +550,7 @@ pub fn classify_oauth_account_fusion_proof(
         .file
         .as_deref()
         .map(|p| {
-            p.ends_with(".py")
-                || p.ends_with(".go")
-                || p.ends_with(".rb")
-                || p.ends_with(".java")
+            p.ends_with(".py") || p.ends_with(".go") || p.ends_with(".rb") || p.ends_with(".java")
         })
         .unwrap_or(false);
     if !is_server_side {
@@ -594,10 +598,9 @@ pub fn classify_protobuf_any_proof(source: &str, finding: &StructuredFinding) ->
     if in_test_path {
         return ProofClass::InvariantViolationProof;
     }
-    let uses_deprecated = source.contains("ptypes.UnmarshalAny")
-        || source.contains("proto.UnmarshalAny");
-    let uses_modern = source.contains("anypb.UnmarshalTo")
-        || source.contains("anypb.UnmarshalNew");
+    let uses_deprecated =
+        source.contains("ptypes.UnmarshalAny") || source.contains("proto.UnmarshalAny");
+    let uses_modern = source.contains("anypb.UnmarshalTo") || source.contains("anypb.UnmarshalNew");
     if uses_deprecated {
         ProofClass::ReachabilityProof
     } else if uses_modern {
@@ -627,10 +630,7 @@ pub fn sqli_concat_is_injectable(is_raw_concat: bool, in_migration_path: bool) -
 /// - Parameterized-query marker in source → `InvariantViolationProof` (suppress)
 /// - Raw SQL string concatenation or `fmt.Sprintf` with SQL keyword → `ReachabilityProof`
 /// - Otherwise → `LatticeGapProposal`
-pub fn classify_sqli_concatenation_proof(
-    source: &str,
-    finding: &StructuredFinding,
-) -> ProofClass {
+pub fn classify_sqli_concatenation_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
     let in_test_path = finding
         .file
         .as_deref()
@@ -789,6 +789,53 @@ pub fn classify_react_xss_proof(source: &str, finding: &StructuredFinding) -> Pr
     ProofClass::LatticeGapProposal
 }
 
+/// Returns `true` when a debug endpoint is present without an auth guard.
+pub fn debug_endpoint_is_unguarded(has_debug_surface: bool, has_auth_guard: bool) -> bool {
+    has_debug_surface && !has_auth_guard
+}
+
+/// Classifies a `security:unauthenticated_debug_endpoint` finding into a `ProofClass`.
+///
+/// - Test/script/dev-server path -> `InvariantViolationProof` (suppress)
+/// - Auth or middleware marker in source -> `InvariantViolationProof` (suppress)
+/// - Debug/internal/admin endpoint marker without auth -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_debug_endpoint_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_non_production_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("scripts/")
+                || p.contains("server.mjs")
+                || p.contains(".spec.")
+                || p.contains(".test.")
+        })
+        .unwrap_or(false);
+    if in_non_production_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_auth_guard = source.contains("auth")
+        || source.contains("authenticate")
+        || source.contains("requiresAuth")
+        || source.contains("middleware");
+    if has_auth_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_debug_surface = source.contains("debug")
+        || source.contains("pprof")
+        || source.contains("metrics")
+        || source.contains("/internal/")
+        || source.contains("/admin/");
+    if debug_endpoint_is_unguarded(has_debug_surface, has_auth_guard) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -938,7 +985,8 @@ mod tests {
             file: Some("codex-rs/model-provider/src/auth.rs".to_string()),
             ..Default::default()
         };
-        let source = "pub struct UnauthenticatedAuthProvider; fn build() { requires_openai_auth: false }";
+        let source =
+            "pub struct UnauthenticatedAuthProvider; fn build() { requires_openai_auth: false }";
         assert_eq!(
             super::classify_intent_divergence_proof(&finding, source),
             ProofClass::ReachabilityProof
@@ -961,7 +1009,8 @@ mod tests {
 
     #[test]
     fn ffi_deref_null_guard_present_yields_invariant_violation_proof() {
-        let source = "let ptr = qdb_read(key);\nif ptr.is_null() { return Err(e); }\nCStr::from_ptr(ptr)";
+        let source =
+            "let ptr = qdb_read(key);\nif ptr.is_null() { return Err(e); }\nCStr::from_ptr(ptr)";
         assert_eq!(
             super::classify_ffi_deref_proof(source, 3),
             ProofClass::InvariantViolationProof
@@ -1000,7 +1049,8 @@ mod tests {
 
     #[test]
     fn lcm_double_free_null_guard_yields_invariant_violation() {
-        let source = "int *buf = malloc(sz);\nif (buf != NULL) {\n    free(buf);\n    free(buf);\n}";
+        let source =
+            "int *buf = malloc(sz);\nif (buf != NULL) {\n    free(buf);\n    free(buf);\n}";
         assert_eq!(
             super::classify_lcm_double_free_proof(source, 3),
             ProofClass::InvariantViolationProof
@@ -1218,7 +1268,8 @@ mod tests {
             line: Some(80),
             ..Default::default()
         };
-        let source = "def callback():\n    code = request.args.get('code')\n    _fetch_access_token(code)\n";
+        let source =
+            "def callback():\n    code = request.args.get('code')\n    _fetch_access_token(code)\n";
         assert_eq!(
             super::classify_oauth_state_validation_proof(source, &finding),
             ProofClass::ReachabilityProof
@@ -1369,7 +1420,8 @@ mod tests {
             file: Some("vault/identity_store.go".to_string()),
             ..Default::default()
         };
-        let source = "if err := ptypes.UnmarshalAny(entity.Metadata, &meta); err != nil { return err }";
+        let source =
+            "if err := ptypes.UnmarshalAny(entity.Metadata, &meta); err != nil { return err }";
         assert_eq!(
             super::classify_protobuf_any_proof(source, &finding),
             ProofClass::ReachabilityProof
@@ -1467,6 +1519,48 @@ mod tests {
         let source = "return <div dangerouslySetInnerHTML={{ __html: props.content }} />;";
         assert_eq!(
             super::classify_react_xss_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn debug_endpoint_dev_server_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:unauthenticated_debug_endpoint".to_string(),
+            file: Some("apps/login/scripts/server.mjs".to_string()),
+            ..Default::default()
+        };
+        let source = "app.get('/debug/vars', handler);";
+        assert_eq!(
+            super::classify_debug_endpoint_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn debug_endpoint_auth_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:unauthenticated_debug_endpoint".to_string(),
+            file: Some("server/routes/debug.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "router.get('/internal/metrics', requiresAuth(middleware(handler)));";
+        assert_eq!(
+            super::classify_debug_endpoint_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn debug_endpoint_unguarded_internal_metrics_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:unauthenticated_debug_endpoint".to_string(),
+            file: Some("server/routes/status.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "router.get('/internal/metrics', metrics_handler);";
+        assert_eq!(
+            super::classify_debug_endpoint_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

@@ -3107,10 +3107,12 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 .as_deref()
                 .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
                 .unwrap_or_default();
-            finding.proof_class = Some(
-                forge::proof_obligation::classify_intent_divergence_proof(finding, &source),
-            );
-        } else if finding.id.contains("ffi_unsafe_deref") || finding.id.contains("raw_pointer_deref") {
+            finding.proof_class = Some(forge::proof_obligation::classify_intent_divergence_proof(
+                finding, &source,
+            ));
+        } else if finding.id.contains("ffi_unsafe_deref")
+            || finding.id.contains("raw_pointer_deref")
+        {
             let source = finding
                 .file
                 .as_deref()
@@ -3163,8 +3165,9 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 .as_deref()
                 .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
                 .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_lcm_malloc_integer_truncation_proof(&source, finding);
+            let proof = forge::proof_obligation::classify_lcm_malloc_integer_truncation_proof(
+                &source, finding,
+            );
             if proof == ProofClass::InvariantViolationProof {
                 return false;
             }
@@ -3222,7 +3225,8 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 .as_deref()
                 .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
                 .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_sqli_concatenation_proof(&source, finding);
+            let proof =
+                forge::proof_obligation::classify_sqli_concatenation_proof(&source, finding);
             if proof == ProofClass::InvariantViolationProof {
                 return false;
             }
@@ -3245,6 +3249,17 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
                 .unwrap_or_default();
             let proof = forge::proof_obligation::classify_react_xss_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("unauthenticated_debug_endpoint") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_debug_endpoint_proof(&source, finding);
             if proof == ProofClass::InvariantViolationProof {
                 return false;
             }
@@ -3279,21 +3294,24 @@ fn apply_phase2b_suppression(dir: &Path, findings: &mut Vec<StructuredFinding>) 
                 return false;
             }
         }
-        if finding.id.contains("tls_verification_bypass") || finding.id.contains("InsecureSkipVerify") {
+        if finding.id.contains("tls_verification_bypass")
+            || finding.id.contains("InsecureSkipVerify")
+        {
             if forge::threat_model_oracle::is_config_gated_tls_bypass(&source, line) {
                 return false;
             }
         }
         if finding.id.contains("dom_xss_innerHTML") {
             let fn_name = extract_enclosing_fn_name(&source, line);
-            if !fn_name.is_empty() && !forge::threat_model_oracle::has_external_caller(&source, &fn_name) {
+            if !fn_name.is_empty()
+                && !forge::threat_model_oracle::has_external_caller(&source, &fn_name)
+            {
                 return false;
             }
         }
         // Structural eradication: react_xss_dangerous_html when DOMPurify.sanitize() guards
         // the dangerouslySetInnerHTML sink in the same file — sanitizer confirmed present.
-        if finding.id.contains("react_xss_dangerous_html")
-            && source.contains("DOMPurify.sanitize(")
+        if finding.id.contains("react_xss_dangerous_html") && source.contains("DOMPurify.sanitize(")
         {
             return false;
         }
@@ -3310,7 +3328,10 @@ fn extract_enclosing_fn_name(source: &str, line: usize) -> String {
         let t = lines[i].trim();
         for prefix in &["func ", "def ", "function ", "async function "] {
             if let Some(rest) = t.strip_prefix(prefix) {
-                let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
                 if !name.is_empty() {
                     return name;
                 }
@@ -4246,7 +4267,9 @@ fn scan_buffer(
     if matches!(ext, "py" | "js" | "ts" | "java" | "kt" | "cs") {
         let src_str = std::str::from_utf8(source).unwrap_or("");
         findings.extend(forge::medical::emit_phi_sink_findings(src_str, label));
-        findings.extend(forge::medical::emit_audit_log_absence_findings(src_str, label));
+        findings.extend(forge::medical::emit_audit_log_absence_findings(
+            src_str, label,
+        ));
     }
     let filename = std::path::Path::new(label)
         .file_name()

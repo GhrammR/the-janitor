@@ -3,6 +3,20 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 156: Debug Endpoint Proof Cure + JWT Guard + Hunt Sweep
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `debug_endpoint_is_unguarded` + `classify_debug_endpoint_proof`: test/script/dev-server paths and auth/middleware markers suppress as `InvariantViolationProof`; unguarded `debug`/`pprof`/`metrics`/`/internal/`/`/admin/` surfaces emit `ReachabilityProof`. 3 deterministic classifier tests added.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `unauthenticated_debug_endpoint` through the proof classifier after `react_xss_dangerous_html`.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — Kani harness `debug_endpoint_unguarded_is_exact_conjunction` plus deterministic regression test added.
+* `crates/forge/src/slop_hunter.rs` *(modified)* — JWT structural guard suppresses cleanup-only `ParseUnverified` expiry scans and DPoP JWK signature-proof contexts; 2 deterministic tests added.
+* `.github/workflows/registry-watch.yml` *(modified)* — Architectural Oracle fix: mutable `actions/checkout@v4`, `github/codeql-action/upload-sarif@v3`, and `actions/github-script@v7` references pinned to immutable tag SHAs.
+* `docs/index.md` *(modified)* — Showcase attestation fix: corrected the hero version string from `vv10.2.2` to `v10.2.2`.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A `security:unauthenticated_debug_endpoint` block hard-deleted; P17-3B OAuth callback context gate logged from Sprint 156 hunt evidence.
+* `tools/campaign/CANDIDATE_LEDGER.md` / `LOW_YIELD_LEDGER.md` *(modified)* — casdoor JWT row moved to LOW_YIELD; Hydra, SuperTokens, and Authentik hunt batches routed to LOW_YIELD.
+* PR #121 *(updated)* — title/body changed to `feat(registry_watch): npm + crates.io + PyPI adapters + SARIF upload`.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 56 passed; `cargo test -p forge -- slop_hunter --test-threads=2` → 332 passed; `cargo test -p forge -- debug_endpoint --test-threads=2` → 14 passed; 3 target hunts completed (`hydra`, `supertokens-core`, `authentik`); casdoor post-guard re-hunt removed cleanup/DPoP JWT false positives.
+
 ## 2026-05-20 — Sprint 155: react_xss + Go Timing FP Fix + SARIF Upload + Timestamped Submissions + Hunt Sweep (oauth2-proxy/casdoor/zitadel)
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `react_xss_is_unguarded` + `classify_react_xss_proof` (DOMPurify/sanitizeHtml/xss() guard → InvariantViolationProof; test path → InvariantViolationProof; dangerouslySetInnerHTML + user-input props → ReachabilityProof). **Phase 2 (Go timing)**: `classify_timing_comparison_proof` extended with Go-specific `bytes.Equal(` check (no `subtle.ConstantTimeCompare`/`hmac.Equal` guard → ReachabilityProof). **Sprint 155 FP fix**: `has_go_timing_sink` narrowed from broad `== + hash/key/token/secret/digest` keyword check to `source.contains("bytes.Equal(")` only — eradicates FP on algorithm-name constant files (zitadel `passwap.go`, keycloak ECDH-ES). 53 proof_obligation tests pass.

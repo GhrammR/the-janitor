@@ -1648,6 +1648,12 @@ fn contains_any_bytes(source: &[u8], needles: &[&[u8]]) -> bool {
         .any(|needle| source.windows(needle.len()).any(|w| w == *needle))
 }
 
+fn contains_all_bytes(source: &[u8], needles: &[&[u8]]) -> bool {
+    needles
+        .iter()
+        .all(|needle| source.windows(needle.len()).any(|w| w == *needle))
+}
+
 fn first_match_pos(source: &[u8], needles: &[&[u8]]) -> Option<usize> {
     needles
         .iter()
@@ -1742,7 +1748,17 @@ fn find_jwt_validation_bypass(source: &[u8]) -> Vec<SlopFinding> {
                 && (contains_any_bytes(&lower, &[b"jwt.require(", b"verifier.verify("])
                     || (call.ends_with(b"parseunverified(")
                         && go_parseunverified_followed_by_signing_enforcement(&lower, start)));
-            if (has_none_alg || has_bad_aud || has_bad_exp) && !decode_only_suppressed {
+            let context_start = start.saturating_sub(1024);
+            let context_end = lower.len().min(end.saturating_add(2048));
+            let structural_context_suppressed = jwt_structural_context_suppressed(
+                call,
+                &lower[context_start..context_end],
+                has_none_alg,
+            );
+            if (has_none_alg || has_bad_aud || has_bad_exp)
+                && !decode_only_suppressed
+                && !structural_context_suppressed
+            {
                 findings.push(SlopFinding {
                     start_byte: start,
                     end_byte: end,
@@ -1758,6 +1774,34 @@ fn find_jwt_validation_bypass(source: &[u8]) -> Vec<SlopFinding> {
     }
 
     Vec::new()
+}
+
+fn jwt_structural_context_suppressed(call: &[u8], context: &[u8], has_none_alg: bool) -> bool {
+    if has_none_alg {
+        return false;
+    }
+
+    let cleanup_expiry_scan = call.ends_with(b"parseunverified(")
+        && contains_all_bytes(
+            context,
+            &[
+                b"cleanuptokens(",
+                b"tokenretentionintervalafterexpiry",
+                b"expiretime",
+            ],
+        );
+    let dpop_jwk_signature_proof = call.ends_with(b"parsewithclaims(")
+        && contains_all_bytes(
+            context,
+            &[
+                b"dpopproofclaims",
+                b"jwkkey.key",
+                b"thumbprint",
+                b"withoutclaimsvalidation",
+            ],
+        );
+
+    cleanup_expiry_scan || dpop_jwk_signature_proof
 }
 
 fn go_parseunverified_followed_by_signing_enforcement(lower: &[u8], start: usize) -> bool {
@@ -14018,6 +14062,61 @@ func verifyToken(raw string, keyFunc jwt.Keyfunc) (*jwt.Token, error) {
                 .iter()
                 .all(|f| !f.description.contains("jwt_validation_bypass")),
             "ParseUnverified used for kid extraction plus explicit signing-method enforcement must not fire jwt_validation_bypass"
+        );
+    }
+
+    #[test]
+    fn test_go_parse_unverified_cleanup_expiry_scan_suppressed() {
+        let src = br#"
+func CleanupTokens(tokenRetentionIntervalAfterExpiry int) error {
+    token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+    if err != nil {
+        return err
+    }
+    exp := claims["exp"].(float64)
+    expireTime := time.Unix(int64(exp), 0)
+    if time.Since(expireTime).Seconds() > float64(tokenRetentionIntervalAfterExpiry) {
+        return deleteExpiredToken()
+    }
+    return nil
+}
+"#;
+        let findings = find_slop("go", src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("jwt_validation_bypass")),
+            "cleanup-only ParseUnverified expiry scans must not fire jwt_validation_bypass"
+        );
+    }
+
+    #[test]
+    fn test_go_dpop_jwk_signature_proof_suppressed() {
+        let src = br#"
+func VerifyDPoPProof(proofToken string, jwkKey jwk.Key) error {
+    thumbprintBytes, err := jwkKey.Thumbprint(crypto.SHA256)
+    if err != nil {
+        return err
+    }
+    _ = thumbprintBytes
+    t, err := jwt.ParseWithClaims(proofToken, &DPoPProofClaims{}, func(token *jwt.Token) (interface{}, error) {
+        return jwkKey.Key, nil
+    }, jwt.WithoutClaimsValidation())
+    if err != nil || !t.Valid {
+        return err
+    }
+    if claims.Htm != method || claims.Htu != htu {
+        return err
+    }
+    return nil
+}
+"#;
+        let findings = find_slop("go", src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("jwt_validation_bypass")),
+            "DPoP JWK signature verification must not fire alg-none jwt_validation_bypass"
         );
     }
 
