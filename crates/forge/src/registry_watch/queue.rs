@@ -91,7 +91,7 @@ impl WatchQueue {
             captured_at,
         };
         let key = entry.dedup_key();
-        if !self.seen.insert(key.clone()) {
+        if !self.seen.insert(key) {
             return Ok(false);
         }
         self.maybe_rotate()?;
