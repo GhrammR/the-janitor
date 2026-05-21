@@ -31,12 +31,12 @@ mod kani_proofs {
     use crate::lcm::ffi_deref_unguarded;
     use crate::linker_hijack::linker_hijack_missing_attestation;
     use crate::mcp_dispatch_guard::session_dispatch_missing_secret_check;
-    use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
         debug_endpoint_is_unguarded, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, proof_obligation_missing, xxe_saml_parser_is_unguarded,
+        intent_divergence_is_reachable, jndi_lookup_is_untrusted, proof_obligation_missing,
+        saml_xsw_validation_order_is_reachable, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -222,6 +222,59 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the SAML XSW predicate is exact:
+    /// it fires iff parser + signature + later selected assertion are visible,
+    /// and no same-assertion binding guard or test/generated path is present.
+    #[kani::proof]
+    fn saml_xsw_validation_order_is_exact_conjunction() {
+        let has_saml_parser: bool = kani::any();
+        let has_signature_validation: bool = kani::any();
+        let consumes_selected_assertion_after_signature: bool = kani::any();
+        let has_assertion_binding_guard: bool = kani::any();
+        let in_test_or_generated_path: bool = kani::any();
+        let fired = saml_xsw_validation_order_is_reachable(
+            has_saml_parser,
+            has_signature_validation,
+            consumes_selected_assertion_after_signature,
+            has_assertion_binding_guard,
+            in_test_or_generated_path,
+        );
+        kani::assert(
+            fired
+                == (has_saml_parser
+                    && has_signature_validation
+                    && consumes_selected_assertion_after_signature
+                    && !has_assertion_binding_guard
+                    && !in_test_or_generated_path),
+            "SAML XSW predicate must be exact conjunction",
+        );
+    }
+
+    /// Prove the JNDI predicate is exact:
+    /// it fires iff lookup + untrusted source are present, and allowlist/constant
+    /// context plus test/local path are absent.
+    #[kani::proof]
+    fn jndi_lookup_untrusted_is_exact_conjunction() {
+        let has_jndi_lookup: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_allowlist_or_constant_context: bool = kani::any();
+        let in_test_or_local_path: bool = kani::any();
+        let fired = jndi_lookup_is_untrusted(
+            has_jndi_lookup,
+            has_untrusted_source,
+            has_allowlist_or_constant_context,
+            in_test_or_local_path,
+        );
+        kani::assert(
+            fired
+                == (has_jndi_lookup
+                    && has_untrusted_source
+                    && !has_allowlist_or_constant_context
+                    && !in_test_or_local_path),
+            "JNDI lookup predicate must be exact conjunction",
+        );
+    }
+
     /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
     /// fires iff a decoder is present AND an allowlist suppressor is absent.
     #[kani::proof]
@@ -363,11 +416,12 @@ mod tests {
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
         debug_endpoint_is_unguarded, ffi_deref_guard_classification, financial_pii_is_unguarded,
-        intent_divergence_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
-        lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
-        oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
-        proof_obligation_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
-        sqli_concat_is_injectable, xxe_saml_parser_is_unguarded,
+        intent_divergence_is_reachable, jndi_lookup_is_untrusted,
+        lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
+        lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
+        oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
+        react_xss_is_unguarded, saml_xsw_validation_order_is_reachable, sqli_concat_is_injectable,
+        xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -573,6 +627,37 @@ mod tests {
     }
 
     #[test]
+    fn saml_xsw_reachability_requires_all_unprotected_markers() {
+        assert!(saml_xsw_validation_order_is_reachable(
+            true, true, true, false, false
+        ));
+        assert!(!saml_xsw_validation_order_is_reachable(
+            false, true, true, false, false
+        ));
+        assert!(!saml_xsw_validation_order_is_reachable(
+            true, false, true, false, false
+        ));
+        assert!(!saml_xsw_validation_order_is_reachable(
+            true, true, false, false, false
+        ));
+        assert!(!saml_xsw_validation_order_is_reachable(
+            true, true, true, true, false
+        ));
+        assert!(!saml_xsw_validation_order_is_reachable(
+            true, true, true, false, true
+        ));
+    }
+
+    #[test]
+    fn jndi_lookup_reachability_requires_untrusted_source_without_guard() {
+        assert!(jndi_lookup_is_untrusted(true, true, false, false));
+        assert!(!jndi_lookup_is_untrusted(false, true, false, false));
+        assert!(!jndi_lookup_is_untrusted(true, false, false, false));
+        assert!(!jndi_lookup_is_untrusted(true, true, true, false));
+        assert!(!jndi_lookup_is_untrusted(true, true, false, true));
+    }
+
+    #[test]
     fn oauth_account_fusion_email_guard_missing_is_exact_conjunction() {
         assert!(oauth_account_fusion_is_missing_email_guard(true, false));
         assert!(!oauth_account_fusion_is_missing_email_guard(false, false));
@@ -706,11 +791,12 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
-        financial_pii_is_unguarded, lcm_double_free_is_reachable,
+        financial_pii_is_unguarded, jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
-        sqli_concat_is_injectable, timing_comparison_is_sensitive, xxe_saml_parser_is_unguarded,
+        saml_xsw_validation_order_is_reachable, sqli_concat_is_injectable,
+        timing_comparison_is_sensitive, xxe_saml_parser_is_unguarded,
     };
     use common::slop::StructuredFinding;
 
@@ -829,6 +915,58 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (has_saml_xml_parser && !has_xxe_hardening && !in_test_path),
             "xxe SAML parser guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `saml_xsw_validation_order_is_reachable` is the exact conjunction
+    /// of parser, signature validation, selected-assertion consumption, and
+    /// absence of same-assertion binding/test context.
+    #[kani::proof]
+    fn classify_saml_xsw_validation_order_no_panic() {
+        let has_saml_parser: bool = kani::any();
+        let has_signature_validation: bool = kani::any();
+        let consumes_selected_assertion_after_signature: bool = kani::any();
+        let has_assertion_binding_guard: bool = kani::any();
+        let in_test_or_generated_path: bool = kani::any();
+        let result = saml_xsw_validation_order_is_reachable(
+            has_saml_parser,
+            has_signature_validation,
+            consumes_selected_assertion_after_signature,
+            has_assertion_binding_guard,
+            in_test_or_generated_path,
+        );
+        kani::assert(
+            result
+                == (has_saml_parser
+                    && has_signature_validation
+                    && consumes_selected_assertion_after_signature
+                    && !has_assertion_binding_guard
+                    && !in_test_or_generated_path),
+            "saml XSW validation-order guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `jndi_lookup_is_untrusted` is the exact conjunction of lookup,
+    /// untrusted source, and absence of allowlist/local context.
+    #[kani::proof]
+    fn classify_jndi_lookup_no_panic() {
+        let has_jndi_lookup: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_allowlist_or_constant_context: bool = kani::any();
+        let in_test_or_local_path: bool = kani::any();
+        let result = jndi_lookup_is_untrusted(
+            has_jndi_lookup,
+            has_untrusted_source,
+            has_allowlist_or_constant_context,
+            in_test_or_local_path,
+        );
+        kani::assert(
+            result
+                == (has_jndi_lookup
+                    && has_untrusted_source
+                    && !has_allowlist_or_constant_context
+                    && !in_test_or_local_path),
+            "jndi lookup guard must be exact conjunction",
         );
     }
 

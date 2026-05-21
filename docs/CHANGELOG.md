@@ -3,6 +3,16 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 158: SAML XSW + JNDI Proof Cures, Hunt Sweep, PR Gate Triage
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `saml_xsw_validation_order_is_reachable` + `classify_saml_xsw_validation_order_proof`; production SAML parser + signature validation + later selected-assertion consumption without same-assertion binding emits `ReachabilityProof`, while test/generated/metadata and validated-assertion contexts suppress as `InvariantViolationProof`. Added `jndi_lookup_is_untrusted` + `classify_jndi_injection_proof`; HTTP/body/header-driven JNDI lookup emits `ReachabilityProof`, while tests, migrations, generated/local paths, constant `java:` lookups, and allowlist guards suppress.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:saml_xsw_validation_order` and `security:jndi_injection` through deterministic proof classifiers, suppressing invariant proofs before ledger output.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added exact-conjunction Kani harnesses and deterministic regression tests for SAML XSW and JNDI predicates; removed a stale Kani-only unused import warning in the touched module.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:saml_xsw_validation_order` and `security:jndi_injection` hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — Sprint 158 rows added for Glean MCP no-findings, Electroneum Legacy Blockchain low-yield batch, and TrustWallet residual informational batch. Existing TrustWallet candidate rows remain in CANDIDATE_LEDGER and were not duplicated.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 68 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` → 29 passed; `cargo test -p cli -- hunt --test-threads=2` → 89 passed; `cargo kani -p forge --harness saml_xsw_validation_order_is_exact_conjunction` → successful; `cargo kani -p forge --harness jndi_lookup_untrusted_is_exact_conjunction` → successful; target sweep complete (`gleanbugbounty/mcp-server-bugbounty` 0 findings, `electroneum/electroneum` 86 low-yield, `trustwallet/wallet-core` 150 with residual low-yield and existing candidates held).
+
 ## 2026-05-21 — Sprint 157: OAuth Context Gate + XXE SAML Proof Cure + Hunt Sweep
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — `classify_oauth_state_validation_proof` now requires a real browser callback marker plus missing session-bound state comparison before emitting `ReachabilityProof`; token/provider/generated/migration/storage/test/script paths suppress as `InvariantViolationProof`. Added Hydra/Fosite, SuperTokens `OAuthTokenAPI.java`, and Authentik generated-migration fixtures. Added `xxe_saml_parser_is_unguarded` + `classify_xxe_saml_parser_proof` with test-path and XXE-hardening suppression.

@@ -976,6 +976,205 @@ pub fn classify_xxe_saml_parser_proof(source: &str, finding: &StructuredFinding)
     }
 }
 
+/// Returns `true` when SAML signature validation can bind one assertion while
+/// downstream logic consumes a different selected assertion.
+pub fn saml_xsw_validation_order_is_reachable(
+    has_saml_parser: bool,
+    has_signature_validation: bool,
+    consumes_selected_assertion_after_signature: bool,
+    has_assertion_binding_guard: bool,
+    in_test_or_generated_path: bool,
+) -> bool {
+    has_saml_parser
+        && has_signature_validation
+        && consumes_selected_assertion_after_signature
+        && !has_assertion_binding_guard
+        && !in_test_or_generated_path
+}
+
+/// Classifies a `security:saml_xsw_validation_order` finding into a `ProofClass`.
+///
+/// - Test/generated/metadata paths -> `InvariantViolationProof` (suppress)
+/// - Same-assertion binding or validated-assertion helpers -> `InvariantViolationProof`
+/// - Signature validation before later selected-assertion consumption -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_saml_xsw_validation_order_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_generated_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("/client")
+        || path_lower.contains("metadata");
+    if in_test_or_generated_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let metadata_loader = source_lower.contains("metadata")
+        && !source_lower.contains("samlresponse")
+        && !source_lower.contains("subjectconfirmationdata");
+    if metadata_loader {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_saml_parser = (source_lower.contains("saml")
+        || source_lower.contains("samlresponse")
+        || source_lower.contains("assertion")
+        || source_lower.contains("urn:oasis:names:tc:saml"))
+        && (source_lower.contains("documentbuilderfactory.newinstance(")
+            || source_lower.contains("saxparserfactory.newinstance(")
+            || source_lower.contains("xml.newdecoder(")
+            || source_lower.contains("xmldom")
+            || source_lower.contains("xml2js")
+            || source_lower.contains("lxml.etree.fromstring")
+            || source_lower.contains("xml.etree.elementtree.fromstring")
+            || source_lower.contains("parse("));
+    let has_signature_validation = source_lower.contains("verifysignature")
+        || source_lower.contains("validate(signature")
+        || source_lower.contains("signaturevalidator")
+        || source_lower.contains("checksignature")
+        || source_lower.contains("xmlsec")
+        || source_lower.contains("validate_signature")
+        || source_lower.contains("verify_signature")
+        || source_lower.contains("signature.validate")
+        || source_lower.contains("validator.validate");
+    let consumes_selected_assertion_after_signature = source_lower
+        .contains("getelementsbytagname(\"assertion\"")
+        || source_lower.contains("getelementsbytagname('assertion'")
+        || source_lower.contains("selectnodes(\"//")
+        || source_lower.contains("xpath")
+        || source_lower.contains("assertions[")
+        || source_lower.contains("getassertion(")
+        || source_lower.contains("nameid")
+        || source_lower.contains("subjectconfirmationdata")
+        || source_lower.contains("inresponseto");
+    let has_assertion_binding_guard = source_lower.contains("validatedassertion")
+        || source_lower.contains("verifiedassertion")
+        || source_lower.contains("signedassertion")
+        || source_lower.contains("getverifiedassertion")
+        || source_lower.contains("validateassertion(")
+        || source_lower.contains("validateinresponseto(")
+        || source_lower.contains("setidattribute")
+        || source_lower.contains("idresolver.registerelementbyid")
+        || source_lower.contains("securevalidation")
+        || source_lower.contains("subjectconfirmationdata")
+            && source_lower.contains("inresponseto")
+            && source_lower.contains("destination")
+            && source_lower.contains("audience");
+    if has_assertion_binding_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+    if saml_xsw_validation_order_is_reachable(
+        has_saml_parser,
+        has_signature_validation,
+        consumes_selected_assertion_after_signature,
+        has_assertion_binding_guard,
+        in_test_or_generated_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when a JNDI lookup accepts attacker-controlled input without
+/// allowlist, constant-only naming, or local container-context restriction.
+pub fn jndi_lookup_is_untrusted(
+    has_jndi_lookup: bool,
+    has_untrusted_source: bool,
+    has_allowlist_or_constant_context: bool,
+    in_test_or_local_path: bool,
+) -> bool {
+    has_jndi_lookup
+        && has_untrusted_source
+        && !has_allowlist_or_constant_context
+        && !in_test_or_local_path
+}
+
+/// Classifies a `security:jndi_injection` finding into a `ProofClass`.
+///
+/// - Tests/migrations/generated/local container config -> `InvariantViolationProof`
+/// - Allowlist or constant-only naming -> `InvariantViolationProof`
+/// - HTTP/body/header input reaching lookup/resolve -> `ReachabilityProof`
+/// - Dynamic lookup without source proof -> `LatticeGapProposal`
+pub fn classify_jndi_injection_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_local_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("migration")
+        || path_lower.contains("generated")
+        || path_lower.contains("local")
+        || path_lower.contains("cache")
+        || path_lower.contains("session");
+    if in_test_or_local_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_jndi_lookup = (source_lower.contains("initialcontext")
+        || source_lower.contains("context ctx")
+        || source_lower.contains("context context")
+        || source_lower.contains("namingcontext"))
+        && (source_lower.contains(".lookup(") || source_lower.contains(".resolve("));
+    let has_untrusted_source = source_lower.contains("request.getparameter(")
+        || source_lower.contains("request.getheader(")
+        || source_lower.contains("request.getquerystring(")
+        || source_lower.contains("@requestparam")
+        || source_lower.contains("@pathvariable")
+        || source_lower.contains("httpservletrequest")
+        || source_lower.contains("servletrequest")
+        || source_lower.contains("jsonnode")
+        || source_lower.contains("objectmapper.readvalue(")
+        || source_lower.contains("exchange.getin().getheader")
+        || source_lower.contains("body.get(");
+    let has_allowlist_or_constant_context = source_lower.contains("lookup(\"java:")
+        || source_lower.contains("lookup('java:")
+        || source_lower.contains("lookup(\"jdbc/")
+        || source_lower.contains("lookup('jdbc/")
+        || source_lower.contains("java:comp/env")
+        || source_lower.contains("java:jboss")
+        || source_lower.contains("context.provider_url")
+        || source_lower.contains("system.getproperty(")
+        || source_lower.contains("system.getenv(")
+        || source_lower.contains("allowedjndi")
+        || source_lower.contains("jndiallowlist")
+        || source_lower.contains("jndi_allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("validatejndi(")
+        || source_lower.contains("isallowedjndi(")
+        || source_lower.contains("startswith(\"java:")
+        || source_lower.contains("startswith('java:");
+    if has_allowlist_or_constant_context {
+        return ProofClass::InvariantViolationProof;
+    }
+    if jndi_lookup_is_untrusted(
+        has_jndi_lookup,
+        has_untrusted_source,
+        has_allowlist_or_constant_context,
+        in_test_or_local_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -1790,6 +1989,90 @@ mod tests {
         let source = "func ParseSAMLResponse(body io.Reader) { decoder := xml.NewDecoder(body); var assertion Assertion; decoder.Decode(&assertion) }";
         assert_eq!(
             super::classify_xxe_saml_parser_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn saml_xsw_test_fixture_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:saml_xsw_validation_order".to_string(),
+            file: Some("src/test/java/idp/SamlXswFixture.java".to_string()),
+            ..Default::default()
+        };
+        let source = "DocumentBuilderFactory.newInstance(); verifySignature(doc); String id = assertion.getAttribute(\"ID\");";
+        assert_eq!(
+            super::classify_saml_xsw_validation_order_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn saml_xsw_validated_assertion_helper_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:saml_xsw_validation_order".to_string(),
+            file: Some("src/main/java/idp/SamlAcsController.java".to_string()),
+            ..Default::default()
+        };
+        let source = "Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input);\nAssertion validatedAssertion = validateAssertion(doc);\nString nameId = validatedAssertion.getSubject().getNameID();";
+        assert_eq!(
+            super::classify_saml_xsw_validation_order_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn saml_xsw_signature_before_selected_assertion_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:saml_xsw_validation_order".to_string(),
+            file: Some("src/main/java/idp/SamlAcsController.java".to_string()),
+            ..Default::default()
+        };
+        let source = "Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input);\nverifySignature(doc);\nNode assertion = doc.getElementsByTagName(\"Assertion\").item(0);\nString nameId = assertion.getTextContent();";
+        assert_eq!(
+            super::classify_saml_xsw_validation_order_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn jndi_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:jndi_injection".to_string(),
+            file: Some("src/test/java/app/JndiLookupTest.java".to_string()),
+            ..Default::default()
+        };
+        let source = "InitialContext ctx = new InitialContext(); Object obj = ctx.lookup(request.getParameter(\"name\"));";
+        assert_eq!(
+            super::classify_jndi_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn jndi_constant_container_context_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:jndi_injection".to_string(),
+            file: Some("src/main/java/app/DataSourceFactory.java".to_string()),
+            ..Default::default()
+        };
+        let source = "InitialContext ctx = new InitialContext(); DataSource ds = (DataSource) ctx.lookup(\"java:comp/env/jdbc/app\");";
+        assert_eq!(
+            super::classify_jndi_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn jndi_http_parameter_lookup_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:jndi_injection".to_string(),
+            file: Some("src/main/java/app/JndiController.java".to_string()),
+            ..Default::default()
+        };
+        let source = "void doGet(HttpServletRequest request) { InitialContext ctx = new InitialContext(); Object obj = ctx.lookup(request.getParameter(\"name\")); }";
+        assert_eq!(
+            super::classify_jndi_injection_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

@@ -3207,6 +3207,29 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("saml_xsw_validation_order") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof =
+                forge::proof_obligation::classify_saml_xsw_validation_order_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("jndi_injection") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_jndi_injection_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         } else if finding.id.contains("oauth_account_fusion") {
             let source = finding
                 .file
