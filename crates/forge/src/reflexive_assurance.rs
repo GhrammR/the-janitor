@@ -34,9 +34,10 @@ mod kani_proofs {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        debug_endpoint_is_unguarded, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, jndi_lookup_is_untrusted, proof_obligation_missing,
-        saml_xsw_validation_order_is_reachable, xxe_saml_parser_is_unguarded,
+        debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
+        intent_divergence_is_reachable, jndi_lookup_is_untrusted, process_builder_is_untrusted,
+        proof_obligation_missing, saml_xsw_validation_order_is_reachable,
+        xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -275,6 +276,56 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the eval-injection predicate is exact:
+    /// it fires iff dynamic eval + untrusted source are present, and
+    /// allowlist/sandbox plus test/local path are absent.
+    #[kani::proof]
+    fn eval_injection_untrusted_is_exact_conjunction() {
+        let has_eval_sink: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_allowlist_or_sandbox: bool = kani::any();
+        let in_test_or_local_path: bool = kani::any();
+        let fired = eval_injection_is_untrusted(
+            has_eval_sink,
+            has_untrusted_source,
+            has_allowlist_or_sandbox,
+            in_test_or_local_path,
+        );
+        kani::assert(
+            fired
+                == (has_eval_sink
+                    && has_untrusted_source
+                    && !has_allowlist_or_sandbox
+                    && !in_test_or_local_path),
+            "eval-injection predicate must be exact conjunction",
+        );
+    }
+
+    /// Prove the process-builder predicate is exact:
+    /// it fires iff process execution + untrusted source are present, and
+    /// command guard plus test/admin path are absent.
+    #[kani::proof]
+    fn process_builder_untrusted_is_exact_conjunction() {
+        let has_process_sink: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_command_guard: bool = kani::any();
+        let in_test_or_admin_path: bool = kani::any();
+        let fired = process_builder_is_untrusted(
+            has_process_sink,
+            has_untrusted_source,
+            has_command_guard,
+            in_test_or_admin_path,
+        );
+        kani::assert(
+            fired
+                == (has_process_sink
+                    && has_untrusted_source
+                    && !has_command_guard
+                    && !in_test_or_admin_path),
+            "process-builder predicate must be exact conjunction",
+        );
+    }
+
     /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
     /// fires iff a decoder is present AND an allowlist suppressor is absent.
     #[kani::proof]
@@ -415,13 +466,13 @@ mod tests {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        debug_endpoint_is_unguarded, ffi_deref_guard_classification, financial_pii_is_unguarded,
-        intent_divergence_is_reachable, jndi_lookup_is_untrusted,
+        debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
+        financial_pii_is_unguarded, intent_divergence_is_reachable, jndi_lookup_is_untrusted,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
-        react_xss_is_unguarded, saml_xsw_validation_order_is_reachable, sqli_concat_is_injectable,
-        xxe_saml_parser_is_unguarded,
+        oauth_state_validation_is_missing, process_builder_is_untrusted, proof_obligation_missing,
+        protobuf_any_is_unguarded, react_xss_is_unguarded, saml_xsw_validation_order_is_reachable,
+        sqli_concat_is_injectable, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -575,6 +626,24 @@ mod tests {
         assert!(!session_tool_intent_drift(true, true, true));
         assert!(!session_tool_intent_drift(false, true, false));
         assert!(!session_tool_intent_drift(true, false, false));
+    }
+
+    #[test]
+    fn eval_injection_reachability_requires_untrusted_source_without_guard() {
+        assert!(eval_injection_is_untrusted(true, true, false, false));
+        assert!(!eval_injection_is_untrusted(false, true, false, false));
+        assert!(!eval_injection_is_untrusted(true, false, false, false));
+        assert!(!eval_injection_is_untrusted(true, true, true, false));
+        assert!(!eval_injection_is_untrusted(true, true, false, true));
+    }
+
+    #[test]
+    fn process_builder_reachability_requires_untrusted_source_without_guard() {
+        assert!(process_builder_is_untrusted(true, true, false, false));
+        assert!(!process_builder_is_untrusted(false, true, false, false));
+        assert!(!process_builder_is_untrusted(true, false, false, false));
+        assert!(!process_builder_is_untrusted(true, true, true, false));
+        assert!(!process_builder_is_untrusted(true, true, false, true));
     }
 
     #[test]

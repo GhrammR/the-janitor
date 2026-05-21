@@ -1175,6 +1175,209 @@ pub fn classify_jndi_injection_proof(source: &str, finding: &StructuredFinding) 
     }
 }
 
+/// Returns `true` when dynamic code evaluation accepts attacker-controlled
+/// input without an allowlist, sandbox, or static-expression guard.
+pub fn eval_injection_is_untrusted(
+    has_eval_sink: bool,
+    has_untrusted_source: bool,
+    has_allowlist_or_sandbox: bool,
+    in_test_or_local_path: bool,
+) -> bool {
+    has_eval_sink && has_untrusted_source && !has_allowlist_or_sandbox && !in_test_or_local_path
+}
+
+/// Classifies a `security:eval_injection` finding into a `ProofClass`.
+///
+/// - Test/script/generated/local paths -> `InvariantViolationProof`
+/// - Allowlist, sandbox, or literal-only evaluator -> `InvariantViolationProof`
+/// - Dynamic eval/load/loadstring on request-controlled data -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_eval_injection_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_local_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("migrations/")
+        || path_lower.contains("migration")
+        || path_lower.contains("examples/")
+        || path_lower.contains("scripts/")
+        || path_lower.contains("/script/")
+        || path_lower.contains("local")
+        || path_lower.contains("admin_config");
+    if in_test_or_local_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_allowlist_or_sandbox = source_lower.contains("ast.literal_eval")
+        || source_lower.contains("safe_eval")
+        || source_lower.contains("sandbox")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("permitted")
+        || source_lower.contains("validate_eval")
+        || source_lower.contains("validateexpression")
+        || source_lower.contains("is_allowed_expression")
+        || source_lower.contains("allowed_expression");
+    if has_allowlist_or_sandbox {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_eval_sink = source_lower.lines().any(dynamic_eval_line);
+    let has_literal_only_eval = !has_eval_sink
+        && source_lower.lines().any(|line| {
+            let line = line.trim();
+            line.contains("eval(\"")
+                || line.contains("eval('")
+                || line.contains("loadstring(\"")
+                || line.contains("loadstring('")
+                || line.contains("load(\"")
+                || line.contains("load('")
+        });
+    if has_literal_only_eval {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_untrusted_source = source_lower.contains("request.")
+        || source_lower.contains("request[")
+        || source_lower.contains("req.")
+        || source_lower.contains("req[")
+        || source_lower.contains("ngx.req")
+        || source_lower.contains("ngx.var.arg")
+        || source_lower.contains("ngx.var.http")
+        || source_lower.contains("ngx.var.cookie")
+        || source_lower.contains("headers")
+        || source_lower.contains("getheader")
+        || source_lower.contains("getparameter")
+        || source_lower.contains("@requestparam")
+        || source_lower.contains("@pathvariable")
+        || source_lower.contains("params[")
+        || source_lower.contains("query[")
+        || source_lower.contains("body[")
+        || source_lower.contains("json.loads(request")
+        || source_lower.contains("jsonnode");
+    if eval_injection_is_untrusted(
+        has_eval_sink,
+        has_untrusted_source,
+        has_allowlist_or_sandbox,
+        in_test_or_local_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+fn dynamic_eval_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.contains("ast.literal_eval") {
+        return false;
+    }
+    for marker in ["eval(", "loadstring(", "load("] {
+        if let Some(idx) = trimmed.find(marker) {
+            let after = trimmed[idx + marker.len()..].trim_start();
+            if !after.starts_with('"') && !after.starts_with('\'') {
+                return true;
+            }
+        }
+    }
+    trimmed.contains("assert(load") || trimmed.contains("pcall(load")
+}
+
+/// Returns `true` when a process-execution sink accepts attacker-controlled
+/// command input without an allowlist, fixed binary, or strict argument map.
+pub fn process_builder_is_untrusted(
+    has_process_sink: bool,
+    has_untrusted_source: bool,
+    has_command_guard: bool,
+    in_test_or_admin_path: bool,
+) -> bool {
+    has_process_sink && has_untrusted_source && !has_command_guard && !in_test_or_admin_path
+}
+
+/// Classifies a `security:process_builder_injection` finding into a `ProofClass`.
+///
+/// - Tests/migrations/local installers/Windows service tooling -> `InvariantViolationProof`
+/// - Fixed argv, enum mapping, or allowlist guard -> `InvariantViolationProof`
+/// - Request-controlled command reaching ProcessBuilder/Runtime.exec -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_process_builder_injection_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_admin_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("migration")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("windowsserviceinstall")
+        || path_lower.contains("serviceinstall")
+        || path_lower.contains("installer")
+        || path_lower.contains("/cli/")
+        || path_lower.contains("/admin/");
+    if in_test_or_admin_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_process_sink = source_lower.contains("new processbuilder(")
+        || source_lower.contains("processbuilder(")
+        || source_lower.contains("runtime.getruntime().exec(")
+        || (source_lower.contains(".command(") && source_lower.contains("processbuilder"));
+    let has_untrusted_source = source_lower.contains("request.getparameter(")
+        || source_lower.contains("request.getheader(")
+        || source_lower.contains("request.getquerystring(")
+        || source_lower.contains("@requestparam")
+        || source_lower.contains("@pathvariable")
+        || source_lower.contains("httpservletrequest")
+        || source_lower.contains("servletrequest")
+        || source_lower.contains("jsonnode")
+        || source_lower.contains("objectmapper.readvalue(")
+        || source_lower.contains("exchange.getin().getheader")
+        || source_lower.contains("body.get(")
+        || source_lower.contains("req.getparameter(")
+        || source_lower.contains("req.getheader(");
+    let has_command_guard = source_lower.contains("allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("allowedcommand")
+        || source_lower.contains("isallowedcommand")
+        || source_lower.contains("validatecommand")
+        || source_lower.contains("commandenum")
+        || source_lower.contains("enumset")
+        || source_lower.contains("switch (")
+        || source_lower.contains("switch(")
+        || source_lower.contains("map.of(")
+        || source_lower.contains("list.of(\"")
+        || source_lower.contains("new processbuilder(\"")
+        || source_lower.contains(".command(\"");
+    if has_command_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+    if process_builder_is_untrusted(
+        has_process_sink,
+        has_untrusted_source,
+        has_command_guard,
+        in_test_or_admin_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -2073,6 +2276,93 @@ mod tests {
         let source = "void doGet(HttpServletRequest request) { InitialContext ctx = new InitialContext(); Object obj = ctx.lookup(request.getParameter(\"name\")); }";
         assert_eq!(
             super::classify_jndi_injection_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn eval_injection_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:eval_injection".to_string(),
+            file: Some("spec/lua/eval_spec.lua".to_string()),
+            ..Default::default()
+        };
+        let source = "local f = loadstring(ngx.req.get_body_data())";
+        assert_eq!(
+            super::classify_eval_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn eval_injection_literal_eval_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:eval_injection".to_string(),
+            file: Some("kong/runloop/balancer/targets.lua".to_string()),
+            ..Default::default()
+        };
+        let source = "local f = loadstring(\"return 1 + 1\")";
+        assert_eq!(
+            super::classify_eval_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn eval_injection_request_body_loadstring_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:eval_injection".to_string(),
+            file: Some("kong/runloop/balancer/targets.lua".to_string()),
+            ..Default::default()
+        };
+        let source = "local code = ngx.req.get_body_data()\nlocal f = loadstring(code)\nreturn f()";
+        assert_eq!(
+            super::classify_eval_injection_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn process_builder_windows_service_install_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:process_builder_injection".to_string(),
+            file: Some(
+                "quarkus/runtime/src/main/java/org/keycloak/quarkus/runtime/cli/command/WindowsServiceInstall.java"
+                    .to_string(),
+            ),
+            ..Default::default()
+        };
+        let source = "new ProcessBuilder(command).start();";
+        assert_eq!(
+            super::classify_process_builder_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn process_builder_fixed_command_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:process_builder_injection".to_string(),
+            file: Some("src/main/java/app/HealthCheck.java".to_string()),
+            ..Default::default()
+        };
+        let source = "Process p = new ProcessBuilder(\"git\", \"status\").start();";
+        assert_eq!(
+            super::classify_process_builder_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn process_builder_request_parameter_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:process_builder_injection".to_string(),
+            file: Some("src/main/java/app/RunController.java".to_string()),
+            ..Default::default()
+        };
+        let source = "void run(HttpServletRequest request) throws Exception { String cmd = request.getParameter(\"cmd\"); new ProcessBuilder(cmd).start(); }";
+        assert_eq!(
+            super::classify_process_builder_injection_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

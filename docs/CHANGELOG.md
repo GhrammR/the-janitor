@@ -3,6 +3,17 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 159: Research README Reset + Eval/Process Proof Cures + Hunt Sweep
+
+* `README.md` *(modified)* — reset the public narrative to research-project positioning: removed purchase-facing framing, kept IFDS/Z3/Kani/PQC proof-obligation substance, added current research questions and local reproduction commands, and avoided HN/sunset announcement dependency.
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `eval_injection_is_untrusted` + `classify_eval_injection_proof`, and `process_builder_is_untrusted` + `classify_process_builder_injection_proof`; both classifiers suppress test/generated/local/admin contexts and emit `ReachabilityProof` only when attacker-controlled request data reaches a dynamic eval or process-execution sink without guards.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:eval_injection` and `security:process_builder_injection` through deterministic proof classifiers, suppressing invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added exact-conjunction Kani harnesses plus deterministic regression tests for eval-injection and process-builder predicates.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:eval_injection` and `security:process_builder_injection` hard-deleted after implementation.
+* `tools/campaign/CANDIDATE_LEDGER.md` / `LOW_YIELD_LEDGER.md` *(modified)* — Sprint 159 hunt rows added: Immutable wallet contracts and Afterpay Android SDK emitted zero findings; ClickHouse residuals routed to LOW_YIELD, with one server-memory CANDIDATE batch retained at 15% pending release-build reproduction.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 74 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` → 31 passed; `cargo test -p cli -- hunt --test-threads=2` → 89 passed; `cargo kani -p forge --harness eval_injection_untrusted_is_exact_conjunction` → successful; `cargo kani -p forge --harness process_builder_untrusted_is_exact_conjunction` → successful; target sweep complete (`immutable/wallet-contracts` 0 findings, `ClickHouse/ClickHouse` 445 findings routed across CANDIDATE/LOW_YIELD, `afterpay/sdk-android` 0 findings).
+
 ## 2026-05-21 — Sprint 158: SAML XSW + JNDI Proof Cures, Hunt Sweep, PR Gate Triage
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — added `saml_xsw_validation_order_is_reachable` + `classify_saml_xsw_validation_order_proof`; production SAML parser + signature validation + later selected-assertion consumption without same-assertion binding emits `ReachabilityProof`, while test/generated/metadata and validated-assertion contexts suppress as `InvariantViolationProof`. Added `jndi_lookup_is_untrusted` + `classify_jndi_injection_proof`; HTTP/body/header-driven JNDI lookup emits `ReachabilityProof`, while tests, migrations, generated/local paths, constant `java:` lookups, and allowlist guards suppress.
