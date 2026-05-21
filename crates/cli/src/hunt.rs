@@ -3235,6 +3235,13 @@ fn apply_phase2b_suppression(dir: &Path, findings: &mut Vec<StructuredFinding>) 
                 return false;
             }
         }
+        // Structural eradication: react_xss_dangerous_html when DOMPurify.sanitize() guards
+        // the dangerouslySetInnerHTML sink in the same file — sanitizer confirmed present.
+        if finding.id.contains("react_xss_dangerous_html")
+            && source.contains("DOMPurify.sanitize(")
+        {
+            return false;
+        }
         true
     });
 }

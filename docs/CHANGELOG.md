@@ -3,6 +3,20 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-20 — Sprint 152: lcm_off_by_one_loop + OAuth State Proof Cures + Hunt Sweep + Platform Gate + XSS PoC
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — **Phase 1**: `lcm_off_by_one_loop_is_exploitable` + `classify_lcm_off_by_one_loop_proof` (±5-line assert/bounds-check → InvariantViolationProof; test/bench path → InvariantViolationProof; ±10-line C export → ReachabilityProof). **Phase 2**: `oauth_state_validation_is_missing` + `classify_oauth_state_validation_proof` (.ts/.js → LatticeGapProposal; .py/.go/.rb/.java with state check → InvariantViolationProof; no state check → ReachabilityProof). 6 deterministic tests added (3 per classifier).
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification`: `lcm_off_by_one_loop` and `oauth_missing_state_validation` branches wired after `lcm_malloc_integer_truncation`. **Structural eradication**: `apply_phase2b_suppression` extended with DOMPurify guard — `react_xss_dangerous_html` suppressed when `DOMPurify.sanitize(` present in file (eliminates querybook FP class).
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `compliance_oracle_kani` gains 2 Kani harnesses (`classify_lcm_off_by_one_loop_no_panic`, `classify_oauth_state_validation_no_panic`); `tests` module gains 2 regression tests + updated imports.
+* `crates/forge/src/authz.rs` *(modified)* — Oracle Execution Law: `authz.rs:538` char-boundary panic on UTF-8 multibyte strings fixed (`raw_end` → walk back via `is_char_boundary`). Fixes vault hunt panic.
+* `.INNOVATION_LOG.md` *(modified)* — Hard-deleted P17-3A `lcm_off_by_one_loop` and `oauth_excessive_scope` blocks.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — TrustWallet `lcm_off_by_one_loop` upgraded 25%→40% (4 production sites confirmed `reachability_proof`). Querybook `oauth_missing_state_validation` upgraded 40%→65% (8 server-side Python files confirm `reachability_proof`; no state check in any). Added 4 new CANDIDATE rows: teleport protobuf_any×28 (25%), teleport ffi_unsafe_deref (25%), vault protobuf_any×41 (30%), vault AppRole non_constant_time (35%).
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — 15 new LOW_YIELD rows across teleport, vault, stripe-node including querybook react_xss (DOMPurify confirmed, 0%).
+* **Phase 4**: Branch protection on `main` configured via GitHub API — `required_approving_review_count: 1`, `dismiss_stale_reviews: true`, `enforce_admins: true`.
+* **Phase 5**: querybook XSS Docker PoC — DOMPurify.sanitize() confirmed at all 6 `dangerouslySetInnerHTML` sinks in StatementLog.tsx and SearchResultItem.tsx. Approval moved 35%→0%, finding moved to LOW_YIELD.
+
+**Verification**: `cargo test -p forge -p cli -j2 -- --test-threads=2` → 1240 passed ✓ | 2 Kani harnesses in compliance_oracle_kani ✓ | branch protection live (`required_approving_review_count: 1`) ✓ | 3-org hunt sweep complete ✓
+
 ## 2026-05-16 — Sprint Batch 138: P17-4 OAuth State Validation + P7-2 Phase B patch_proof Oracle + Dependabot Auto-merge
 
 * `crates/forge/src/oauth_account_fusion.rs` *(modified)* — P17-4 **OAuth State Parameter Absence Detector**: `detect_missing_state_validation(source: &[u8], label: &str) -> Vec<SlopFinding>`. Two AhoCorasick automata: OAuth code-extract group (`code=`, `authorization_code`, `grant_type=authorization_code`, `oauth_code`, `auth_code`) and state-validation group (`state_param`, `oauth_state`, `csrf_token`, `request_verifier`, `pkce_verifier`, `state =`, `state=`). Fires `security:oauth_missing_state_validation` at High when group-1 matches but group-2 is absent (whole-file scope). 4 deterministic tests: TP (code= without state), TN (code= + state present), TN (no OAuth code), TN (state= without code). P17-4 block eradicated from `.INNOVATION_LOG.md`.
