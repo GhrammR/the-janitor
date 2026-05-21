@@ -334,10 +334,11 @@ mod tests {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
-        ffi_deref_guard_classification, intent_divergence_is_reachable,
+        ffi_deref_guard_classification, financial_pii_is_unguarded, intent_divergence_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, proof_obligation_missing, protobuf_any_is_unguarded,
+        sqli_concat_is_injectable,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -540,6 +541,22 @@ mod tests {
         assert!(!protobuf_any_is_unguarded(true, true));
         assert!(!protobuf_any_is_unguarded(false, true));
     }
+
+    #[test]
+    fn sqli_concat_injectable_is_exact_conjunction() {
+        assert!(sqli_concat_is_injectable(true, false));
+        assert!(!sqli_concat_is_injectable(false, false));
+        assert!(!sqli_concat_is_injectable(true, true));
+        assert!(!sqli_concat_is_injectable(false, true));
+    }
+
+    #[test]
+    fn financial_pii_unguarded_is_exact_conjunction() {
+        assert!(financial_pii_is_unguarded(true, false));
+        assert!(!financial_pii_is_unguarded(false, false));
+        assert!(!financial_pii_is_unguarded(true, true));
+        assert!(!financial_pii_is_unguarded(false, true));
+    }
 }
 
 // ── binary_diff Kani proofs ───────────────────────────────────────────────
@@ -635,10 +652,11 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
-        lcm_double_free_is_reachable, lcm_malloc_integer_truncation_is_exploitable,
-        lcm_off_by_one_loop_is_exploitable, lcm_use_after_free_is_reachable,
-        oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
-        protobuf_any_is_unguarded, timing_comparison_is_sensitive,
+        financial_pii_is_unguarded, lcm_double_free_is_reachable,
+        lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
+        lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
+        oauth_state_validation_is_missing, protobuf_any_is_unguarded,
+        sqli_concat_is_injectable, timing_comparison_is_sensitive,
     };
     use common::slop::StructuredFinding;
 
@@ -760,6 +778,32 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (uses_deprecated && !in_test),
             "protobuf_any guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `sqli_concat_is_injectable` is the exact conjunction of
+    /// raw-concat flag and absence of migration path.
+    #[kani::proof]
+    fn sqli_concat_injectable_is_exact_conjunction() {
+        let is_raw: bool = kani::any();
+        let in_migration: bool = kani::any();
+        let result = sqli_concat_is_injectable(is_raw, in_migration);
+        kani::assert(
+            result == (is_raw && !in_migration),
+            "sqli_concat guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `financial_pii_is_unguarded` is the exact conjunction of
+    /// PII-sink presence and absence of a masking guard.
+    #[kani::proof]
+    fn financial_pii_unguarded_is_exact_conjunction() {
+        let has_sink: bool = kani::any();
+        let has_mask: bool = kani::any();
+        let result = financial_pii_is_unguarded(has_sink, has_mask);
+        kani::assert(
+            result == (has_sink && !has_mask),
+            "financial_pii guard must be exact conjunction",
         );
     }
 }

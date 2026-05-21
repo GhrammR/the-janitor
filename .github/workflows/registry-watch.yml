@@ -1,0 +1,28 @@
+name: registry-watch
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  registry-watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run registry watch scan
+        run: janitor registry-watch --dry-run --output /tmp/rw_report.json
+      - name: File issue on detection
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Registry Watch: suspicious package detected',
+              body: 'Automated registry scan fired. Review /tmp/rw_report.json.'
+            })

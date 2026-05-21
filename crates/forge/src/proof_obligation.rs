@@ -604,6 +604,128 @@ pub fn classify_protobuf_any_proof(source: &str, finding: &StructuredFinding) ->
     }
 }
 
+/// Returns `true` when a SQL concatenation finding is genuinely injectable:
+/// raw concatenation present and NOT inside a migration/test path.
+pub fn sqli_concat_is_injectable(is_raw_concat: bool, in_migration_path: bool) -> bool {
+    is_raw_concat && !in_migration_path
+}
+
+/// Classifies a `security:sqli_concatenation` finding into a `ProofClass`.
+///
+/// - Test/mock/fixture file path → `InvariantViolationProof` (suppress)
+/// - Parameterized-query marker in source → `InvariantViolationProof` (suppress)
+/// - Raw SQL string concatenation or `fmt.Sprintf` with SQL keyword → `ReachabilityProof`
+/// - Otherwise → `LatticeGapProposal`
+pub fn classify_sqli_concatenation_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("mock")
+                || p.contains("fixture")
+                || p.ends_with("_test.go")
+                || p.ends_with("Test.java")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_parameterized = source.contains("$1")
+        || source.contains("$2")
+        || source.contains("Prepare(")
+        || source.contains("stmt.Exec(")
+        || source.contains("sqlx::query!")
+        || source.contains("PreparedStatement")
+        || source.contains("db.Prepare(")
+        || source.contains("Query($")
+        || source.contains("NamedQuery(")
+        || source.contains("sqlx::query_as!");
+    if has_parameterized {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_raw_concat = source.contains("+ \"")
+        && (source.contains("SELECT")
+            || source.contains("INSERT")
+            || source.contains("UPDATE")
+            || source.contains("DELETE")
+            || source.contains("WHERE")
+            || source.contains("FROM"));
+    let has_fmt_sprintf = source.contains("fmt.Sprintf")
+        && (source.contains("SELECT")
+            || source.contains("WHERE")
+            || source.contains("INSERT")
+            || source.contains("DELETE"));
+    let has_string_format = source.contains("String.format(")
+        && (source.contains("SELECT") || source.contains("WHERE"));
+    if has_raw_concat || has_fmt_sprintf || has_string_format {
+        return ProofClass::ReachabilityProof;
+    }
+    ProofClass::LatticeGapProposal
+}
+
+/// Returns `true` when financial PII flows to an LLM sink without a masking guard.
+pub fn financial_pii_is_unguarded(has_pii_sink: bool, has_masking_guard: bool) -> bool {
+    has_pii_sink && !has_masking_guard
+}
+
+/// Classifies a `security:financial_pii_to_external_llm` finding into a `ProofClass`.
+///
+/// - Test/mock/fixture file path → `InvariantViolationProof` (suppress)
+/// - Masking/redaction guard present → `InvariantViolationProof` (suppress)
+/// - PII field name AND LLM sink both present → `ReachabilityProof`
+/// - Otherwise → `LatticeGapProposal`
+pub fn classify_financial_pii_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| p.contains("test") || p.contains("mock") || p.contains("fixture"))
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_masking = source.contains("redact(")
+        || source.contains("mask_pii(")
+        || source.contains("anonymize(")
+        || source.contains("scrub_pii(")
+        || source.contains("[REDACTED]")
+        || source.contains("pii_filter")
+        || source.contains("DataMasker")
+        || source.contains("sanitize_pii(")
+        || source.contains("strip_pii(")
+        || source.contains("hash_pii(");
+    if has_masking {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_pii = source.contains("ssn")
+        || source.contains("credit_card")
+        || source.contains("card_number")
+        || source.contains("account_number")
+        || source.contains("routing_number")
+        || source.contains("tax_id")
+        || source.contains("social_security")
+        || source.contains("bank_account");
+    let has_llm_sink = source.contains("openai.com")
+        || source.contains("anthropic.com")
+        || source.contains("api.openai")
+        || source.contains("ChatCompletion")
+        || source.contains("client.chat")
+        || source.contains("llm_gateway")
+        || source.contains("ws.WriteMessage(")
+        || source.contains("sendToLLM");
+    if has_pii && has_llm_sink {
+        return ProofClass::ReachabilityProof;
+    }
+    ProofClass::LatticeGapProposal
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -1202,6 +1324,84 @@ mod tests {
         assert_eq!(
             super::classify_protobuf_any_proof(source, &finding),
             ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn sqli_concat_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            file: Some("store/store_test.go".to_string()),
+            ..Default::default()
+        };
+        let source = r#"query := "SELECT * FROM users WHERE id=" + userId"#;
+        assert_eq!(
+            super::classify_sqli_concatenation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn sqli_concat_raw_concat_go_yields_reachability() {
+        let finding = StructuredFinding {
+            file: Some("core/store/store.go".to_string()),
+            ..Default::default()
+        };
+        let source = r#"q := fmt.Sprintf("SELECT * FROM users WHERE name='%s'", userName)"#;
+        assert_eq!(
+            super::classify_sqli_concatenation_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn sqli_concat_parameterized_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            file: Some("core/store/store.go".to_string()),
+            ..Default::default()
+        };
+        let source = r#"rows, err := db.Prepare("SELECT * FROM users WHERE id = $1")"#;
+        assert_eq!(
+            super::classify_sqli_concatenation_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn financial_pii_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            file: Some("services/gateway/test/ws_test.go".to_string()),
+            ..Default::default()
+        };
+        let source = "ssn := req.SSN\nws.WriteMessage(ssn)";
+        assert_eq!(
+            super::classify_financial_pii_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn financial_pii_masked_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            file: Some("services/gateway/network/wsconnection.go".to_string()),
+            ..Default::default()
+        };
+        let source = "sanitized := redact(user.ssn)\nclient.chat(sanitized)";
+        assert_eq!(
+            super::classify_financial_pii_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn financial_pii_unmasked_llm_sink_yields_reachability() {
+        let finding = StructuredFinding {
+            file: Some("services/gateway/network/wsconnection.go".to_string()),
+            ..Default::default()
+        };
+        let source = "payload := req.credit_card\nws.WriteMessage(websocket.TextMessage, payload)";
+        assert_eq!(
+            super::classify_financial_pii_proof(source, &finding),
+            ProofClass::ReachabilityProof
         );
     }
 }

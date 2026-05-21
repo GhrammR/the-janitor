@@ -3217,6 +3217,28 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("sqli_concatenation") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_sqli_concatenation_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("financial_pii_to_external_llm") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_financial_pii_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         }
         true
     });
