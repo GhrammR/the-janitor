@@ -747,8 +747,7 @@ fn format_auth0_report_with_component(
     }
 
     let mut reports = Vec::with_capacity(grouped.len());
-    for (rule_id, group) in &grouped {
-        let mut sorted_group = group.clone();
+    for (rule_id, mut sorted_group) in grouped {
         sorted_group.sort_by(|left, right| {
             let left_key = (
                 left.file.as_deref().unwrap_or("~"),
