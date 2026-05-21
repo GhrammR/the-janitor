@@ -35,9 +35,10 @@ mod kani_proofs {
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
         debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, jndi_lookup_is_untrusted, process_builder_is_untrusted,
-        proof_obligation_missing, saml_xsw_validation_order_is_reachable,
-        xxe_saml_parser_is_unguarded,
+        intent_divergence_is_reachable, jndi_lookup_is_untrusted,
+        oauth_excessive_scope_is_reachable, pqc_hybrid_downgrade_is_reachable,
+        process_builder_is_untrusted, proof_obligation_missing,
+        saml_xsw_validation_order_is_reachable, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -326,6 +327,56 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the PQC hybrid downgrade predicate is exact:
+    /// it fires iff hybrid/PQC requirement + downgrade path are present, and
+    /// policy pin/allowlist plus test/generated path are absent.
+    #[kani::proof]
+    fn pqc_hybrid_downgrade_is_exact_conjunction() {
+        let has_hybrid_requirement: bool = kani::any();
+        let has_downgrade_path: bool = kani::any();
+        let has_policy_pin_or_allowlist: bool = kani::any();
+        let in_test_or_generated_path: bool = kani::any();
+        let fired = pqc_hybrid_downgrade_is_reachable(
+            has_hybrid_requirement,
+            has_downgrade_path,
+            has_policy_pin_or_allowlist,
+            in_test_or_generated_path,
+        );
+        kani::assert(
+            fired
+                == (has_hybrid_requirement
+                    && has_downgrade_path
+                    && !has_policy_pin_or_allowlist
+                    && !in_test_or_generated_path),
+            "PQC hybrid downgrade predicate must be exact conjunction",
+        );
+    }
+
+    /// Prove the OAuth excessive-scope predicate is exact:
+    /// it fires iff sensitive scope + token context are present, and
+    /// audience/least-privilege guard plus test/admin path are absent.
+    #[kani::proof]
+    fn oauth_excessive_scope_is_exact_conjunction() {
+        let has_sensitive_scope: bool = kani::any();
+        let has_untrusted_or_token_context: bool = kani::any();
+        let has_audience_or_least_privilege_guard: bool = kani::any();
+        let in_test_or_admin_path: bool = kani::any();
+        let fired = oauth_excessive_scope_is_reachable(
+            has_sensitive_scope,
+            has_untrusted_or_token_context,
+            has_audience_or_least_privilege_guard,
+            in_test_or_admin_path,
+        );
+        kani::assert(
+            fired
+                == (has_sensitive_scope
+                    && has_untrusted_or_token_context
+                    && !has_audience_or_least_privilege_guard
+                    && !in_test_or_admin_path),
+            "OAuth excessive-scope predicate must be exact conjunction",
+        );
+    }
+
     /// Prove the Java deserialization allowlist-bypass gate is an exact conjunction:
     /// fires iff a decoder is present AND an allowlist suppressor is absent.
     #[kani::proof]
@@ -470,7 +521,8 @@ mod tests {
         financial_pii_is_unguarded, intent_divergence_is_reachable, jndi_lookup_is_untrusted,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, process_builder_is_untrusted, proof_obligation_missing,
+        oauth_excessive_scope_is_reachable, oauth_state_validation_is_missing,
+        pqc_hybrid_downgrade_is_reachable, process_builder_is_untrusted, proof_obligation_missing,
         protobuf_any_is_unguarded, react_xss_is_unguarded, saml_xsw_validation_order_is_reachable,
         sqli_concat_is_injectable, xxe_saml_parser_is_unguarded,
     };
@@ -644,6 +696,32 @@ mod tests {
         assert!(!process_builder_is_untrusted(true, false, false, false));
         assert!(!process_builder_is_untrusted(true, true, true, false));
         assert!(!process_builder_is_untrusted(true, true, false, true));
+    }
+
+    #[test]
+    fn pqc_hybrid_downgrade_requires_hybrid_requirement_and_downgrade_path() {
+        assert!(pqc_hybrid_downgrade_is_reachable(true, true, false, false));
+        assert!(!pqc_hybrid_downgrade_is_reachable(
+            false, true, false, false
+        ));
+        assert!(!pqc_hybrid_downgrade_is_reachable(
+            true, false, false, false
+        ));
+        assert!(!pqc_hybrid_downgrade_is_reachable(true, true, true, false));
+        assert!(!pqc_hybrid_downgrade_is_reachable(true, true, false, true));
+    }
+
+    #[test]
+    fn oauth_excessive_scope_requires_sensitive_scope_without_guard() {
+        assert!(oauth_excessive_scope_is_reachable(true, true, false, false));
+        assert!(!oauth_excessive_scope_is_reachable(
+            false, true, false, false
+        ));
+        assert!(!oauth_excessive_scope_is_reachable(
+            true, false, false, false
+        ));
+        assert!(!oauth_excessive_scope_is_reachable(true, true, true, false));
+        assert!(!oauth_excessive_scope_is_reachable(true, true, false, true));
     }
 
     #[test]

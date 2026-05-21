@@ -57,6 +57,22 @@ Table of all files modified, created, staged, or committed in this session.
 If no code was staged or committed (research-only session), state "No code
 staged."
 
+If `README.md` or another GitHub-rendered documentation entrypoint changed and
+the operator asked for GitHub visibility, this section must also state the
+local commit SHA, pushed remote branch SHA, and whether GitHub's default branch
+can show the change before merge. A branch push is not equivalent to a
+default-branch README update; say so explicitly.
+
+Required proof for README/documentation visibility claims:
+- `git rev-parse HEAD`
+- `git ls-remote origin <current-branch>`
+- `git show origin/<current-branch>:README.md | head -40` or an equivalent
+  remote-content read
+
+If a commit was made for a directive that expects GitHub-visible documentation,
+the directive is incomplete until `git push` succeeds or the final response
+reports the concrete push blocker.
+
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:
 - P0/P1/P2 item created, compacted, or completed with one-line rationale

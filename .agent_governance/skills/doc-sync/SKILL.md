@@ -7,6 +7,7 @@ Mapping Matrix below.
 
 | Changed path pattern | Document to audit |
 |----------------------|-------------------|
+| `README.md` | remote branch README content |
 | `crates/**` | `SOVEREIGN_BRIEFING.md` |
 | `justfile` | `RUNBOOK.md` |
 | Any new or modified CLI flag | `RUNBOOK.md` |
@@ -22,6 +23,7 @@ Mapping Matrix below.
 
    | Trigger | Verification checklist |
    |---------|----------------------|
+   | `README.md` changed | Was the commit pushed, does `origin/<branch>:README.md` contain the intended text, and is any default-branch visibility dependency stated? |
    | `crates/**` changed | Does `SOVEREIGN_BRIEFING.md` reflect the new module, struct, or public API? |
    | `justfile` changed | Does `RUNBOOK.md` list the new/modified recipe with correct syntax? |
    | CLI flag added/renamed | Does `RUNBOOK.md` show the updated flag name and description? |
@@ -33,6 +35,14 @@ Mapping Matrix below.
    - Re-run the pre-commit gate after the update.
 
 4. **If the document is current**: proceed to commit.
+
+5. **If `README.md` changed for a GitHub-visible directive**:
+   - After commit, push the current branch or report the exact push blocker.
+   - Verify remote branch content with:
+     `git show origin/<branch>:README.md | head -40`
+   - If GitHub's default repository README still points at `main`, explicitly
+     state that the branch README is updated but the default GitHub landing page
+     will not show it until merge.
 
 ## Abort conditions
 

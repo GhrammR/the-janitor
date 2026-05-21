@@ -5,7 +5,7 @@ name: Workflow Lint
 #   2. actionlint static analysis (downloaded fresh for each run, SHA-pinned).
 #   3. SHA-pin discipline — every `uses:` reference must be either
 #      a literal commit SHA or a `./` local path.  Major-version floats
-#      (`@v4`, `@main`, `@latest`) are rejected per OpenSSF Scorecard
+#      major-version floats and branch aliases are rejected per OpenSSF Scorecard
 #      Pinned-Dependencies criterion.
 #
 # Runs on PRs that touch workflow files; safe to skip on docs-only PRs.
@@ -91,7 +91,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Reject major-version floats (@v1/@v2/.../@main/@master/@latest)
+          # Reject major-version floats and branch aliases
           # in any workflow or composite action.  Local references (uses: ./)
           # and SHA pins (40-hex string) are allowed.
           UNPINNED=$(

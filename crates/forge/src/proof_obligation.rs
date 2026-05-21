@@ -1378,6 +1378,207 @@ pub fn classify_process_builder_injection_proof(
     }
 }
 
+/// Returns `true` when a production auth/crypto path can downgrade away from a
+/// configured hybrid/PQC requirement without a policy pin or allowlist.
+pub fn pqc_hybrid_downgrade_is_reachable(
+    has_hybrid_requirement: bool,
+    has_downgrade_path: bool,
+    has_policy_pin_or_allowlist: bool,
+    in_test_or_generated_path: bool,
+) -> bool {
+    has_hybrid_requirement
+        && has_downgrade_path
+        && !has_policy_pin_or_allowlist
+        && !in_test_or_generated_path
+}
+
+/// Classifies a `security:pqc_hybrid_downgrade` finding into a `ProofClass`.
+///
+/// - Test/generated/docs/key-utility-only paths -> `InvariantViolationProof`
+/// - Explicit algorithm policy pins or allowlists -> `InvariantViolationProof`
+/// - Production hybrid/PQC negotiation accepting legacy algorithms -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_pqc_hybrid_downgrade_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_generated_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("migration")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.ends_with(".md")
+        || (path_lower.contains("keyutils") && !path_lower.contains("auth"));
+    if in_test_or_generated_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_hybrid_requirement = source_lower.contains("pqc")
+        || source_lower.contains("post-quantum")
+        || source_lower.contains("post quantum")
+        || source_lower.contains("ml-dsa")
+        || source_lower.contains("mldsa")
+        || source_lower.contains("dilithium")
+        || source_lower.contains("slh-dsa")
+        || source_lower.contains("ml-kem")
+        || source_lower.contains("mlkem")
+        || source_lower.contains("hybrid");
+    let has_legacy_algorithm = source_lower.contains("rsa")
+        || source_lower.contains("ecdsa")
+        || source_lower.contains("ecdh")
+        || source_lower.contains("x25519")
+        || source_lower.contains("ed25519")
+        || source_lower.contains("sha1withrsa")
+        || source_lower.contains("rs256")
+        || source_lower.contains("es256");
+    let has_negotiation_or_verification = source_lower.contains("algorithm")
+        || source_lower.contains(" alg")
+        || source_lower.contains("signature")
+        || source_lower.contains("verify")
+        || source_lower.contains("jwt")
+        || source_lower.contains("jws")
+        || source_lower.contains("certificate")
+        || source_lower.contains("provider");
+    let has_downgrade_path = has_legacy_algorithm && has_negotiation_or_verification;
+    let has_policy_pin_or_allowlist = source_lower.contains("allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("allowedalgorithms")
+        || source_lower.contains("permittedalgorithms")
+        || source_lower.contains("minimumsecurity")
+        || source_lower.contains("min_security")
+        || source_lower.contains("requirepqc")
+        || source_lower.contains("require_pqc")
+        || source_lower.contains("requirehybrid")
+        || source_lower.contains("require_hybrid")
+        || source_lower.contains("policy.pin")
+        || source_lower.contains("policy_pin")
+        || source_lower.contains("rejectlegacy")
+        || source_lower.contains("reject_legacy");
+    if has_policy_pin_or_allowlist {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    if pqc_hybrid_downgrade_is_reachable(
+        has_hybrid_requirement,
+        has_downgrade_path,
+        has_policy_pin_or_allowlist,
+        in_test_or_generated_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when a production OAuth/token path grants broad scope to
+/// untrusted input without audience, resource, or least-privilege constraints.
+pub fn oauth_excessive_scope_is_reachable(
+    has_sensitive_scope: bool,
+    has_untrusted_or_token_context: bool,
+    has_audience_or_least_privilege_guard: bool,
+    in_test_or_admin_path: bool,
+) -> bool {
+    has_sensitive_scope
+        && has_untrusted_or_token_context
+        && !has_audience_or_least_privilege_guard
+        && !in_test_or_admin_path
+}
+
+/// Classifies a `security:oauth_excessive_scope` finding into a `ProofClass`.
+///
+/// - Tests/examples/generated/local/admin config -> `InvariantViolationProof`
+/// - Audience/resource/least-privilege scope constraints -> `InvariantViolationProof`
+/// - Production OAuth/token code granting admin/repo/wildcard scope -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_oauth_excessive_scope_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let in_test_or_admin_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("local")
+        || path_lower.contains("operator")
+        || path_lower.contains("/admin/")
+        || path_lower.ends_with(".md");
+    if in_test_or_admin_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_sensitive_scope = source_lower.contains("admin:org")
+        || source_lower.contains("admin:enterprise")
+        || source_lower.contains("id-token: write")
+        || source_lower.contains("id-token:write")
+        || source_lower.contains("permissions: write-all")
+        || source_lower.contains("scope=*")
+        || source_lower.contains("scope=%2a")
+        || source_lower.contains("\"scope\":\"*\"")
+        || source_lower.contains("scope: \"*\"")
+        || source_lower.contains("scope: [\"*\"]")
+        || source_lower.contains("scope=repo")
+        || source_lower.contains("scope: repo")
+        || source_lower.contains(" repo ")
+        || source_lower.contains(" repo,")
+        || source_lower.contains(" repo\"");
+    let has_untrusted_or_token_context = source_lower.contains("oauth")
+        || source_lower.contains("github")
+        || source_lower.contains("authorization_url")
+        || source_lower.contains("request_token")
+        || source_lower.contains("scopedtoken")
+        || source_lower.contains("access_token")
+        || source_lower.contains("client_id")
+        || source_lower.contains("request.")
+        || source_lower.contains("req.")
+        || source_lower.contains("workflow_dispatch")
+        || source_lower.contains("pull_request_target");
+    let has_audience_or_least_privilege_guard = source_lower.contains("audience:")
+        || source_lower.contains("audience=")
+        || source_lower.contains("resource:")
+        || source_lower.contains("resource=")
+        || source_lower.contains("allowed_scopes")
+        || source_lower.contains("allowedscopes")
+        || source_lower.contains("leastprivilege")
+        || source_lower.contains("least_privilege")
+        || source_lower.contains("validate_scope")
+        || source_lower.contains("validatescope")
+        || source_lower.contains("scope_allowlist")
+        || source_lower.contains("scopeallowlist")
+        || source_lower.contains("read:user user:email");
+    if has_audience_or_least_privilege_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    if oauth_excessive_scope_is_reachable(
+        has_sensitive_scope,
+        has_untrusted_or_token_context,
+        has_audience_or_least_privilege_guard,
+        in_test_or_admin_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -2363,6 +2564,93 @@ mod tests {
         let source = "void run(HttpServletRequest request) throws Exception { String cmd = request.getParameter(\"cmd\"); new ProcessBuilder(cmd).start(); }";
         assert_eq!(
             super::classify_process_builder_injection_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn pqc_hybrid_keyutils_constant_utility_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:pqc_hybrid_downgrade".to_string(),
+            file: Some("common/src/main/java/org/keycloak/common/util/KeyUtils.java".to_string()),
+            ..Default::default()
+        };
+        let source = "KeyPairGenerator.getInstance(\"RSA\").generateKeyPair();";
+        assert_eq!(
+            super::classify_pqc_hybrid_downgrade_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn pqc_hybrid_policy_pin_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:pqc_hybrid_downgrade".to_string(),
+            file: Some("src/main/java/auth/SignatureVerifier.java".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "requireHybrid(policy); allowedAlgorithms = List.of(\"ML-DSA\", \"ML-KEM\"); verify(signature);";
+        assert_eq!(
+            super::classify_pqc_hybrid_downgrade_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn pqc_hybrid_legacy_algorithm_negotiation_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:pqc_hybrid_downgrade".to_string(),
+            file: Some("src/main/java/auth/SignatureVerifier.java".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "boolean hybrid = tenant.requiresPqc(); String algorithm = header.alg(); if (algorithm.equals(\"RS256\")) verify(signature);";
+        assert_eq!(
+            super::classify_pqc_hybrid_downgrade_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn oauth_excessive_scope_local_operator_config_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some("config/local/operator-oauth.yaml".to_string()),
+            ..Default::default()
+        };
+        let source = "scope: repo admin:org";
+        assert_eq!(
+            super::classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_excessive_scope_resource_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some("src/oauth/github_token.go".to_string()),
+            ..Default::default()
+        };
+        let source = "scope=repo&resource=repo:owner/name&validate_scope(scope)";
+        assert_eq!(
+            super::classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_excessive_scope_request_token_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some("src/oauth/github_token.go".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "func mint(req Request) { scope := req.Query(\"scope\") + \" repo admin:org\"; request_token(scope); }";
+        assert_eq!(
+            super::classify_oauth_excessive_scope_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

@@ -3,6 +3,19 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 160: README Remote-Proof Governance + PQC/OAuth Proof Cures + CashApp/Bullish Sweep
+
+* `.agent_governance/rules/response-format.md` *(modified)* — final-response law now requires README/GitHub-rendered documentation changes to prove local SHA, pushed remote branch SHA, remote `README.md` content, and default-branch visibility semantics before claiming GitHub propagation.
+* `.agent_governance/skills/doc-sync/SKILL.md` *(modified)* — README changes now trigger remote branch content verification, push-or-blocker reporting, and explicit default-branch visibility wording.
+* `.github/workflows/workflow-lint.yml` *(modified)* — Architectural Oracle cleanup removed literal mutable-action tag examples from comments so coarse `@vN`/branch-alias scans no longer report comment-only rows.
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `pqc_hybrid_downgrade_is_reachable` + `classify_pqc_hybrid_downgrade_proof`, and `oauth_excessive_scope_is_reachable` + `classify_oauth_excessive_scope_proof`; both classifiers suppress test/generated/local/admin/documentation contexts and emit `ReachabilityProof` only for production downgrade/excessive-scope conjunctions without policy guards.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:pqc_hybrid_downgrade` and `security:oauth_excessive_scope` through deterministic proof classifiers, suppressing invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added exact-conjunction Kani harnesses and deterministic regression tests for PQC hybrid downgrade and OAuth excessive-scope predicates.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:pqc_hybrid_downgrade` and `security:oauth_excessive_scope` hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — Sprint 160 hunt rows added: Cash App Android SDK and Bullish API Docs emitted zero findings; Cash App Hermit emitted two local installer-template `security:unpinned_asset` rows routed to LOW_YIELD at 5%.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 80 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` → 33 passed; `cargo test -p cli -- hunt --test-threads=2` → 89 passed; `cargo kani -p forge --harness pqc_hybrid_downgrade_is_exact_conjunction` → successful; `cargo kani -p forge --harness oauth_excessive_scope_is_exact_conjunction` → successful; target sweep complete (`cashapp/cash-app-pay-android-sdk` 0 findings, `cashapp/hermit` 2 LOW_YIELD findings, `bullish-exchange/api-docs` 0 findings); PR #121 latest artifact at commit `550f186` remains blocked only by blast-radius violation (`slop_score=220`, 7 top-level directories).
+
 ## 2026-05-21 — Sprint 159: Research README Reset + Eval/Process Proof Cures + Hunt Sweep
 
 * `README.md` *(modified)* — reset the public narrative to research-project positioning: removed purchase-facing framing, kept IFDS/Z3/Kani/PQC proof-obligation substance, added current research questions and local reproduction commands, and avoided HN/sunset announcement dependency.
