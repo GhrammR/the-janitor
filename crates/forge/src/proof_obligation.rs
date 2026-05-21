@@ -266,13 +266,27 @@ pub fn classify_timing_comparison_proof(source: &str, finding: &StructuredFindin
     let in_test_path = finding
         .file
         .as_deref()
-        .map(|p| p.contains("test") || p.ends_with("_test.go") || p.contains("bench"))
+        .map(|p| {
+            p.contains("test")
+                || p.ends_with("_test.go")
+                || p.contains("bench")
+                || p.ends_with("Test.java")
+                || p.ends_with("Spec.java")
+                || p.contains("test/")
+        })
         .unwrap_or(false);
     let has_secret_marker = source.contains("hmac")
         || source.contains("HMAC")
         || source.contains("session_key")
         || source.contains("auth_tag")
-        || source.contains("nonce");
+        || source.contains("nonce")
+        || source.contains("rawPassword")
+        || source.contains("secretId")
+        || source.contains("SecretId")
+        || source.contains("secretKey")
+        || source.contains("SecretKey")
+        || source.contains("PasswordHash")
+        || source.contains("passwordHash");
     if timing_comparison_is_sensitive(has_secret_marker, in_test_path) {
         ProofClass::ReachabilityProof
     } else {
@@ -873,6 +887,45 @@ mod tests {
             ..Default::default()
         };
         let source = "func TestVerifySession(t *testing.T) {\n    nonce := session.nonce\n    return bytes.Equal(got, expected)\n}";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn timing_comparison_java_argon2_yields_reachability_proof() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some(
+                "crypto/default/src/main/java/org/keycloak/crypto/hash/Argon2PasswordHashProvider.java"
+                    .to_string(),
+            ),
+            line: Some(102),
+            ..Default::default()
+        };
+        let source = "public boolean verify(String rawPassword, PasswordCredentialModel credential) {\n\
+            String encoded = encode(rawPassword, secretData.getSalt(), version, type, hashLength, parallelism, memory, iterations);\n\
+            return encoded.equals(secretData.getValue());\n\
+            }";
+        assert_eq!(
+            super::classify_timing_comparison_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn timing_comparison_java_test_class_yields_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:non_constant_time_comparison".to_string(),
+            file: Some(
+                "crypto/default/src/test/java/org/keycloak/crypto/hash/Argon2PasswordHashProviderTest.java"
+                    .to_string(),
+            ),
+            line: Some(55),
+            ..Default::default()
+        };
+        let source = "void testVerify_rawPassword() { return encoded.equals(stored); }";
         assert_eq!(
             super::classify_timing_comparison_proof(source, &finding),
             ProofClass::LatticeGapProposal
