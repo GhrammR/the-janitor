@@ -6735,3 +6735,51 @@ TrustWallet re-hunt: `scrypt.c:334,336` lcm_double_free confirmed still in scope
 * `crates/forge/src/lib.rs` *(modified)* — `pub mod rebac_registry` and `pub mod kani_bridge` removed.
 
 **Verification**: `cargo check -p forge` ✓ | `cargo check -p cli` ✓ | 14 new tests pass (`lcm_use_after_free` ×3, `lcm_malloc_trunc` ×3, `timing_comparison_check_password_hash` ×1, `lcm_use_after_free_reachability` ×1, `lcm_malloc_truncation_exploitability` ×1, pre-existing lcm/timing ×5)
+
+## 2026-05-20 — Sprint 154: sqli_concat + financial_pii Proof Cures, Hunt Sweep ×3, Vault Phase 4 DoS Assessment, Registry-Watch Pipeline
+
+### Phase 1: sqli_concatenation Proof Obligation Cure
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `classify_sqli_concatenation_proof`: test/fixture path → `InvariantViolationProof`; parameterized guard (9 patterns) → `InvariantViolationProof`; raw concat + SQL keyword → `ReachabilityProof`; else → `LatticeGapProposal`. `sqli_concat_is_injectable(is_raw, in_migration)` Kani-verified predicate. 3 unit tests.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `sqli_concat_injectable_is_exact_conjunction` Kani proof + deterministic regression test.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` new branch: `finding.id.contains("sqli_concatenation")` → classify + retain/suppress.
+
+### Phase 2: financial_pii_to_external_llm Proof Obligation Cure
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `classify_financial_pii_proof`: test path → `InvariantViolationProof`; masking guard (10 patterns) → `InvariantViolationProof`; PII identifier + LLM sink co-presence → `ReachabilityProof`. `financial_pii_is_unguarded(has_sink, has_mask)` Kani-verified predicate. 3 unit tests.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `financial_pii_unguarded_is_exact_conjunction` Kani proof + deterministic regression test.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` new branch: `finding.id.contains("financial_pii_to_external_llm")` → classify + retain/suppress.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:sqli_concatenation` and `security:financial_pii_to_external_llm` hard-deleted per Absolute Eradication Law (proof cures shipped).
+
+### Phase 3: Hunt Sweep ×3 — mattermost, grafana, supabase
+
+All three hunts returned NO new CANDIDATE or BOUNTY promotions. Full Tri-Ledger Funnel applied:
+
+* **mattermost/server/channels** (Sprint 154 full re-hunt): 3 `oauth_missing_state_validation` FPs (`app/saml.go` uses `CreateSamlRelayToken` = correct state mechanism; `sqlstore/oauth_store.go` = DB layer; `app/ratelimit.go` = middleware). 5 `ssrf_dynamic_url` = operator-scope (already in LOW_YIELD from Sprint 151). All → LOW_YIELD.
+* **grafana/pkg** (26 findings): 7 `protobuf_any_unguarded_decode` FPs (`proto.Unmarshal` on typed messages misclassified as Any deserialization); 6 `oauth_missing_state_validation` FPs (non-handler files); 1 `jwt_validation_bypass` FP (`_ *jwt.Token` + `jwt.WithValidMethods` = correct single-key HS512 pattern); 5 `tls_verification_bypass` correctly suppressed as `invariant_violation_proof`; 4 `model_weight_backdoor` FPs; 1 `ssrf_dynamic_url` (commands/generate tool); 1 `unpinned_asset` (tooling). All → LOW_YIELD.
+* **supabase/packages** (7 findings): All in `packages/marketing/src/` (marketing site). XSS ×5 + SSRF ×1 = out of scope for Supabase HackerOne (GoTrue/PostgREST/Realtime in scope, marketing site is not). All → LOW_YIELD.
+
+Structural FP notes logged:
+- `proto.Unmarshal` on concrete type ≠ `anypb.UnmarshalAny` — detector must require explicit Any dispatch
+- `jwt.ParseWithClaims` with `jwt.WithValidMethods` guard = correct pattern; suppress FP on `_ *jwt.Token`
+- OAuth state classifier needs HTTP handler context gate (route registration or `r.URL.Query().Get("code")`)
+- Monorepo marketing directories must be pre-filtered before hunt runs
+
+### Phase 4: Vault protobuf_any Docker PoC Assessment
+
+* Docker PoC: `POST /v1/identity/entity` with `{"name":"exploit-json","metadata":{"@type":"type.googleapis.com/vault.identity.Entity"}}` → HTTP 500 (controlled error; Vault logs show no panic/stack trace).
+* Assessment: `ptypes.UnmarshalAny` at `vault/identity_store.go:1172,1188,1194,1271,1289,1309` is in the storage deserialization path (Consul/etcd reads), NOT reachable from the entity write API. Authenticated attacker with `identity-write` reaches JSON API validation layer only.
+* `@type` metadata DoS (authenticated, controlled error, no data exfiltration) → LOW_YIELD.
+* `CANDIDATE_LEDGER.md` *(modified)* — Vault protobuf_any entry R&D updated with Phase 4 PoC result; approval held at 50%.
+* `LOW_YIELD_LEDGER.md` *(modified)* — `protobuf_any_http_metadata_dos` entry added; 6 FP class entries added for mattermost/grafana/supabase batches.
+
+### Phase 5: openai/codex Intent Divergence Demotion
+
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — openai/codex `intent_divergence` at 85% demoted; row deleted.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — openai/codex demoted with full reason: `UnauthenticatedAuthProvider.add_auth_headers()` no-op is intentional design (OSS provider support); explicit test at line 130 proves expected behaviour; `find_codex_home()` is user-home-only (no project-level attack vector). DO NOT re-surface.
+
+### Phase 6: Registry-Watch CI Pipeline
+
+* `.github/workflows/registry-watch.yml` *(created)* — Daily cron (`0 8 * * *`) + `workflow_dispatch`. Runs `janitor registry-watch --dry-run --output /tmp/rw_report.json`. Files GitHub issue on failure via `actions/github-script@v7`. Permissions: `contents: read`, `issues: write`.
+
+**Verification**: `cargo test -p forge` 1258 passed, 0 failed. P17-3A sqli + financial_pii eradicated from INNOVATION_LOG. 12 LOW_YIELD entries added. Vault CANDIDATE held at 50%.
