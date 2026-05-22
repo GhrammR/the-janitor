@@ -60,12 +60,15 @@ staged."
 If the directive involved a GitHub pull request, this section must classify the
 PR using `.agent_governance/rules/pr-resolution.md`: `MERGE`,
 `AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`, `SOLO_REVIEW_POLICY_DRIFT`,
-`WAIT_FOR_CHECKS`, `REBASE_OR_RECREATE`, `CLOSE_SUPERSEDED`, or `LEAVE_OPEN`.
-A PR with `mergeStateStatus=DIRTY`, `reviewDecision=REVIEW_REQUIRED`, or
-failed/timed-out app-owned gates must not be described as mergeable. In this
+`SOLO_REQUIRED_CHECKS_DRIFT`, `WAIT_FOR_CHECKS`, `REBASE_OR_RECREATE`,
+`CLOSE_SUPERSEDED`, or `LEAVE_OPEN`. A PR with `mergeStateStatus=DIRTY`,
+`reviewDecision=REVIEW_REQUIRED`, failed/timed-out app-owned gates, or missing
+required status-check contexts must not be described as mergeable. In this
 solo-maintainer repository, a self-authored PR with required branch-protection
-review is `SOLO_REVIEW_POLICY_DRIFT`; restore zero required reviews, verify
-branch protection, arm auto-merge, and run the 1m/5m/9m watch cadence.
+review is `SOLO_REVIEW_POLICY_DRIFT`; empty or incomplete required status
+checks are `SOLO_REQUIRED_CHECKS_DRIFT`. Restore policy, verify branch
+protection, arm auto-merge only after expected checks are configured, and run
+the 1m/5m/9m watch cadence.
 
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:
@@ -179,7 +182,9 @@ The prompt MUST:
    `reviewDecision=REVIEW_REQUIRED` and branch protection requiring approving
    reviews must be classified as `SOLO_REVIEW_POLICY_DRIFT`; auto-merge armed
    on that PR is not completion until zero required reviews are restored and
-   checks pass.
+   checks pass. A PR whose branch protection has empty or incomplete required
+   status checks must be classified as `SOLO_REQUIRED_CHECKS_DRIFT`; auto-merge
+   must not be armed until the expected check contexts are restored.
 
 **Architectural Oracle Execution Law**: If the Architectural Oracle Tip
 identifies a legacy drift or optimization that requires fewer than 50 lines of

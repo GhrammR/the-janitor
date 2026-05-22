@@ -16,15 +16,28 @@ Required steady state:
 
 1. `required_approving_review_count == 0`
 2. `enforce_admins.enabled == true`
-3. Required checks remain enabled for Janitor Integrity, Structural Firewall,
-   CodeQL, MSRV, Workflow Lint, Dependency Review, and any path-specific gates
-   configured on `main`.
+3. Required status checks are non-empty and include the expected always-on PR
+   gates:
+   - `PR Resolution Audit`
+   - `Janitor Integrity Check`
+   - `Structural Firewall`
+   - `MSRV — Rust 1.92.0`
+   - `Dependency Review`
+   - `Analyze (actions)`
+   - `Analyze (javascript-typescript)`
+   - `Analyze (python)`
+   - `Analyze (rust)`
 4. Signed commits remain mandatory by local policy.
 
 If `reviewDecision=REVIEW_REQUIRED` on a human-authored PR in this solo repo,
 classify it as `SOLO_REVIEW_POLICY_DRIFT`. Do not ask for external review as
 the normal path. Restore the solo-maintainer branch-protection policy, verify
 the policy, arm auto-merge, and then watch checks to completion.
+
+If `required_status_checks.contexts` is empty or missing any expected always-on
+PR gate, classify it as `SOLO_REQUIRED_CHECKS_DRIFT`. Do not arm auto-merge.
+Restore the expected contexts first, verify branch protection, then re-evaluate
+the PR.
 
 ## Required Evidence
 
@@ -36,6 +49,7 @@ gh api user --jq '{login,id}'
 gh pr view <pr> --json author,headRefName,headRefOid,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup,url
 gh pr checks <pr>
 gh api repos/<owner>/<repo>/branches/<default_branch>/protection --jq '{required_pull_request_reviews,enforce_admins}'
+gh api repos/<owner>/<repo>/branches/<default_branch>/protection/required_status_checks --jq '{strict,contexts,checks}'
 ```
 
 For GitHub-visible documentation, also verify the rendered surfaces separately:
@@ -58,6 +72,15 @@ This state is not mergeable and not resolved. It is a repository policy drift,
 not a request for an external reviewer. The final answer must say
 `SOLO_REVIEW_POLICY_DRIFT` until branch protection is restored to zero required
 approvals and the PR is rechecked.
+
+Treat a PR as **solo-required-checks-drift** when either is true:
+
+1. `required_status_checks.contexts` is empty.
+2. Any expected always-on PR gate from Solo Maintainer Mode is absent.
+
+This state is not mergeable and not resolved. Auto-merge may merge too early if
+required contexts are empty. The final answer must say
+`SOLO_REQUIRED_CHECKS_DRIFT` until the expected contexts are restored.
 
 Treat a PR as **supersede-only** when any of these are true:
 
@@ -87,16 +110,28 @@ For a solo-review-policy-drift PR:
    the operator to update branch protection; do not ask for fake external
    review.
 
+For a solo-required-checks-drift PR:
+
+1. Do **not** arm auto-merge.
+2. Restore the expected required status check contexts listed in Solo
+   Maintainer Mode if admin permission exists.
+3. Verify `required_status_checks.strict == true` and that all expected
+   contexts are present.
+4. Re-arm auto-merge only after this verification.
+5. If admin permission is missing, report `SOLO_REQUIRED_CHECKS_DRIFT` and ask
+   the operator to restore required checks.
+
 ## Post-Push Auto-Merge Watch
 
 After every commit/push/PR-create flow, and after every push to an open PR:
 
-1. Immediately collect `gh pr view <pr>` and `gh pr checks <pr>`.
+1. Immediately collect `gh pr view <pr>`, `gh pr checks <pr>`, and branch
+   protection status-check contexts.
 2. At `+1 minute`, collect the same state and report only changed blockers.
 3. At `+5 minutes`, collect the same state and report only changed blockers.
 4. At the final Governor window (`+9 minutes`; expected Janitor Integrity
    terminal duration is approximately `9m2s`), collect final PR state.
-5. If all required checks pass and auto-merge is not armed, arm it.
+5. If all expected checks pass and auto-merge is not armed, arm it.
 6. If the PR merged, verify the merge and stop.
 7. If the PR is still blocked after the final window, classify it using this
    rule and name exactly one blocker.
@@ -124,6 +159,7 @@ For a supersede-only PR:
 | green checks + clean merge state + no review required | merge or enable auto-merge |
 | checks pending + clean merge state + no review required | `AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`; run 1m/5m/9m watch |
 | self-authored + review required + required review count > 0 | `SOLO_REVIEW_POLICY_DRIFT`; restore zero required reviews |
+| required status checks empty or missing expected contexts | `SOLO_REQUIRED_CHECKS_DRIFT`; restore required check contexts |
 | dirty/conflicting | rebase/recreate from `origin/main`; do not merge |
 | app-owned gate failed/timed out | inspect gate artifact; if PR-wide policy failure, split/close |
 | stale feature PR superseded by narrower work | comment and close |
