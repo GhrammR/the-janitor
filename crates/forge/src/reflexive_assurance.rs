@@ -34,6 +34,7 @@ mod kani_proofs {
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
     use crate::proof_obligation::{
+        cargo_build_worm_is_reachable, ci_persistence_vector_is_reachable,
         debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
         intent_divergence_is_reachable, jndi_lookup_is_untrusted,
         oauth_excessive_scope_is_reachable, pqc_hybrid_downgrade_is_reachable,
@@ -487,6 +488,50 @@ mod kani_proofs {
         kani::assert(
             result == (has_artifact_ingestion && !has_provenance_guard && !in_nonproduction_path),
             "unverified provenance reachability must be exact conjunction",
+        );
+    }
+
+    #[kani::proof]
+    fn cargo_build_worm_is_exact_conjunction() {
+        let has_build_lifecycle: bool = kani::any();
+        let has_dangerous_payload: bool = kani::any();
+        let has_build_guard: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let result = cargo_build_worm_is_reachable(
+            has_build_lifecycle,
+            has_dangerous_payload,
+            has_build_guard,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            result
+                == (has_build_lifecycle
+                    && has_dangerous_payload
+                    && !has_build_guard
+                    && !in_nonproduction_path),
+            "cargo build worm reachability must be exact conjunction",
+        );
+    }
+
+    #[kani::proof]
+    fn ci_persistence_vector_is_exact_conjunction() {
+        let has_persistence_sink: bool = kani::any();
+        let has_ci_or_package_lifecycle: bool = kani::any();
+        let has_attestation_or_allowlist: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let result = ci_persistence_vector_is_reachable(
+            has_persistence_sink,
+            has_ci_or_package_lifecycle,
+            has_attestation_or_allowlist,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            result
+                == (has_persistence_sink
+                    && has_ci_or_package_lifecycle
+                    && !has_attestation_or_allowlist
+                    && !in_nonproduction_path),
+            "CI persistence reachability must be exact conjunction",
         );
     }
 

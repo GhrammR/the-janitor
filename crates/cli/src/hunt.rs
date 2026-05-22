@@ -3232,6 +3232,29 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("cargo_build_worm") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_cargo_build_worm_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("ci_persistence_vector") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof =
+                forge::proof_obligation::classify_ci_persistence_vector_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         } else if finding.id.contains("xxe_saml_parser") {
             let source = finding
                 .file

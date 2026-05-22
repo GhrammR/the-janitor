@@ -11,26 +11,27 @@ hide:
 
 # The Janitor
 
-**v10.2.2 — The Mathematical Firewall Against Autonomous AI. 23 Grammars. IFDS + Z3 SMT + AEG. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds. Zero-Upload. On-Device.**
+**v10.2.2 — Rust static-analysis security research platform. 23 grammars. IFDS + Z3 SMT. Kani proof obligations. Exploit-witness synthesis. Post-quantum provenance. Zero-upload local execution.**
 
 ---
 
-> **Sonar finds style violations.**
-> **The Janitor enforces structural integrity.**
+> **Research question:** can static analysis turn AI-assisted code review from prose trust into reproducible proof obligations?
 
 > *82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.*
 
 ---
 
-## THE ENFORCEMENT LAYER
+## Research Questions and Safety Outcomes
 
-The Janitor is not a linter. It is not a SAST scanner. It is a **structural enforcement layer** that runs on your hardware, in your pipeline, on every pull request — before the merge button is available. The Janitor is a deterministic pre-merge defense for autonomous and AI-assisted pull requests, verifying structural policy before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.
+The Janitor is an active Rust static-analysis research platform studying whether IFDS dataflow, Z3 path feasibility, Kani proof obligations, exploit-witness synthesis, and post-quantum provenance can make security triage reproducible under AI-assisted development. The research outcome is a local, zero-upload pipeline that classifies findings by proof strength before they reach audit ledgers or human review.
+
+The empirical method is deterministic: run the same detector corpus across real repositories, preserve proof-class decisions as structured findings, verify critical predicates with Kani, and attach reproducible command evidence where a vulnerability claim is strong enough to leave research triage. The project is currently best understood as a research artifact and collaboration surface, not a procurement-ready enterprise product.
 
 ## Research Foundation
 
 The Janitor is an active security research platform spanning four technical frontiers:
 
-- **Interprocedural Taint Analysis (IFDS)** — full context-sensitive dataflow across 14 languages with sanitizer-registry suppression and Z3 SMT path-feasibility refinement. Beats CodeQL on cross-function reachability at zero cloud cost.
+- **Interprocedural Taint Analysis (IFDS)** — context-sensitive dataflow across 14 languages with sanitizer-registry suppression and Z3 SMT path-feasibility refinement.
 - **Formal Verification (Kani + Z3)** — every security-critical predicate ships with a `#[kani::proof]` harness proving absence of panics and integer overflow across all symbolic inputs. Z3-backed exploit witnesses synthesize `curl`-form reproduction commands from model-extracted payloads.
 - **Post-Quantum Provenance (ML-DSA-65 + SHA-384)** — all findings are sealed into SLSA Level 4 `DecisionCapsule` records with dual-PQC attestation, verifiable offline without source upload.
 - **ZK AST Attestation (roadmap)** — in-progress Halo2/Plonky3 circuit design for absence-of-bad-pattern proofs, enabling FedRAMP High and DoD IL6 compliance attestation without revealing source.
