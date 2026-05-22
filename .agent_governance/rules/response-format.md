@@ -57,6 +57,16 @@ Table of all files modified, created, staged, or committed in this session.
 If no code was staged or committed (research-only session), state "No code
 staged."
 
+If the directive involved a GitHub pull request, this section must classify the
+PR using `.agent_governance/rules/pr-resolution.md`: `MERGE`,
+`AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`, `SOLO_REVIEW_POLICY_DRIFT`,
+`WAIT_FOR_CHECKS`, `REBASE_OR_RECREATE`, `CLOSE_SUPERSEDED`, or `LEAVE_OPEN`.
+A PR with `mergeStateStatus=DIRTY`, `reviewDecision=REVIEW_REQUIRED`, or
+failed/timed-out app-owned gates must not be described as mergeable. In this
+solo-maintainer repository, a self-authored PR with required branch-protection
+review is `SOLO_REVIEW_POLICY_DRIFT`; restore zero required reviews, verify
+branch protection, arm auto-merge, and run the 1m/5m/9m watch cadence.
+
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:
 - P0/P1/P2 item created, compacted, or completed with one-line rationale
@@ -161,6 +171,15 @@ The prompt MUST:
    The tip must name the exact file and line of the drift pocket and provide the
    precise `rm <file>`, `sed -i 's/old/new/' <file>`, or one-line code-deletion
    command that eliminates it — not a vague "consider" suggestion.
+10. If the prompt includes any phase for an existing PR, it MUST quote the live
+   blocker from `gh pr view` / `gh pr checks` and use the PR Resolution Gate
+   action class. Dirty, self-review-blocked, or app-gate-failed PRs must be
+   superseded or split first; the prompt must not keep appending unrelated work
+   to the same broken branch. A self-authored PR with
+   `reviewDecision=REVIEW_REQUIRED` and branch protection requiring approving
+   reviews must be classified as `SOLO_REVIEW_POLICY_DRIFT`; auto-merge armed
+   on that PR is not completion until zero required reviews are restored and
+   checks pass.
 
 **Architectural Oracle Execution Law**: If the Architectural Oracle Tip
 identifies a legacy drift or optimization that requires fewer than 50 lines of

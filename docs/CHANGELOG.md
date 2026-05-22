@@ -3,6 +3,16 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — PR Resolution Governance Gate
+
+* `.agent_governance/rules/pr-resolution.md` *(created)* — formalizes PR terminality classification: dirty merge state, self-review deadlock, app-owned gate failures/timeouts, Structural Firewall blast radius, generated `.janitor/**` artifacts, and mixed docs/engine/campaign/workflow PRs now route to supersede/split instead of more commits.
+* `.agent_governance/skills/pr-resolution/SKILL.md` *(created)* — reusable PR Resolution Gate skill with required `gh pr view`, `gh pr checks`, branch-protection proof, action classes, and merge/close decision table.
+* `.agent_governance/rules/response-format.md` *(modified)* — final summaries and next Sovereign Directive prompts must quote live PR blockers and use the PR Resolution Gate class before including PR phases.
+* `.agent_governance/skills/doc-sync/SKILL.md` *(modified)* — GitHub-visible docs changes now trigger PR Resolution Gate; dirty or self-review-blocked docs PRs must be replaced by docs-only branches from `origin/main`.
+* `.github/workflows/pr-resolution-audit.yml` *(created)* — lightweight PR audit check that inspects live PR state and diff shape without executing untrusted PR code; fails dirty, app-gate-failed, oversized, generated-artifact, or mixed-scope PRs, and reports self-review deadlocks as `EXTERNAL_REVIEW_REQUIRED`.
+* `.agent_governance/rules/pr-resolution.md`, `.agent_governance/skills/pr-resolution/SKILL.md`, `.agent_governance/rules/response-format.md`, and `.github/workflows/pr-resolution-audit.yml` *(tightened)* — green self-authored PRs blocked only by branch-protection review now classify as `SOLO_REVIEW_POLICY_DRIFT`; auto-merge alone is explicitly not completion.
+* `.agent_governance/rules/pr-resolution.md`, `.agent_governance/skills/pr-resolution/SKILL.md`, `.agent_governance/skills/pre-commit-gate/SKILL.md`, and `.agent_governance/skills/doc-sync/SKILL.md` *(tightened)* — solo-maintainer mode now requires `required_approving_review_count=0`, preserves checks/admin enforcement as merge authority, and mandates post-push PR observation at immediate, +1m, +5m, and final +9m Governor window.
+
 ## 2026-05-16 — Sprint Batch 138: P17-4 OAuth State Validation + P7-2 Phase B patch_proof Oracle + Dependabot Auto-merge
 
 * `crates/forge/src/oauth_account_fusion.rs` *(modified)* — P17-4 **OAuth State Parameter Absence Detector**: `detect_missing_state_validation(source: &[u8], label: &str) -> Vec<SlopFinding>`. Two AhoCorasick automata: OAuth code-extract group (`code=`, `authorization_code`, `grant_type=authorization_code`, `oauth_code`, `auth_code`) and state-validation group (`state_param`, `oauth_state`, `csrf_token`, `request_verifier`, `pkce_verifier`, `state =`, `state=`). Fires `security:oauth_missing_state_validation` at High when group-1 matches but group-2 is absent (whole-file scope). 4 deterministic tests: TP (code= without state), TN (code= + state present), TN (no OAuth code), TN (state= without code). P17-4 block eradicated from `.INNOVATION_LOG.md`.

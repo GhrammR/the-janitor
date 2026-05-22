@@ -1,0 +1,154 @@
+name: PR Resolution Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to audit"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  audit:
+    name: PR Resolution Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit PR terminality
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_PR: ${{ github.event.pull_request.number || '' }}
+          INPUT_PR: ${{ github.event.inputs.pr || '' }}
+          ACTOR: ${{ github.actor }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${EVENT_PR}"
+          if [ -z "${PR_NUMBER}" ]; then
+            PR_NUMBER="${INPUT_PR}"
+          fi
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "::error::No pull request number supplied"
+            exit 1
+          fi
+
+          PR_JSON="$(gh pr view "${PR_NUMBER}" --repo "${REPO}" \
+            --json author,headRefName,headRefOid,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup,url)"
+          FILES="$(gh pr diff "${PR_NUMBER}" --repo "${REPO}" --name-only)"
+
+          author="$(printf '%s' "${PR_JSON}" | jq -r '.author.login')"
+          merge_state="$(printf '%s' "${PR_JSON}" | jq -r '.mergeStateStatus')"
+          review_decision="$(printf '%s' "${PR_JSON}" | jq -r '.reviewDecision')"
+          head_sha="$(printf '%s' "${PR_JSON}" | jq -r '.headRefOid')"
+          url="$(printf '%s' "${PR_JSON}" | jq -r '.url')"
+          author_is_bot="false"
+          if printf '%s' "${author}" | grep -q '\[bot\]$'; then
+            author_is_bot="true"
+          fi
+          self_review_deadlock="false"
+          if [ "${review_decision}" = "REVIEW_REQUIRED" ] && [ "${author}" = "${ACTOR}" ] && [ "${author_is_bot}" = "false" ]; then
+            self_review_deadlock="true"
+          fi
+
+          top_level_count="$(printf '%s\n' "${FILES}" \
+            | awk -F/ 'NF {print $1}' \
+            | sort -u \
+            | wc -l \
+            | tr -d ' ')"
+          has_janitor_artifact="false"
+          if printf '%s\n' "${FILES}" | grep -q '^\.janitor/'; then
+            has_janitor_artifact="true"
+          fi
+
+          has_docs="false"
+          has_engine="false"
+          has_campaign="false"
+          has_workflow="false"
+          if printf '%s\n' "${FILES}" | grep -Eq '^(README\.md|docs/index\.md|docs/security\.md)'; then
+            has_docs="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -Eq '^(crates/|\.INNOVATION_LOG\.md)'; then
+            has_engine="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -Eq '^tools/campaign/'; then
+            has_campaign="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -Eq '^(\.github/|action\.yml)'; then
+            has_workflow="true"
+          fi
+
+          app_gate_bad="$(printf '%s' "${PR_JSON}" \
+            | jq -r '[.statusCheckRollup[]?
+              | select((.name == "Janitor Integrity Check" or .name == "Structural Firewall")
+                and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))] | length')"
+
+          action_class="MERGE"
+          if [ "${merge_state}" = "DIRTY" ] || [ "${merge_state}" = "CONFLICTING" ]; then
+            action_class="REBASE_OR_RECREATE"
+          elif [ "${self_review_deadlock}" = "true" ]; then
+            action_class="SOLO_REVIEW_POLICY_DRIFT"
+          elif [ "${app_gate_bad}" != "0" ]; then
+            action_class="WAIT_FOR_CHECKS"
+          elif [ "${top_level_count}" -gt 5 ] || [ "${has_janitor_artifact}" = "true" ]; then
+            action_class="CLOSE_SUPERSEDED"
+          elif [ "${has_docs}" = "true" ] && { [ "${has_engine}" = "true" ] || [ "${has_campaign}" = "true" ] || [ "${has_workflow}" = "true" ]; }; then
+            action_class="CLOSE_SUPERSEDED"
+          fi
+
+          {
+            echo "## PR Resolution Audit"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| PR | ${url} |"
+            echo "| Head | \`${head_sha}\` |"
+            echo "| Author | ${author} |"
+            echo "| Merge state | ${merge_state} |"
+            echo "| Review decision | ${review_decision} |"
+            echo "| Action class | ${action_class} |"
+            echo "| Top-level directories | ${top_level_count} |"
+            echo "| .janitor artifacts touched | ${has_janitor_artifact} |"
+            echo "| Mixed docs/engine/campaign/workflow | docs=${has_docs}, engine=${has_engine}, campaign=${has_campaign}, workflow=${has_workflow} |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          failed=0
+
+          if [ "${merge_state}" = "DIRTY" ] || [ "${merge_state}" = "CONFLICTING" ]; then
+            echo "::error::PR is ${merge_state}; recreate or rebase from origin/main before adding more work"
+            failed=1
+          fi
+
+          if [ "${self_review_deadlock}" = "true" ]; then
+            echo "::error title=SOLO_REVIEW_POLICY_DRIFT::Human review is required on a solo-maintainer PR. Restore required_approving_review_count=0 so checks and auto-merge can govern the merge."
+            failed=1
+          fi
+
+          if [ "${app_gate_bad}" != "0" ]; then
+            echo "::error::App-owned gate failed or timed out; inspect Janitor Integrity/Structural Firewall before continuing"
+            failed=1
+          fi
+
+          if [ "${top_level_count}" -gt 5 ]; then
+            echo "::error::Blast radius exceeds five top-level directories; split into narrow PRs"
+            failed=1
+          fi
+
+          if [ "${has_janitor_artifact}" = "true" ]; then
+            echo "::error::.janitor generated artifact is part of the PR; remove it unless explicitly requested"
+            failed=1
+          fi
+
+          if [ "${has_docs}" = "true" ] && { [ "${has_engine}" = "true" ] || [ "${has_campaign}" = "true" ] || [ "${has_workflow}" = "true" ]; }; then
+            echo "::error::GitHub-visible documentation is mixed with engine/campaign/workflow changes; split docs into a docs-only PR"
+            failed=1
+          fi
+
+          exit "${failed}"
