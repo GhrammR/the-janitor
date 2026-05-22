@@ -1,0 +1,104 @@
+name: Code Scanning Alert Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to audit"
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: read
+
+jobs:
+  audit:
+    name: Code Scanning Alert Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit code-scanning alerts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_PR: ${{ github.event.pull_request.number || '' }}
+          INPUT_PR: ${{ github.event.inputs.pr || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${EVENT_PR}"
+          if [ -z "${PR_NUMBER}" ]; then
+            PR_NUMBER="${INPUT_PR}"
+          fi
+
+          fetch_alerts() {
+            local ref="$1"
+            local output="$2"
+            local err="$3"
+            gh api "repos/${REPO}/code-scanning/alerts" \
+              -X GET \
+              -f state=open \
+              -f ref="${ref}" \
+              -F per_page=100 \
+              >"${output}" 2>"${err}"
+          }
+
+          main_alerts="$(mktemp)"
+          main_err="$(mktemp)"
+          if ! fetch_alerts "refs/heads/main" "${main_alerts}" "${main_err}"; then
+            echo "::error title=CODE_SCANNING_API_UNAVAILABLE::Unable to read open code-scanning alerts for refs/heads/main"
+            cat "${main_err}"
+            exit 1
+          fi
+
+          main_count="$(jq 'length' "${main_alerts}")"
+          main_high_count="$(
+            jq '[.[] | select(((.rule.security_severity_level // .rule.severity // "") | ascii_downcase) | test("critical|high"))] | length' \
+              "${main_alerts}"
+          )"
+
+          pr_count=""
+          pr_ref=""
+          if [ -n "${PR_NUMBER}" ]; then
+            pr_ref="refs/pull/${PR_NUMBER}/merge"
+            pr_alerts="$(mktemp)"
+            pr_err="$(mktemp)"
+            if fetch_alerts "${pr_ref}" "${pr_alerts}" "${pr_err}"; then
+              pr_count="$(jq 'length' "${pr_alerts}")"
+            else
+              pr_count="unavailable"
+            fi
+          fi
+
+          {
+            echo "## Code Scanning Alert Audit"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Main open alerts | ${main_count} |"
+            echo "| Main high/critical alerts | ${main_high_count} |"
+            if [ -n "${pr_ref}" ]; then
+              echo "| PR ref | \`${pr_ref}\` |"
+              echo "| PR open alerts | ${pr_count} |"
+            fi
+            echo
+            echo "| Alert | Tool | Rule | Severity | Location |"
+            echo "| --- | --- | --- | --- | --- |"
+            jq -r '.[:20][] |
+              "| #\(.number) | \(.tool.name) | \(.rule.id) | \(.rule.security_severity_level // .rule.severity // "unknown") | \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line) |"' \
+              "${main_alerts}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [ "${pr_count}" != "" ] && [ "${pr_count}" != "unavailable" ] && [ "${pr_count}" -gt "${main_count}" ]; then
+            echo "::error title=CODE_SCANNING_NEW_ALERTS::PR ref has ${pr_count} open alerts; main baseline has ${main_count}"
+            exit 1
+          fi
+
+          if [ "${main_count}" -gt 0 ]; then
+            echo "::notice title=CODE_SCANNING_BASELINE_OPEN::refs/heads/main has ${main_count} open code-scanning alerts (${main_high_count} high/critical)"
+          fi

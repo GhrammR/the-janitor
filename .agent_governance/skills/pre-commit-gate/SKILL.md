@@ -36,6 +36,7 @@
 | GPG signing key locked | Prompt for `gpg-unlock`, wait for operator confirmation, then resume the same signed commit |
 | Pushed PR is blocked by human review in solo mode | Restore zero required reviews, verify branch protection, arm auto-merge, and run the PR watch cadence |
 | Branch protection has empty required checks | Restore expected required check contexts before arming auto-merge |
+| Code-scanning alert inspection is unavailable | Require the Code Scanning Alert Audit workflow result before finalizing PR state |
 
 ## Notes
 

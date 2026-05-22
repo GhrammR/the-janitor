@@ -19,6 +19,7 @@ Required steady state:
 3. Required status checks are non-empty and include the expected always-on PR
    gates:
    - `PR Resolution Audit`
+   - `Code Scanning Alert Audit`
    - `Janitor Integrity Check`
    - `Structural Firewall`
    - `MSRV — Rust 1.92.0`
@@ -39,6 +40,28 @@ PR gate, classify it as `SOLO_REQUIRED_CHECKS_DRIFT`. Do not arm auto-merge.
 Restore the expected contexts first, verify branch protection, then re-evaluate
 the PR.
 
+## Code Scanning Alert Review
+
+Every PR inspection must include GitHub code-scanning state. A passing CodeQL
+check only proves that the current PR did not produce a failing CodeQL job; it
+does not prove that the repository has no open code-scanning alerts on `main`.
+
+Required code-scanning evidence:
+
+```bash
+gh api repos/<owner>/<repo>/code-scanning/alerts \
+  -X GET -f state=open -f ref=refs/heads/main -F per_page=100 \
+  --jq '[.[] | {number,rule:.rule.id,severity:(.rule.security_severity_level // .rule.severity),tool:.tool.name,path:.most_recent_instance.location.path,line:.most_recent_instance.location.start_line}]'
+```
+
+If the local token returns `403` or `404`, do not assume there are no alerts.
+Report `CODE_SCANNING_API_UNAVAILABLE` and rely on the GitHub Actions
+`Code Scanning Alert Audit` workflow, which runs with `security-events: read`.
+
+Open baseline alerts on `main` must be reported as backlog telemetry on every
+PR inspection. Existing baseline alerts do not block unrelated PRs by default.
+New or increased alerts on a PR ref block the PR as `CODE_SCANNING_NEW_ALERTS`.
+
 ## Required Evidence
 
 Before any final answer or next-sprint prompt says a PR should be fixed,
@@ -50,6 +73,7 @@ gh pr view <pr> --json author,headRefName,headRefOid,baseRefName,reviewDecision,
 gh pr checks <pr>
 gh api repos/<owner>/<repo>/branches/<default_branch>/protection --jq '{required_pull_request_reviews,enforce_admins}'
 gh api repos/<owner>/<repo>/branches/<default_branch>/protection/required_status_checks --jq '{strict,contexts,checks}'
+gh api repos/<owner>/<repo>/code-scanning/alerts -X GET -f state=open -f ref=refs/heads/main -F per_page=100
 ```
 
 For GitHub-visible documentation, also verify the rendered surfaces separately:
@@ -81,6 +105,14 @@ Treat a PR as **solo-required-checks-drift** when either is true:
 This state is not mergeable and not resolved. Auto-merge may merge too early if
 required contexts are empty. The final answer must say
 `SOLO_REQUIRED_CHECKS_DRIFT` until the expected contexts are restored.
+
+Treat a PR as **code-scanning-new-alerts** when the PR ref has more open
+code-scanning alerts than `refs/heads/main`, or when the Code Scanning Alert
+Audit workflow reports new high/critical findings attributable to the PR.
+
+Treat a PR as **code-scanning-api-unavailable** when neither local inspection
+nor the GitHub Actions audit can read code-scanning alerts. This is a telemetry
+failure; the PR must not be called fully inspected.
 
 Treat a PR as **supersede-only** when any of these are true:
 
@@ -121,16 +153,27 @@ For a solo-required-checks-drift PR:
 5. If admin permission is missing, report `SOLO_REQUIRED_CHECKS_DRIFT` and ask
    the operator to restore required checks.
 
+For code-scanning issues:
+
+1. If only baseline `main` alerts exist, report the count, severity, rule, and
+   file/line in telemetry; do not block unrelated PRs.
+2. If PR alerts exceed baseline, block the PR as `CODE_SCANNING_NEW_ALERTS`.
+3. If the API is unavailable locally, require the `Code Scanning Alert Audit`
+   workflow result before finalizing the PR state.
+4. If both local and workflow audit are unavailable, report
+   `CODE_SCANNING_API_UNAVAILABLE` and do not call the PR fully inspected.
+
 ## Post-Push Auto-Merge Watch
 
 After every commit/push/PR-create flow, and after every push to an open PR:
 
-1. Immediately collect `gh pr view <pr>`, `gh pr checks <pr>`, and branch
-   protection status-check contexts.
+1. Immediately collect `gh pr view <pr>`, `gh pr checks <pr>`, branch
+   protection status-check contexts, and code-scanning alert state.
 2. At `+1 minute`, collect the same state and report only changed blockers.
 3. At `+5 minutes`, collect the same state and report only changed blockers.
 4. At the final Governor window (`+9 minutes`; expected Janitor Integrity
-   terminal duration is approximately `9m2s`), collect final PR state.
+   terminal duration is approximately `9m2s`), collect final PR state and
+   code-scanning alert state.
 5. If all expected checks pass and auto-merge is not armed, arm it.
 6. If the PR merged, verify the merge and stop.
 7. If the PR is still blocked after the final window, classify it using this
@@ -160,6 +203,8 @@ For a supersede-only PR:
 | checks pending + clean merge state + no review required | `AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`; run 1m/5m/9m watch |
 | self-authored + review required + required review count > 0 | `SOLO_REVIEW_POLICY_DRIFT`; restore zero required reviews |
 | required status checks empty or missing expected contexts | `SOLO_REQUIRED_CHECKS_DRIFT`; restore required check contexts |
+| new PR code-scanning alerts above baseline | `CODE_SCANNING_NEW_ALERTS`; block and remediate |
+| code-scanning API unavailable locally and in workflow | `CODE_SCANNING_API_UNAVAILABLE`; do not call fully inspected |
 | dirty/conflicting | rebase/recreate from `origin/main`; do not merge |
 | app-owned gate failed/timed out | inspect gate artifact; if PR-wide policy failure, split/close |
 | stale feature PR superseded by narrower work | comment and close |
