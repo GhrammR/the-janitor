@@ -3,6 +3,14 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-21 — Sprint 160B: GitHub Repository Surface Sync Governance
+
+* `.agent_governance/rules/response-format.md` *(modified)* — GitHub-visible documentation proof now distinguishes repository metadata description/homepage, default-branch README, and feature-branch README. Agents must no longer imply a README branch push changes the visible repository description.
+* `.agent_governance/skills/doc-sync/SKILL.md` *(modified)* — README changes now require live `gh api repos/<owner>/<repo>` metadata verification and default-branch README verification, with immediate repository-description patching when stale.
+* `.github/workflows/repo-surface-sync.yml` *(created)* — workflow-dispatch/main-push guard verifies the live repository metadata description and default-branch README marker match the intended research-project positioning.
+
+**Verification**: live repository metadata now reports description `Rust static-analysis security research platform for IFDS, Z3/Kani proof obligations, exploit-witness synthesis, and post-quantum provenance.`; default branch remains `main`, so the public landing README still requires the README reset to land on `main`.
+
 ## 2026-05-21 — Sprint 160: README Remote-Proof Governance + PQC/OAuth Proof Cures + CashApp/Bullish Sweep
 
 * `.agent_governance/rules/response-format.md` *(modified)* — final-response law now requires README/GitHub-rendered documentation changes to prove local SHA, pushed remote branch SHA, remote `README.md` content, and default-branch visibility semantics before claiming GitHub propagation.

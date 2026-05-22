@@ -7,7 +7,7 @@ Mapping Matrix below.
 
 | Changed path pattern | Document to audit |
 |----------------------|-------------------|
-| `README.md` | remote branch README content |
+| `README.md` | GitHub public repository surface: repo metadata description, default-branch README, and remote branch README |
 | `crates/**` | `SOVEREIGN_BRIEFING.md` |
 | `justfile` | `RUNBOOK.md` |
 | Any new or modified CLI flag | `RUNBOOK.md` |
@@ -23,7 +23,7 @@ Mapping Matrix below.
 
    | Trigger | Verification checklist |
    |---------|----------------------|
-   | `README.md` changed | Was the commit pushed, does `origin/<branch>:README.md` contain the intended text, and is any default-branch visibility dependency stated? |
+   | `README.md` changed | Was the commit pushed, does `origin/<branch>:README.md` contain the intended text, does `origin/<default_branch>:README.md` contain the public landing-page text or explicitly require merge, and does GitHub repository metadata `description` match the intended public positioning? |
    | `crates/**` changed | Does `SOVEREIGN_BRIEFING.md` reflect the new module, struct, or public API? |
    | `justfile` changed | Does `RUNBOOK.md` list the new/modified recipe with correct syntax? |
    | CLI flag added/renamed | Does `RUNBOOK.md` show the updated flag name and description? |
@@ -40,9 +40,20 @@ Mapping Matrix below.
    - After commit, push the current branch or report the exact push blocker.
    - Verify remote branch content with:
      `git show origin/<branch>:README.md | head -40`
+   - Verify the repository's live metadata with:
+     `gh api repos/<owner>/<repo> --jq '{description,homepage,default_branch}'`
+   - Resolve the default branch from that API response or
+     `git ls-remote --symref origin HEAD`, then verify the public landing README
+     with:
+     `git show origin/<default_branch>:README.md | head -40`
    - If GitHub's default repository README still points at `main`, explicitly
      state that the branch README is updated but the default GitHub landing page
      will not show it until merge.
+   - If the repository metadata description is stale, update it immediately
+     with:
+     `gh api repos/<owner>/<repo> -X PATCH -f description='<intended one-line public description>'`
+     and re-read the metadata response. A README commit does not update this
+     field.
 
 ## Abort conditions
 

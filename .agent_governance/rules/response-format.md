@@ -59,19 +59,35 @@ staged."
 
 If `README.md` or another GitHub-rendered documentation entrypoint changed and
 the operator asked for GitHub visibility, this section must also state the
-local commit SHA, pushed remote branch SHA, and whether GitHub's default branch
-can show the change before merge. A branch push is not equivalent to a
-default-branch README update; say so explicitly.
+local commit SHA, pushed remote branch SHA, live repository metadata, and
+whether GitHub's default branch can show the change before merge. A branch push
+is not equivalent to a default-branch README update, and neither one updates
+the repository description under the repo name. Say so explicitly.
 
 Required proof for README/documentation visibility claims:
 - `git rev-parse HEAD`
 - `git ls-remote origin <current-branch>`
 - `git show origin/<current-branch>:README.md | head -40` or an equivalent
   remote-content read
+- `gh api repos/<owner>/<repo> --jq '{description,homepage,default_branch}'`
+- `git show origin/<default_branch>:README.md | head -40` when the operator
+  asks about the public GitHub landing page
 
 If a commit was made for a directive that expects GitHub-visible documentation,
 the directive is incomplete until `git push` succeeds or the final response
 reports the concrete push blocker.
+
+If the operator asks what GitHub visibly shows on the repository page, inspect
+and report all public surfaces separately:
+1. Repository metadata `description` / `homepage` from the GitHub API.
+2. Default-branch `README.md`, which powers the normal landing page.
+3. Current feature-branch `README.md`, which is visible only when the branch is
+   selected or after merge.
+
+If any of those surfaces are stale and the authenticated account has
+permission, update the stale repository metadata with `gh api repos/<owner>/<repo>
+-X PATCH -f description=...` immediately. Do not imply that a README commit
+can change the repository description.
 
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:

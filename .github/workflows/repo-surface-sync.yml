@@ -1,0 +1,78 @@
+name: Repository Surface Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - .github/workflows/repo-surface-sync.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify GitHub repository surface
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_DESCRIPTION: Rust static-analysis security research platform for IFDS, Z3/Kani proof obligations, exploit-witness synthesis, and post-quantum provenance.
+      EXPECTED_README_MARKER: Rust static-analysis research across 23 grammars
+    steps:
+      - name: Verify metadata and default README
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          repo_json="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}")"
+
+          python3 - "${repo_json}" <<'PY'
+          import json
+          import os
+          import sys
+
+          repo = json.loads(sys.argv[1])
+          expected = os.environ["EXPECTED_DESCRIPTION"]
+          actual = repo.get("description") or ""
+          if actual != expected:
+              raise SystemExit(
+                  f"repository description drift: expected {expected!r}, got {actual!r}"
+              )
+          print(f"metadata description ok: {actual}")
+          print(f"default branch: {repo['default_branch']}")
+          PY
+
+          default_branch="$(python3 - "${repo_json}" <<'PY'
+          import json
+          import sys
+          print(json.loads(sys.argv[1])["default_branch"])
+          PY
+          )"
+
+          readme_json="$(curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/contents/README.md?ref=${default_branch}")"
+
+          python3 - "${readme_json}" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          content = json.loads(sys.argv[1])["content"]
+          readme = base64.b64decode(content).decode("utf-8", "replace")
+          marker = os.environ["EXPECTED_README_MARKER"]
+          if marker not in readme:
+              raise SystemExit(
+                  f"default-branch README drift: missing marker {marker!r}"
+              )
+          print("default README marker ok")
+          PY
