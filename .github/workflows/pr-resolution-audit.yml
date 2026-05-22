@@ -93,14 +93,14 @@ jobs:
           action_class="MERGE"
           if [ "${merge_state}" = "DIRTY" ] || [ "${merge_state}" = "CONFLICTING" ]; then
             action_class="REBASE_OR_RECREATE"
+          elif [ "${self_review_deadlock}" = "true" ]; then
+            action_class="SOLO_REVIEW_POLICY_DRIFT"
           elif [ "${app_gate_bad}" != "0" ]; then
             action_class="WAIT_FOR_CHECKS"
           elif [ "${top_level_count}" -gt 5 ] || [ "${has_janitor_artifact}" = "true" ]; then
             action_class="CLOSE_SUPERSEDED"
           elif [ "${has_docs}" = "true" ] && { [ "${has_engine}" = "true" ] || [ "${has_campaign}" = "true" ] || [ "${has_workflow}" = "true" ]; }; then
             action_class="CLOSE_SUPERSEDED"
-          elif [ "${self_review_deadlock}" = "true" ]; then
-            action_class="EXTERNAL_REVIEW_REQUIRED"
           fi
 
           {
@@ -127,7 +127,8 @@ jobs:
           fi
 
           if [ "${self_review_deadlock}" = "true" ]; then
-            echo "::warning title=EXTERNAL_REVIEW_REQUIRED::PR author '${author}' cannot satisfy the required approving review; auto-merge is not completion"
+            echo "::error title=SOLO_REVIEW_POLICY_DRIFT::Human review is required on a solo-maintainer PR. Restore required_approving_review_count=0 so checks and auto-merge can govern the merge."
+            failed=1
           fi
 
           if [ "${app_gate_bad}" != "0" ]; then

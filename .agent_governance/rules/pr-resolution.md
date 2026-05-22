@@ -2,10 +2,29 @@
 
 ## Purpose
 
-A pull request that is dirty, structurally oversized, self-review blocked, or
-red on app-owned gates is not a sprint target. It is a routing failure. The
-agent must stop adding implementation phases to that PR and create a concrete
-replacement plan.
+A pull request that is dirty, structurally oversized, blocked by impossible
+solo-maintainer review policy, or red on app-owned gates is not a sprint
+target. It is a routing failure. The agent must stop adding implementation
+phases to that PR and create a concrete replacement plan.
+
+## Solo Maintainer Mode
+
+This repository is operated by a solo maintainer. Branch protection must use
+required status checks as the merge authority, not required human review.
+
+Required steady state:
+
+1. `required_approving_review_count == 0`
+2. `enforce_admins.enabled == true`
+3. Required checks remain enabled for Janitor Integrity, Structural Firewall,
+   CodeQL, MSRV, Workflow Lint, Dependency Review, and any path-specific gates
+   configured on `main`.
+4. Signed commits remain mandatory by local policy.
+
+If `reviewDecision=REVIEW_REQUIRED` on a human-authored PR in this solo repo,
+classify it as `SOLO_REVIEW_POLICY_DRIFT`. Do not ask for external review as
+the normal path. Restore the solo-maintainer branch-protection policy, verify
+the policy, arm auto-merge, and then watch checks to completion.
 
 ## Required Evidence
 
@@ -29,24 +48,23 @@ gh api repos/<owner>/<repo> --jq '{description,homepage,default_branch}'
 
 ## Terminal Failure Conditions
 
-Treat a PR as **external-review-required** when all of these are true:
+Treat a PR as **solo-review-policy-drift** when all of these are true:
 
 1. Required branch protection has `required_approving_review_count > 0`.
 2. `reviewDecision=REVIEW_REQUIRED`.
 3. The authenticated operator authored the PR.
-4. No different write-access reviewer has approved it.
 
-This state is not mergeable and not resolved. Arming `gh pr merge --auto` may
-be useful, but it is not completion because auto-merge cannot satisfy the
-missing human approval. The final answer must say `EXTERNAL_REVIEW_REQUIRED`
-and name the exact review blocker.
+This state is not mergeable and not resolved. It is a repository policy drift,
+not a request for an external reviewer. The final answer must say
+`SOLO_REVIEW_POLICY_DRIFT` until branch protection is restored to zero required
+approvals and the PR is rechecked.
 
 Treat a PR as **supersede-only** when any of these are true:
 
 1. `mergeStateStatus` is `DIRTY`, `CONFLICTING`, or `UNKNOWN` after refresh.
 2. `reviewDecision=REVIEW_REQUIRED`, the authenticated operator authored the
    PR, and the PR is also dirty, gate-blocked, structurally oversized, or
-   mixed-scope. Self-review by itself is `review-blocked`, not mergeable.
+   mixed-scope.
 3. `Janitor Integrity Check`, `Structural Firewall`, or another app-owned gate
    is `FAILURE`, `TIMED_OUT`, or repeatedly pending beyond 10 minutes.
 4. The Structural Firewall reports blast radius across more than five
@@ -57,20 +75,31 @@ Treat a PR as **supersede-only** when any of these are true:
 
 ## Required Action
 
-For an external-review-required PR:
+For a solo-review-policy-drift PR:
 
 1. Do **not** report the PR as merged, mergeable, or resolved.
-2. Do **not** use `ENABLE_AUTO_MERGE_AFTER_REVIEW`; that action class is
-   reserved for bot-authored dependency PRs after review has been supplied or
-   requested by a different write-access actor.
-3. Request an external approving review from a write-access reviewer when one
-   is known.
-4. If no external reviewer is available, ask the operator for exactly one
-   explicit choice: provide a reviewer, close/supersede the PR, or authorize a
-   temporary branch-protection bypass.
-5. A bypass is allowed only with explicit operator approval, all required
-   checks green, immediate restoration of the original review count, and final
-   proof that branch protection is back to its original state.
+2. Restore branch protection to `required_approving_review_count=0` if admin
+   permission exists, preserving required checks and `enforce_admins`.
+3. Verify branch protection after the update.
+4. Re-arm auto-merge with `gh pr merge <pr> --auto --squash --delete-branch`.
+5. Run the Post-Push Auto-Merge Watch cadence below.
+6. If admin permission is missing, report `SOLO_REVIEW_POLICY_DRIFT` and ask
+   the operator to update branch protection; do not ask for fake external
+   review.
+
+## Post-Push Auto-Merge Watch
+
+After every commit/push/PR-create flow, and after every push to an open PR:
+
+1. Immediately collect `gh pr view <pr>` and `gh pr checks <pr>`.
+2. At `+1 minute`, collect the same state and report only changed blockers.
+3. At `+5 minutes`, collect the same state and report only changed blockers.
+4. At the final Governor window (`+9 minutes`; expected Janitor Integrity
+   terminal duration is approximately `9m2s`), collect final PR state.
+5. If all required checks pass and auto-merge is not armed, arm it.
+6. If the PR merged, verify the merge and stop.
+7. If the PR is still blocked after the final window, classify it using this
+   rule and name exactly one blocker.
 
 For a supersede-only PR:
 
@@ -92,13 +121,14 @@ For a supersede-only PR:
 
 | PR state | Action |
 |----------|--------|
-| green checks + approved + clean merge state | merge or enable auto-merge |
-| green checks + review required + bot-authored dependency PR | request/perform write-access review, then enable auto-merge |
-| self-authored + review required + required review count > 0 | `EXTERNAL_REVIEW_REQUIRED`; external approval or explicit bypass required |
+| green checks + clean merge state + no review required | merge or enable auto-merge |
+| checks pending + clean merge state + no review required | `AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`; run 1m/5m/9m watch |
+| self-authored + review required + required review count > 0 | `SOLO_REVIEW_POLICY_DRIFT`; restore zero required reviews |
 | dirty/conflicting | rebase/recreate from `origin/main`; do not merge |
 | app-owned gate failed/timed out | inspect gate artifact; if PR-wide policy failure, split/close |
 | stale feature PR superseded by narrower work | comment and close |
 
-Branch protection must never be weakened except for a docs-only emergency merge
-with explicit operator approval, all required checks green, immediate restoration
-of the original review count, and final branch-protection proof.
+Branch protection must not be weakened by removing required status checks or
+admin enforcement. In this solo-maintainer repository, setting required human
+review count to zero is not a bypass; it is the steady-state policy that lets
+status checks and auto-merge do their job.
