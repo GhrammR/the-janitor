@@ -52,7 +52,9 @@ work.
      resolution unless the PR modifies the alerted file/rule.
    - code-scanning-new-alerts: block auto-merge and remediate the new alert.
    - code-scanning-api-unavailable: require a successful
-     `Code Scanning Alert Audit` check before finalizing PR state.
+     `Code Scanning Alert Audit` check before finalizing PR state. The audit
+     must cover immediate, +1 minute, +5 minutes, and +9 minutes samples, not
+     just an early pre-CodeQL API read.
    - gate-blocked: inspect artifact/log once and report exact invariant.
    - dirty: recreate from `origin/main`; do not push more commits to the dirty branch.
    - supersede-only: comment, close if self-authored/superseded, and create narrow replacement branch.

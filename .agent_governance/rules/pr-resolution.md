@@ -57,6 +57,9 @@ gh api repos/<owner>/<repo>/code-scanning/alerts \
 If the local token returns `403` or `404`, do not assume there are no alerts.
 Report `CODE_SCANNING_API_UNAVAILABLE` and rely on the GitHub Actions
 `Code Scanning Alert Audit` workflow, which runs with `security-events: read`.
+That workflow is not a single early sample. It must sample code-scanning state
+at `immediate`, `+1 minute`, `+5 minutes`, and `+9 minutes`, so delayed CodeQL
+SARIF ingestion can surface before auto-merge completes.
 
 Open baseline alerts on `main` must be reported as backlog telemetry on every
 PR inspection. Existing baseline alerts do not block unrelated PRs by default.
