@@ -89,6 +89,10 @@ jobs:
             | jq -r '[.statusCheckRollup[]?
               | select((.name == "Janitor Integrity Check" or .name == "Structural Firewall")
                 and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))] | length')"
+          pending_checks="$(printf '%s' "${PR_JSON}" \
+            | jq -r '[.statusCheckRollup[]?
+              | select((.status != null and .status != "COMPLETED")
+                or (.state != null and .state == "PENDING"))] | length')"
 
           action_class="MERGE"
           if [ "${merge_state}" = "DIRTY" ] || [ "${merge_state}" = "CONFLICTING" ]; then
@@ -97,6 +101,8 @@ jobs:
             action_class="SOLO_REVIEW_POLICY_DRIFT"
           elif [ "${app_gate_bad}" != "0" ]; then
             action_class="WAIT_FOR_CHECKS"
+          elif [ "${pending_checks}" != "0" ]; then
+            action_class="AUTO_MERGE_ARMED_WAITING_FOR_CHECKS"
           elif [ "${top_level_count}" -gt 5 ] || [ "${has_janitor_artifact}" = "true" ]; then
             action_class="CLOSE_SUPERSEDED"
           elif [ "${has_docs}" = "true" ] && { [ "${has_engine}" = "true" ] || [ "${has_campaign}" = "true" ] || [ "${has_workflow}" = "true" ]; }; then
@@ -114,6 +120,7 @@ jobs:
             echo "| Merge state | ${merge_state} |"
             echo "| Review decision | ${review_decision} |"
             echo "| Action class | ${action_class} |"
+            echo "| Pending checks | ${pending_checks} |"
             echo "| Top-level directories | ${top_level_count} |"
             echo "| .janitor artifacts touched | ${has_janitor_artifact} |"
             echo "| Mixed docs/engine/campaign/workflow | docs=${has_docs}, engine=${has_engine}, campaign=${has_campaign}, workflow=${has_workflow} |"
