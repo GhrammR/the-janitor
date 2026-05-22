@@ -10,9 +10,10 @@ replacement plan.
 ## Required Evidence
 
 Before any final answer or next-sprint prompt says a PR should be fixed,
-merged, closed, or superseded, collect current GitHub state:
+merged, closed, superseded, or auto-merge armed, collect current GitHub state:
 
 ```bash
+gh api user --jq '{login,id}'
 gh pr view <pr> --json author,headRefName,headRefOid,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup,url
 gh pr checks <pr>
 gh api repos/<owner>/<repo>/branches/<default_branch>/protection --jq '{required_pull_request_reviews,enforce_admins}'
@@ -27,6 +28,18 @@ gh api repos/<owner>/<repo> --jq '{description,homepage,default_branch}'
 ```
 
 ## Terminal Failure Conditions
+
+Treat a PR as **external-review-required** when all of these are true:
+
+1. Required branch protection has `required_approving_review_count > 0`.
+2. `reviewDecision=REVIEW_REQUIRED`.
+3. The authenticated operator authored the PR.
+4. No different write-access reviewer has approved it.
+
+This state is not mergeable and not resolved. Arming `gh pr merge --auto` may
+be useful, but it is not completion because auto-merge cannot satisfy the
+missing human approval. The final answer must say `EXTERNAL_REVIEW_REQUIRED`
+and name the exact review blocker.
 
 Treat a PR as **supersede-only** when any of these are true:
 
@@ -43,6 +56,21 @@ Treat a PR as **supersede-only** when any of these are true:
    campaign, workflow, or generated-artifact changes.
 
 ## Required Action
+
+For an external-review-required PR:
+
+1. Do **not** report the PR as merged, mergeable, or resolved.
+2. Do **not** use `ENABLE_AUTO_MERGE_AFTER_REVIEW`; that action class is
+   reserved for bot-authored dependency PRs after review has been supplied or
+   requested by a different write-access actor.
+3. Request an external approving review from a write-access reviewer when one
+   is known.
+4. If no external reviewer is available, ask the operator for exactly one
+   explicit choice: provide a reviewer, close/supersede the PR, or authorize a
+   temporary branch-protection bypass.
+5. A bypass is allowed only with explicit operator approval, all required
+   checks green, immediate restoration of the original review count, and final
+   proof that branch protection is back to its original state.
 
 For a supersede-only PR:
 
@@ -66,7 +94,7 @@ For a supersede-only PR:
 |----------|--------|
 | green checks + approved + clean merge state | merge or enable auto-merge |
 | green checks + review required + bot-authored dependency PR | request/perform write-access review, then enable auto-merge |
-| self-authored + review required | external approval required; self-approval is invalid |
+| self-authored + review required + required review count > 0 | `EXTERNAL_REVIEW_REQUIRED`; external approval or explicit bypass required |
 | dirty/conflicting | rebase/recreate from `origin/main`; do not merge |
 | app-owned gate failed/timed out | inspect gate artifact; if PR-wide policy failure, split/close |
 | stale feature PR superseded by narrower work | comment and close |

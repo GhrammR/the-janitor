@@ -9,7 +9,8 @@ implemented as a result.
 * `.agent_governance/skills/pr-resolution/SKILL.md` *(created)* — reusable PR Resolution Gate skill with required `gh pr view`, `gh pr checks`, branch-protection proof, action classes, and merge/close decision table.
 * `.agent_governance/rules/response-format.md` *(modified)* — final summaries and next Sovereign Directive prompts must quote live PR blockers and use the PR Resolution Gate class before including PR phases.
 * `.agent_governance/skills/doc-sync/SKILL.md` *(modified)* — GitHub-visible docs changes now trigger PR Resolution Gate; dirty or self-review-blocked docs PRs must be replaced by docs-only branches from `origin/main`.
-* `.github/workflows/pr-resolution-audit.yml` *(created)* — lightweight PR audit check that inspects live PR state and diff shape without executing untrusted PR code; fails dirty, self-review-deadlocked, app-gate-failed, oversized, generated-artifact, or mixed-scope PRs.
+* `.github/workflows/pr-resolution-audit.yml` *(created)* — lightweight PR audit check that inspects live PR state and diff shape without executing untrusted PR code; fails dirty, app-gate-failed, oversized, generated-artifact, or mixed-scope PRs, and reports self-review deadlocks as `EXTERNAL_REVIEW_REQUIRED`.
+* `.agent_governance/rules/pr-resolution.md`, `.agent_governance/skills/pr-resolution/SKILL.md`, `.agent_governance/rules/response-format.md`, and `.github/workflows/pr-resolution-audit.yml` *(tightened)* — green self-authored PRs blocked only by branch-protection review now classify as `EXTERNAL_REVIEW_REQUIRED`; auto-merge alone is explicitly not completion.
 
 ## 2026-05-16 — Sprint Batch 138: P17-4 OAuth State Validation + P7-2 Phase B patch_proof Oracle + Dependabot Auto-merge
 

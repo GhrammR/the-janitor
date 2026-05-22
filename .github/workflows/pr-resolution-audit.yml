@@ -53,6 +53,10 @@ jobs:
           if printf '%s' "${author}" | grep -q '\[bot\]$'; then
             author_is_bot="true"
           fi
+          self_review_deadlock="false"
+          if [ "${review_decision}" = "REVIEW_REQUIRED" ] && [ "${author}" = "${ACTOR}" ] && [ "${author_is_bot}" = "false" ]; then
+            self_review_deadlock="true"
+          fi
 
           top_level_count="$(printf '%s\n' "${FILES}" \
             | awk -F/ 'NF {print $1}' \
@@ -86,6 +90,19 @@ jobs:
               | select((.name == "Janitor Integrity Check" or .name == "Structural Firewall")
                 and (.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))] | length')"
 
+          action_class="MERGE"
+          if [ "${merge_state}" = "DIRTY" ] || [ "${merge_state}" = "CONFLICTING" ]; then
+            action_class="REBASE_OR_RECREATE"
+          elif [ "${app_gate_bad}" != "0" ]; then
+            action_class="WAIT_FOR_CHECKS"
+          elif [ "${top_level_count}" -gt 5 ] || [ "${has_janitor_artifact}" = "true" ]; then
+            action_class="CLOSE_SUPERSEDED"
+          elif [ "${has_docs}" = "true" ] && { [ "${has_engine}" = "true" ] || [ "${has_campaign}" = "true" ] || [ "${has_workflow}" = "true" ]; }; then
+            action_class="CLOSE_SUPERSEDED"
+          elif [ "${self_review_deadlock}" = "true" ]; then
+            action_class="EXTERNAL_REVIEW_REQUIRED"
+          fi
+
           {
             echo "## PR Resolution Audit"
             echo
@@ -96,6 +113,7 @@ jobs:
             echo "| Author | ${author} |"
             echo "| Merge state | ${merge_state} |"
             echo "| Review decision | ${review_decision} |"
+            echo "| Action class | ${action_class} |"
             echo "| Top-level directories | ${top_level_count} |"
             echo "| .janitor artifacts touched | ${has_janitor_artifact} |"
             echo "| Mixed docs/engine/campaign/workflow | docs=${has_docs}, engine=${has_engine}, campaign=${has_campaign}, workflow=${has_workflow} |"
@@ -108,8 +126,8 @@ jobs:
             failed=1
           fi
 
-          if [ "${review_decision}" = "REVIEW_REQUIRED" ] && [ "${author}" = "${ACTOR}" ] && [ "${author_is_bot}" = "false" ]; then
-            echo "::warning::Self-review deadlock: PR author '${author}' needs an external approving review"
+          if [ "${self_review_deadlock}" = "true" ]; then
+            echo "::warning title=EXTERNAL_REVIEW_REQUIRED::PR author '${author}' cannot satisfy the required approving review; auto-merge is not completion"
           fi
 
           if [ "${app_gate_bad}" != "0" ]; then

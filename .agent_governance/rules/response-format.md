@@ -60,9 +60,13 @@ staged."
 If the directive involved a GitHub pull request, this section must classify the
 PR using `.agent_governance/rules/pr-resolution.md`: `MERGE`,
 `ENABLE_AUTO_MERGE_AFTER_REVIEW`, `WAIT_FOR_CHECKS`, `REBASE_OR_RECREATE`,
+`EXTERNAL_REVIEW_REQUIRED`, `BYPASS_REQUIRES_EXPLICIT_APPROVAL`,
 `CLOSE_SUPERSEDED`, or `LEAVE_OPEN`. A PR with `mergeStateStatus=DIRTY`,
 `reviewDecision=REVIEW_REQUIRED`, or failed/timed-out app-owned gates must not
-be described as mergeable.
+be described as mergeable. A self-authored PR with required branch-protection
+review is `EXTERNAL_REVIEW_REQUIRED` until a different write-access reviewer
+approves it or the operator explicitly authorizes a temporary protection
+bypass.
 
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:
@@ -172,7 +176,10 @@ The prompt MUST:
    blocker from `gh pr view` / `gh pr checks` and use the PR Resolution Gate
    action class. Dirty, self-review-blocked, or app-gate-failed PRs must be
    superseded or split first; the prompt must not keep appending unrelated work
-   to the same broken branch.
+   to the same broken branch. A self-authored PR with
+   `reviewDecision=REVIEW_REQUIRED` and branch protection requiring approving
+   reviews must be classified as `EXTERNAL_REVIEW_REQUIRED`; auto-merge armed
+   on that PR is not completion.
 
 **Architectural Oracle Execution Law**: If the Architectural Oracle Tip
 identifies a legacy drift or optimization that requires fewer than 50 lines of

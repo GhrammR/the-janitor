@@ -8,12 +8,16 @@ work.
 
 1. Read `.agent_governance/rules/pr-resolution.md`.
 2. Resolve live state:
+   - `gh api user --jq '{login,id}'`
    - `gh pr view <pr> --json author,headRefName,headRefOid,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup,url`
    - `gh pr checks <pr>`
    - `gh api repos/<owner>/<repo>/branches/<default_branch>/protection --jq '{required_pull_request_reviews,enforce_admins}'`
 3. Classify the PR:
    - **mergeable**: clean merge state, approved or no review required, required checks green.
    - **review-blocked**: checks green or still running, but review is required.
+   - **external-review-required**: checks are green or auto-merge is armed, but
+     branch protection requires review and the authenticated operator authored
+     the PR. This is not resolved.
    - **gate-blocked**: app-owned check failed, timed out, or is still pending past 10 minutes.
    - **dirty**: merge state is `DIRTY`, `CONFLICTING`, or stale/unknown after refresh.
    - **supersede-only**: dirty plus gate-blocked, self-review plus another
@@ -22,6 +26,10 @@ work.
 4. Act by class:
    - mergeable: merge or enable auto-merge.
    - review-blocked bot dependency: approve only after checking diff/checks, then enable auto-merge.
+   - external-review-required: request a different write-access approving
+     reviewer, or ask the operator to choose external review, close/supersede,
+     or explicit temporary branch-protection bypass. Do not describe auto-merge
+     as completion.
    - gate-blocked: inspect artifact/log once and report exact invariant.
    - dirty: recreate from `origin/main`; do not push more commits to the dirty branch.
    - supersede-only: comment, close if self-authored/superseded, and create narrow replacement branch.
@@ -35,6 +43,8 @@ Report each PR as one of:
 
 - `MERGE`
 - `ENABLE_AUTO_MERGE_AFTER_REVIEW`
+- `EXTERNAL_REVIEW_REQUIRED`
+- `BYPASS_REQUIRES_EXPLICIT_APPROVAL`
 - `WAIT_FOR_CHECKS`
 - `REBASE_OR_RECREATE`
 - `CLOSE_SUPERSEDED`
