@@ -36,11 +36,11 @@ mod kani_proofs {
     use crate::proof_obligation::{
         cargo_build_worm_is_reachable, ci_persistence_vector_is_reachable,
         debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, jndi_lookup_is_untrusted,
-        oauth_excessive_scope_is_reachable, pqc_hybrid_downgrade_is_reachable,
-        process_builder_is_untrusted, proof_obligation_missing,
-        saml_xsw_validation_order_is_reachable, unverified_provenance_is_reachable,
-        xxe_saml_parser_is_unguarded,
+        intent_divergence_is_reachable, java_deser_allowlist_bypass_is_reachable,
+        jndi_lookup_is_untrusted, oauth_excessive_scope_is_reachable,
+        pqc_hybrid_downgrade_is_reachable, process_builder_is_untrusted, proof_obligation_missing,
+        saml_xsw_validation_order_is_reachable, unsafe_deserialization_is_reachable,
+        unverified_provenance_is_reachable, xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -389,6 +389,56 @@ mod kani_proofs {
         kani::assert(
             fired == (has_decoder && !has_allowlist),
             "java deser allowlist-bypass gate must be exact conjunction",
+        );
+    }
+
+    /// Prove the proof-obligation Java deserialization gate is exact:
+    /// it fires iff sink + untrusted source are present, and filter plus
+    /// nonproduction path are absent.
+    #[kani::proof]
+    fn java_deser_allowlist_bypass_is_exact_conjunction() {
+        let has_deserialization_sink: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_allowlist_or_filter: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let fired = java_deser_allowlist_bypass_is_reachable(
+            has_deserialization_sink,
+            has_untrusted_source,
+            has_allowlist_or_filter,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            fired
+                == (has_deserialization_sink
+                    && has_untrusted_source
+                    && !has_allowlist_or_filter
+                    && !in_nonproduction_path),
+            "java deser proof predicate must be exact conjunction",
+        );
+    }
+
+    /// Prove the unsafe deserialization proof gate is exact:
+    /// it fires iff unsafe sink + untrusted source are present, and safe loader
+    /// plus nonproduction path are absent.
+    #[kani::proof]
+    fn unsafe_deserialization_is_exact_conjunction() {
+        let has_unsafe_deserialization_sink: bool = kani::any();
+        let has_untrusted_source: bool = kani::any();
+        let has_safe_deserialization_guard: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let fired = unsafe_deserialization_is_reachable(
+            has_unsafe_deserialization_sink,
+            has_untrusted_source,
+            has_safe_deserialization_guard,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            fired
+                == (has_unsafe_deserialization_sink
+                    && has_untrusted_source
+                    && !has_safe_deserialization_guard
+                    && !in_nonproduction_path),
+            "unsafe deserialization predicate must be exact conjunction",
         );
     }
 

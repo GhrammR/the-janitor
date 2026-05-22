@@ -27,6 +27,10 @@ The Janitor is an active Rust static-analysis research platform studying whether
 
 The empirical method is deterministic: run the same detector corpus across real repositories, preserve proof-class decisions as structured findings, verify critical predicates with Kani, and attach reproducible command evidence where a vulnerability claim is strong enough to leave research triage. The project is currently best understood as a research artifact and collaboration surface, not a procurement-ready enterprise product.
 
+## Cloud Reproducibility Track
+
+Janitor evidence can be reproduced in GitHub Actions and mapped onto Google Cloud Build and Artifact Registry provenance without uploading source code to a hosted scanner. A reproducibility run emits local findings, proof-class decisions, SARIF, and provenance metadata that can be mirrored into Cloud Build attestations or Artifact Registry records while keeping repository contents inside the operator-controlled build environment.
+
 ## Research Foundation
 
 The Janitor is an active security research platform spanning four technical frontiers:

@@ -1876,6 +1876,245 @@ pub fn classify_ci_persistence_vector_proof(
     }
 }
 
+/// Returns `true` when production Java deserialization consumes attacker-
+/// controlled bytes without an object filter, class allowlist, or fixed mapping.
+pub fn java_deser_allowlist_bypass_is_reachable(
+    has_deserialization_sink: bool,
+    has_untrusted_source: bool,
+    has_allowlist_or_filter: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_deserialization_sink
+        && has_untrusted_source
+        && !has_allowlist_or_filter
+        && !in_nonproduction_path
+}
+
+/// Classifies a `security:java_deser_allowlist_bypass` finding into a `ProofClass`.
+///
+/// - Tests/generated/migrations/fixtures -> `InvariantViolationProof`
+/// - ObjectInputFilter, class allowlists, or fixed type mappings -> `InvariantViolationProof`
+/// - Production Java request/message bytes reaching native deserialization -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_java_deser_allowlist_bypass_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("migration")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/bench")
+        || path_lower.contains("/script")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_constant_fixture = source_lower.contains("bytearrayinputstream(new byte")
+        || source_lower.contains("static final byte[]")
+        || source_lower.contains("private static final byte[]")
+        || source_lower.contains("serialized_fixture")
+        || source_lower.contains("constant fixture");
+    let has_allowlist_or_filter = source_lower.contains("objectinputfilter")
+        || source_lower.contains("setobjectinputfilter")
+        || source_lower.contains("serialfilter")
+        || source_lower.contains("validatingobjectinputstream")
+        || source_lower.contains("classfilter")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("allowedclasses")
+        || source_lower.contains("allowed_classes")
+        || source_lower.contains("setdecoderclass")
+        || source_lower.contains("sealed class")
+        || source_lower.contains("sealed interface")
+        || source_lower.contains("typeregistry")
+        || source_lower.contains("type registry")
+        || source_lower.contains("fixed type")
+        || has_constant_fixture;
+    if has_allowlist_or_filter {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_deserialization_sink = source_lower.contains("objectinputstream")
+        || source_lower.contains("readobject(")
+        || source_lower.contains("resolveclass(")
+        || source_lower.contains("objectserializationdecoder")
+        || source_lower.contains("objectdecoderinputstream")
+        || source_lower.contains("deserialize(")
+        || source_lower.contains("xmldecoder")
+        || source_lower.contains("xstream")
+        || source_lower.contains("fromxml(");
+    let has_untrusted_source = source_lower.contains("httpservletrequest")
+        || source_lower.contains("servletinputstream")
+        || source_lower.contains("request.getinputstream(")
+        || source_lower.contains("request.getparameter(")
+        || source_lower.contains("request.getheader(")
+        || source_lower.contains("@requestbody")
+        || source_lower.contains("multipartfile")
+        || source_lower.contains("socket.getinputstream(")
+        || source_lower.contains("session.getattribute(")
+        || source_lower.contains("message.getbody(")
+        || source_lower.contains("bytesmessage")
+        || source_lower.contains("consumerrecord")
+        || source_lower.contains("record.value(")
+        || source_lower.contains("body.get(")
+        || source_lower.contains("inputstream");
+
+    if java_deser_allowlist_bypass_is_reachable(
+        has_deserialization_sink,
+        has_untrusted_source,
+        has_allowlist_or_filter,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when an unsafe native deserializer consumes attacker-
+/// controlled input without a safe loader, type allowlist, signature, or schema.
+pub fn unsafe_deserialization_is_reachable(
+    has_unsafe_deserialization_sink: bool,
+    has_untrusted_source: bool,
+    has_safe_deserialization_guard: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_unsafe_deserialization_sink
+        && has_untrusted_source
+        && !has_safe_deserialization_guard
+        && !in_nonproduction_path
+}
+
+/// Classifies a `security:unsafe_deserialization` finding into a `ProofClass`.
+///
+/// - Tests/benchmarks/generated/cache scripts -> `InvariantViolationProof`
+/// - Safe loaders, filters, signatures, or fixed schemas -> `InvariantViolationProof`
+/// - Production request/message/upload input reaching native deserialization -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_unsafe_deserialization_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("benchmark")
+        || path_lower.contains("/bench")
+        || path_lower.contains("/cache/")
+        || path_lower.contains("/script")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_safe_deserialization_guard = source_lower.contains("safe_load")
+        || source_lower.contains("safeloader")
+        || source_lower.contains("typ='safe'")
+        || source_lower.contains("typ=\"safe\"")
+        || source_lower.contains("objectinputfilter")
+        || source_lower.contains("setobjectinputfilter")
+        || source_lower.contains("validatingobjectinputstream")
+        || source_lower.contains("classfilter")
+        || source_lower.contains("allowlist")
+        || source_lower.contains("whitelist")
+        || source_lower.contains("type allowlist")
+        || source_lower.contains("schema")
+        || source_lower.contains("fixed schema")
+        || source_lower.contains("jsonschema")
+        || source_lower.contains("signature")
+        || source_lower.contains("verify(")
+        || source_lower.contains("verified")
+        || source_lower.contains("hmac")
+        || source_lower.contains("signed artifact")
+        || source_lower.contains("offline-only")
+        || source_lower.contains("offline_only")
+        || source_lower.contains("constant fixture");
+    if has_safe_deserialization_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_unsafe_deserialization_sink = source_lower.contains("pickle.loads(")
+        || source_lower.contains("pickle.load(")
+        || source_lower.contains("yaml.load(")
+        || source_lower.contains("marshal.load(")
+        || source_lower.contains("marshal.restore(")
+        || source_lower.contains("objectinputstream")
+        || source_lower.contains("readobject(")
+        || source_lower.contains("xmldecoder")
+        || source_lower.contains("xstream")
+        || source_lower.contains("fromxml(")
+        || source_lower.contains("unserialize(")
+        || source_lower.contains("binaryformatter")
+        || source_lower.contains("typenamehandling.auto")
+        || source_lower.contains("typenamehandling.all")
+        || source_lower.contains("typenamehandling.objects")
+        || source_lower.contains("losformatter")
+        || source_lower.contains("objectstateformatter")
+        || source_lower.contains("deserialize(");
+    let has_untrusted_source = source_lower.contains("request.")
+        || source_lower.contains("request[")
+        || source_lower.contains("req.")
+        || source_lower.contains("req[")
+        || source_lower.contains("httpservletrequest")
+        || source_lower.contains("servletinputstream")
+        || source_lower.contains("@requestbody")
+        || source_lower.contains("headers")
+        || source_lower.contains("getheader")
+        || source_lower.contains("getparameter")
+        || source_lower.contains("params[")
+        || source_lower.contains("query[")
+        || source_lower.contains("body[")
+        || source_lower.contains("body.get(")
+        || source_lower.contains("cookie")
+        || source_lower.contains("session")
+        || source_lower.contains("webhook")
+        || source_lower.contains("upload")
+        || source_lower.contains("multipart")
+        || source_lower.contains("socket")
+        || source_lower.contains("message.getbody(")
+        || source_lower.contains("consumerrecord")
+        || source_lower.contains("record.value(")
+        || source_lower.contains("queue")
+        || source_lower.contains("kafka");
+
+    if unsafe_deserialization_is_reachable(
+        has_unsafe_deserialization_sink,
+        has_untrusted_source,
+        has_safe_deserialization_guard,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -3076,6 +3315,90 @@ mod tests {
             "cp agent.service /etc/systemd/system/agent.service\nsystemctl enable agent.service";
         assert_eq!(
             super::classify_ci_persistence_vector_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn java_deser_generated_fixture_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/generated/java/app/DeserFixture.java".to_string()),
+            ..Default::default()
+        };
+        let source = "ObjectInputStream ois = new ObjectInputStream(inputStream); Object obj = ois.readObject();";
+        assert_eq!(
+            super::classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn java_deser_object_input_filter_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/main/java/app/SessionDecoder.java".to_string()),
+            ..Default::default()
+        };
+        let source = "ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter(\"com.acme.*;!*\")); Object obj = ois.readObject();";
+        assert_eq!(
+            super::classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn java_deser_request_stream_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/main/java/app/SessionDecoder.java".to_string()),
+            ..Default::default()
+        };
+        let source = "void read(HttpServletRequest request) throws Exception { ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); Object obj = ois.readObject(); }";
+        assert_eq!(
+            super::classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn unsafe_deserialization_benchmark_cache_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:unsafe_deserialization".to_string(),
+            file: Some("script/benchmarks/cache/bench.rb".to_string()),
+            ..Default::default()
+        };
+        let source = "obj = Marshal.load(cache_blob)";
+        assert_eq!(
+            super::classify_unsafe_deserialization_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn unsafe_deserialization_safe_loader_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:unsafe_deserialization".to_string(),
+            file: Some("src/api/config_loader.py".to_string()),
+            ..Default::default()
+        };
+        let source = "payload = request.body\nobj = yaml.load(payload, Loader=yaml.SafeLoader)";
+        assert_eq!(
+            super::classify_unsafe_deserialization_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn unsafe_deserialization_request_pickle_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:unsafe_deserialization".to_string(),
+            file: Some("src/api/session_loader.py".to_string()),
+            ..Default::default()
+        };
+        let source = "def load_session(request):\n    payload = request.body\n    return pickle.loads(payload)";
+        assert_eq!(
+            super::classify_unsafe_deserialization_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

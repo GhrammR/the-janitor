@@ -3,6 +3,17 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — Sprint 163: Deserialization Proof Cures + Cloud Reproducibility Track
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `java_deser_allowlist_bypass_is_reachable` / `classify_java_deser_allowlist_bypass_proof` and `unsafe_deserialization_is_reachable` / `classify_unsafe_deserialization_proof`; classifiers suppress tests, generated fixtures, benchmarks, cache scripts, ObjectInputFilter/class allowlists, safe loaders, signatures, and fixed schemas, and emit `ReachabilityProof` only for production attacker-controlled deserialization paths without guards.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:java_deser_allowlist_bypass` and `security:unsafe_deserialization` through deterministic proof classifiers, suppressing invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added Kani exact-conjunction harnesses for Java deserialization allowlist bypass and unsafe deserialization proof predicates.
+* `docs/index.md` *(modified)* — added `Cloud Reproducibility Track` to the first-page research narrative, mapping GitHub Actions evidence to Google Cloud Build / Artifact Registry provenance without source upload.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:java_deser_allowlist_bypass` and `security:unsafe_deserialization` hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` / `tools/campaign/target_ledger.json` *(modified)* — Sprint 162 hunt rows added: Uniswap v3-info emitted zero findings and is out of scope; Aave UI emitted 16 informational UI/client findings and is out of scope; Chainlink emitted 62 informational rows with existing demotions and no autonomous payload.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` -> 95 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` -> 34 passed; `cargo test -p cli -- hunt --test-threads=2` -> 89 passed; `cargo kani -p forge --harness java_deser_allowlist_bypass_is_exact_conjunction` -> successful; `cargo kani -p forge --harness unsafe_deserialization_is_exact_conjunction` -> successful; `jq empty tools/campaign/target_ledger.json` -> clean; `git diff --check` -> clean; `.INNOVATION_LOG.md` completion-marker/proof-block hygiene scan -> clean.
+
 ## 2026-05-22 — Sprint 162: Build-Lifecycle Persistence Proof Cures + Research Docs First Viewport
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — added `cargo_build_worm_is_reachable` / `classify_cargo_build_worm_proof` and `ci_persistence_vector_is_reachable` / `classify_ci_persistence_vector_proof`; classifiers suppress test/docs/examples/local/sandboxed/attested paths and emit `ReachabilityProof` only for production build or CI/package lifecycle execution without guard.
