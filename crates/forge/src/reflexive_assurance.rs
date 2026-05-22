@@ -38,7 +38,8 @@ mod kani_proofs {
         intent_divergence_is_reachable, jndi_lookup_is_untrusted,
         oauth_excessive_scope_is_reachable, pqc_hybrid_downgrade_is_reachable,
         process_builder_is_untrusted, proof_obligation_missing,
-        saml_xsw_validation_order_is_reachable, xxe_saml_parser_is_unguarded,
+        saml_xsw_validation_order_is_reachable, unverified_provenance_is_reachable,
+        xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -473,6 +474,22 @@ mod kani_proofs {
         );
     }
 
+    #[kani::proof]
+    fn unverified_provenance_is_exact_conjunction() {
+        let has_artifact_ingestion: bool = kani::any();
+        let has_provenance_guard: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let result = unverified_provenance_is_reachable(
+            has_artifact_ingestion,
+            has_provenance_guard,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            result == (has_artifact_ingestion && !has_provenance_guard && !in_nonproduction_path),
+            "unverified provenance reachability must be exact conjunction",
+        );
+    }
+
     /// Prove that `ffi_deref_guard_classification` is a total, panic-free function
     /// returning exactly one of the three documented variants for all input pairs.
     #[kani::proof]
@@ -524,7 +541,8 @@ mod tests {
         oauth_excessive_scope_is_reachable, oauth_state_validation_is_missing,
         pqc_hybrid_downgrade_is_reachable, process_builder_is_untrusted, proof_obligation_missing,
         protobuf_any_is_unguarded, react_xss_is_unguarded, saml_xsw_validation_order_is_reachable,
-        sqli_concat_is_injectable, xxe_saml_parser_is_unguarded,
+        sqli_concat_is_injectable, unverified_provenance_is_reachable,
+        xxe_saml_parser_is_unguarded,
     };
     use crate::slop_hunter::Severity;
     use common::slop::ProofClass;
@@ -730,6 +748,14 @@ mod tests {
         assert!(!llm_provenance_missing(true, true));
         assert!(!llm_provenance_missing(false, false));
         assert!(!llm_provenance_missing(false, true));
+    }
+
+    #[test]
+    fn unverified_provenance_requires_ingestion_missing_guard_and_production_path() {
+        assert!(unverified_provenance_is_reachable(true, false, false));
+        assert!(!unverified_provenance_is_reachable(false, false, false));
+        assert!(!unverified_provenance_is_reachable(true, true, false));
+        assert!(!unverified_provenance_is_reachable(true, false, true));
     }
 
     #[test]

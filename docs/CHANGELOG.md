@@ -3,6 +3,15 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — Sprint 161: Self-Review Deadlock Governance + Supply-Chain Provenance Proof Cure
+
+* `.agent_governance/rules/response-format.md` *(modified)* — GitHub-visible documentation final summaries now require explicit self-review deadlock detection when the authenticated user authored the PR and branch protection requires an approving review; allowed resolution is external write-access approval or a temporary review-count bypass with immediate restoration and final protection proof.
+* `.agent_governance/skills/doc-sync/SKILL.md` *(modified)* — doc-sync now carries the same self-review deadlock protocol for README/public-surface PRs.
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `unverified_provenance_is_reachable` and `classify_unverified_provenance_proof`; tests cover docs/examples suppression, checksum/SHA guard suppression, and production raw Git dependency reachability.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `supply_chain:unverified_provenance` through the deterministic proof classifier and suppresses invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added Kani harness `unverified_provenance_is_exact_conjunction` and a deterministic regression test for the exact conjunction predicate.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A `supply_chain:unverified_provenance` block hard-deleted after implementation.
+
 ## 2026-05-21 — Sprint 160B: GitHub Repository Surface Sync Governance
 
 * `.agent_governance/rules/response-format.md` *(modified)* — GitHub-visible documentation proof now distinguishes repository metadata description/homepage, default-branch README, and feature-branch README. Agents must no longer imply a README branch push changes the visible repository description.

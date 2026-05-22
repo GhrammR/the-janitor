@@ -1579,6 +1579,108 @@ pub fn classify_oauth_excessive_scope_proof(
     }
 }
 
+/// Returns `true` when production artifact ingestion lacks checksum,
+/// signature, SLSA, or equivalent provenance verification.
+pub fn unverified_provenance_is_reachable(
+    has_artifact_ingestion: bool,
+    has_provenance_guard: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_artifact_ingestion && !has_provenance_guard && !in_nonproduction_path
+}
+
+/// Classifies a `supply_chain:unverified_provenance` finding into a `ProofClass`.
+///
+/// - Tests/docs/examples/generated/local caches -> `InvariantViolationProof`
+/// - Checksum/signature/SLSA/Sigstore provenance -> `InvariantViolationProof`
+/// - Production raw artifact/dependency ingestion without provenance -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_unverified_provenance_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/local/")
+        || path_lower.contains("/cache/")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let manifest_or_release_path = path_lower.ends_with("cargo.toml")
+        || path_lower.ends_with("package.json")
+        || path_lower.ends_with("go.mod")
+        || path_lower.ends_with("pyproject.toml")
+        || path_lower.ends_with("pom.xml")
+        || path_lower.ends_with("build.gradle")
+        || path_lower.ends_with(".yml")
+        || path_lower.ends_with(".yaml")
+        || path_lower.ends_with("dockerfile");
+    let has_raw_artifact_reference = source_lower.contains("git =")
+        || source_lower.contains("git+")
+        || source_lower.contains("github.com/")
+        || source_lower.contains("http_archive(")
+        || source_lower.contains("curl ")
+        || source_lower.contains("wget ")
+        || source_lower.contains("releases/download")
+        || source_lower.contains("archive/refs")
+        || source_lower.contains("actions/download-artifact")
+        || source_lower.contains("add https://")
+        || source_lower.contains("url = \"http");
+    let has_install_or_release_context = manifest_or_release_path
+        || source_lower.contains("[dependencies]")
+        || source_lower.contains("\"dependencies\"")
+        || source_lower.contains("require (")
+        || source_lower.contains("<dependency>")
+        || source_lower.contains("download")
+        || source_lower.contains("artifact")
+        || source_lower.contains("release");
+    let has_artifact_ingestion = has_raw_artifact_reference && has_install_or_release_context;
+    let has_provenance_guard = source_lower.contains("sha256")
+        || source_lower.contains("sha384")
+        || source_lower.contains("sha512")
+        || source_lower.contains("checksum")
+        || source_lower.contains("integrity")
+        || source_lower.contains("cosign")
+        || source_lower.contains("sigstore")
+        || source_lower.contains("slsa")
+        || source_lower.contains("attestation")
+        || source_lower.contains("provenance")
+        || source_lower.contains("gpg --verify")
+        || source_lower.contains("minisign")
+        || source_lower.contains("trusted registry")
+        || source_lower.contains("registry allowlist")
+        || source_lower.contains("registry_allowlist");
+    if has_provenance_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    if unverified_provenance_is_reachable(
+        has_artifact_ingestion,
+        has_provenance_guard,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -2651,6 +2753,49 @@ mod tests {
             "func mint(req Request) { scope := req.Query(\"scope\") + \" repo admin:org\"; request_token(scope); }";
         assert_eq!(
             super::classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn unverified_provenance_docs_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "supply_chain:unverified_provenance".to_string(),
+            file: Some("docs/examples/Cargo.toml".to_string()),
+            ..Default::default()
+        };
+        let source = "[dependencies]\nplugin = { git = \"https://github.com/acme/plugin\" }";
+        assert_eq!(
+            super::classify_unverified_provenance_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn unverified_provenance_checksum_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "supply_chain:unverified_provenance".to_string(),
+            file: Some("build/deps.yml".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "download: https://github.com/acme/tool/releases/download/v1/tool.tgz\nsha256: deadbeef";
+        assert_eq!(
+            super::classify_unverified_provenance_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn unverified_provenance_raw_git_dependency_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "supply_chain:unverified_provenance".to_string(),
+            file: Some("Cargo.toml".to_string()),
+            ..Default::default()
+        };
+        let source = "[dependencies]\nplugin = { git = \"https://github.com/acme/plugin\" }";
+        assert_eq!(
+            super::classify_unverified_provenance_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }
