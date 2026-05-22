@@ -34,6 +34,15 @@ Mapping Matrix below.
 
 4. **If the document is current**: proceed to commit.
 
+5. **If the change is intended to be visible on GitHub** (`README.md`,
+   `docs/index.md`, repository metadata, or documentation landing pages):
+   - Run the PR Resolution Gate before finalizing the sprint.
+   - If the current PR is dirty, self-review blocked, app-gate failed, or
+     structurally oversized, do not continue pushing documentation commits to
+     that PR.
+   - Create a docs-only replacement branch from `origin/main` and route the
+     broken PR to `CLOSE_SUPERSEDED` or `REBASE_OR_RECREATE`.
+
 ## Abort conditions
 
 | Condition | Action |
