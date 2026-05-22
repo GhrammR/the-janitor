@@ -3,6 +3,17 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — Sprint 164: MCP/FFI Proof Cures + Adversarial Robustness Docs + Hunt Sweep
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `mcp_confused_deputy_dispatch_is_reachable` / `classify_mcp_confused_deputy_dispatch_proof` and `ffi_memory_corruption_is_reachable` / `classify_ffi_memory_corruption_proof`; classifiers suppress tests, generated fixtures, local-dev transports, generated bindings, local shims, and explicit secret/capability/null/length/ownership guards, and emit `ReachabilityProof` only for production untrusted dispatch or FFI pointer/length sinks without guards.
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` now routes `security:mcp_confused_deputy_dispatch` and `security:ffi_memory_corruption` through deterministic proof classifiers, suppressing invariant proofs before ledger routing.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added Kani exact-conjunction harnesses `mcp_confused_deputy_dispatch_is_exact_conjunction` and `ffi_memory_corruption_is_exact_conjunction`.
+* `README.md` / `docs/index.md` *(modified)* — added `Adversarial Robustness and Tool-Intent Safety`, framing prompt injection, MCP/tool dispatch, agentic origin, and untrusted-context transposition as deterministic proof-obligation research surfaces.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A blocks for `security:mcp_confused_deputy_dispatch` and `security:ffi_memory_corruption` hard-deleted after implementation.
+* `tools/campaign/LOW_YIELD_LEDGER.md` / `tools/campaign/target_ledger.json` *(modified)* — Sprint 164 hunt rows added: Uniswap v3-periphery emitted zero findings; Aave v3-periphery emitted four informational/deprecated rows; Mattermost plugin AI emitted five lattice-gap/client/DCRP rows. No BOUNTY or CANDIDATE promotion occurred.
+
+**Verification**: `cargo test -p forge -- proof_obligation --test-threads=2` -> 101 passed; `cargo test -p forge -- reflexive_assurance --test-threads=2` -> 34 passed; `cargo test -p cli -- hunt --test-threads=2` -> 89 passed; `cargo kani -p forge --harness mcp_confused_deputy_dispatch_is_exact_conjunction` -> successful; `cargo kani -p forge --harness ffi_memory_corruption_is_exact_conjunction` -> successful; target sweep complete (`Uniswap/v3-periphery` 0 findings, `aave/aave-v3-periphery` 4 LOW_YIELD findings, `mattermost/mattermost-plugin-ai` 5 LOW_YIELD findings); branch protection remained at one required approving review with admin enforcement.
+
 ## 2026-05-22 — Sprint 163: Deserialization Proof Cures + Cloud Reproducibility Track
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — added `java_deser_allowlist_bypass_is_reachable` / `classify_java_deser_allowlist_bypass_proof` and `unsafe_deserialization_is_reachable` / `classify_unsafe_deserialization_proof`; classifiers suppress tests, generated fixtures, benchmarks, cache scripts, ObjectInputFilter/class allowlists, safe loaders, signatures, and fixed schemas, and emit `ReachabilityProof` only for production attacker-controlled deserialization paths without guards.

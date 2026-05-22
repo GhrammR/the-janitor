@@ -36,6 +36,14 @@ The Janitor is an active security research platform spanning four technical fron
 - Where do static detectors need formal predicates, symbolic constraints, or
   explicit lattice-gap proposals instead of another rule string?
 
+## Adversarial Robustness and Tool-Intent Safety
+
+The Janitor treats prompt injection, MCP/tool dispatch, agentic origin, and
+untrusted-context transposition as security research surfaces. The engine tests
+these paths with deterministic proof obligations for prompt/tool
+non-interference, confused-deputy dispatch, agentic-origin classification, and
+retrieval-context trust before findings reach audit ledgers.
+
 ## Research Findings
 
 **Finding 1 — Syntactic pattern matching is insufficient for triage-quality results.** The engine reliably produced findings that matched vulnerability patterns and reliably failed Tier-1 validation. The gap: detectors matched syntax but did not reason about surrounding context — auth decorators, sanitizer helpers, framework middleware pipelines, and scope rules.

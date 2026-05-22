@@ -36,8 +36,9 @@ mod kani_proofs {
     use crate::proof_obligation::{
         cargo_build_worm_is_reachable, ci_persistence_vector_is_reachable,
         debug_endpoint_is_unguarded, eval_injection_is_untrusted, ffi_deref_guard_classification,
-        intent_divergence_is_reachable, java_deser_allowlist_bypass_is_reachable,
-        jndi_lookup_is_untrusted, oauth_excessive_scope_is_reachable,
+        ffi_memory_corruption_is_reachable, intent_divergence_is_reachable,
+        java_deser_allowlist_bypass_is_reachable, jndi_lookup_is_untrusted,
+        mcp_confused_deputy_dispatch_is_reachable, oauth_excessive_scope_is_reachable,
         pqc_hybrid_downgrade_is_reachable, process_builder_is_untrusted, proof_obligation_missing,
         saml_xsw_validation_order_is_reachable, unsafe_deserialization_is_reachable,
         unverified_provenance_is_reachable, xxe_saml_parser_is_unguarded,
@@ -472,6 +473,31 @@ mod kani_proofs {
         );
     }
 
+    /// Prove the MCP confused-deputy proof gate is exact:
+    /// fires iff session dispatch and untrusted session/tool input are present,
+    /// while secret/capability guard and nonproduction path are absent.
+    #[kani::proof]
+    fn mcp_confused_deputy_dispatch_is_exact_conjunction() {
+        let has_session_dispatch: bool = kani::any();
+        let has_untrusted_session_or_tool_input: bool = kani::any();
+        let has_secret_or_capability_guard: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let fired = mcp_confused_deputy_dispatch_is_reachable(
+            has_session_dispatch,
+            has_untrusted_session_or_tool_input,
+            has_secret_or_capability_guard,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            fired
+                == (has_session_dispatch
+                    && has_untrusted_session_or_tool_input
+                    && !has_secret_or_capability_guard
+                    && !in_nonproduction_path),
+            "MCP confused-deputy dispatch proof gate must be exact conjunction",
+        );
+    }
+
     /// Prove the FFI raw-pointer dereference gate is an exact conjunction:
     /// fires iff a sink is present AND an FFI source is present AND no guard exists.
     #[kani::proof]
@@ -483,6 +509,31 @@ mod kani_proofs {
         kani::assert(
             fired == (has_sink && has_source && !has_guard),
             "FFI deref unguarded gate must be exact conjunction",
+        );
+    }
+
+    /// Prove the FFI memory-corruption proof gate is exact:
+    /// fires iff an FFI export boundary and unsafe memory sink are present,
+    /// while pointer/length guard and nonproduction path are absent.
+    #[kani::proof]
+    fn ffi_memory_corruption_is_exact_conjunction() {
+        let has_ffi_export_boundary: bool = kani::any();
+        let has_unsafe_memory_sink: bool = kani::any();
+        let has_pointer_or_length_guard: bool = kani::any();
+        let in_nonproduction_path: bool = kani::any();
+        let fired = ffi_memory_corruption_is_reachable(
+            has_ffi_export_boundary,
+            has_unsafe_memory_sink,
+            has_pointer_or_length_guard,
+            in_nonproduction_path,
+        );
+        kani::assert(
+            fired
+                == (has_ffi_export_boundary
+                    && has_unsafe_memory_sink
+                    && !has_pointer_or_length_guard
+                    && !in_nonproduction_path),
+            "FFI memory-corruption proof gate must be exact conjunction",
         );
     }
 

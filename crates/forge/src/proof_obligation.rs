@@ -2115,6 +2115,215 @@ pub fn classify_unsafe_deserialization_proof(
     }
 }
 
+/// Returns `true` when untrusted MCP session/tool input can reach privileged
+/// dispatch without a session-secret, capability, or same-principal guard.
+pub fn mcp_confused_deputy_dispatch_is_reachable(
+    has_session_dispatch: bool,
+    has_untrusted_session_or_tool_input: bool,
+    has_secret_or_capability_guard: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_session_dispatch
+        && has_untrusted_session_or_tool_input
+        && !has_secret_or_capability_guard
+        && !in_nonproduction_path
+}
+
+/// Classifies a `security:mcp_confused_deputy_dispatch` finding into a
+/// `ProofClass`.
+///
+/// - Tests/generated/local-dev transports -> `InvariantViolationProof`
+/// - Session-secret, capability, or same-principal guard -> `InvariantViolationProof`
+/// - Production untrusted session/tool dispatch without a guard -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_mcp_confused_deputy_dispatch_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/local")
+        || path_lower.contains("/dev")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_secret_or_capability_guard = source_lower.contains("verify_session")
+        || (source_lower.contains("verify(") && source_lower.contains("secret"))
+        || source_lower.contains("presented_secret")
+        || source_lower.contains("session_secret")
+        || source_lower.contains("session.secret")
+        || source_lower.contains("hmac")
+        || source_lower.contains("token_check")
+        || source_lower.contains("authenticate")
+        || source_lower.contains("authorize_tool")
+        || source_lower.contains("allowed_tools")
+        || source_lower.contains("tool_allowlist")
+        || source_lower.contains("capability_binding")
+        || source_lower.contains("bind_capability")
+        || source_lower.contains("verify_capability")
+        || source_lower.contains("required_capability")
+        || source_lower.contains("capabilities.contains")
+        || source_lower.contains("same_principal")
+        || source_lower.contains("sameprincipal")
+        || source_lower.contains("principal_id ==")
+        || source_lower.contains("tenant_id ==");
+    if has_secret_or_capability_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_session_dispatch = (source_lower.contains("sessions.get(")
+        || source_lower.contains("session_map.get(")
+        || source_lower.contains("sessionstore.get(")
+        || source_lower.contains("lookup_session(")
+        || source_lower.contains("session_by_id("))
+        && (source_lower.contains(".invoke(")
+            || source_lower.contains("invoke_tool")
+            || source_lower.contains("call_tool")
+            || source_lower.contains("execute_tool")
+            || source_lower.contains("run_tool")
+            || source_lower.contains("dispatch_tool")
+            || source_lower.contains("tools/call"));
+    let has_untrusted_session_or_tool_input = source_lower.contains("req.id")
+        || source_lower.contains("request.id")
+        || source_lower.contains("params.id")
+        || source_lower.contains("session_id")
+        || source_lower.contains("req.tool")
+        || source_lower.contains("request.tool")
+        || source_lower.contains("tool_name")
+        || source_lower.contains("tool")
+        || source_lower.contains("args")
+        || source_lower.contains("jsonrpc")
+        || source_lower.contains("tools/call");
+
+    if mcp_confused_deputy_dispatch_is_reachable(
+        has_session_dispatch,
+        has_untrusted_session_or_tool_input,
+        has_secret_or_capability_guard,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Returns `true` when a production FFI/export boundary lets attacker-
+/// controlled pointer/length data reach unsafe memory construction or copy
+/// without null, length, ownership, or bounds guards.
+pub fn ffi_memory_corruption_is_reachable(
+    has_ffi_export_boundary: bool,
+    has_unsafe_memory_sink: bool,
+    has_pointer_or_length_guard: bool,
+    in_nonproduction_path: bool,
+) -> bool {
+    has_ffi_export_boundary
+        && has_unsafe_memory_sink
+        && !has_pointer_or_length_guard
+        && !in_nonproduction_path
+}
+
+/// Classifies a `security:ffi_memory_corruption` finding into a `ProofClass`.
+///
+/// - Tests/examples/generated bindings/local shims -> `InvariantViolationProof`
+/// - Null, length, ownership, or bounds guard -> `InvariantViolationProof`
+/// - Production FFI/export boundary with unsafe pointer/length sink -> `ReachabilityProof`
+/// - Otherwise -> `LatticeGapProposal`
+pub fn classify_ffi_memory_corruption_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path_lower = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    let in_nonproduction_path = path_lower.contains("test")
+        || path_lower.contains("fixture")
+        || path_lower.contains("mock")
+        || path_lower.contains("spec")
+        || path_lower.contains("generated")
+        || path_lower.contains("examples/")
+        || path_lower.contains("/docs/")
+        || path_lower.contains("/sample")
+        || path_lower.contains("/samples/")
+        || path_lower.contains("/local")
+        || path_lower.contains("/platform_shim")
+        || path_lower.contains("/bindings/")
+        || path_lower.ends_with("bindings.rs")
+        || path_lower.ends_with(".md");
+    if in_nonproduction_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let source_lower = source.to_ascii_lowercase();
+    let has_pointer_or_length_guard = source_lower.contains(".is_null()")
+        || source_lower.contains("is_null(")
+        || source_lower.contains("nonnull::new")
+        || source_lower.contains("non-null")
+        || source_lower.contains("len == 0")
+        || source_lower.contains("len > 0")
+        || source_lower.contains("len <=")
+        || source_lower.contains("len.checked")
+        || source_lower.contains("checked_len")
+        || source_lower.contains("validate_len")
+        || source_lower.contains("bounds")
+        || source_lower.contains("checked_add")
+        || source_lower.contains("checked_mul")
+        || source_lower.contains("slice.len()")
+        || source_lower.contains("assert!(")
+        || source_lower.contains("debug_assert!(")
+        || source_lower.contains("ownership_guard")
+        || source_lower.contains("borrowed")
+        || source_lower.contains("read_only")
+        || source_lower.contains("readonly");
+    if has_pointer_or_length_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_ffi_export_boundary = source_lower.contains("extern \"c\"")
+        || source_lower.contains("#[no_mangle]")
+        || source_lower.contains("pub unsafe extern")
+        || source_lower.contains("secp256k1_api")
+        || source_lower.contains("extern {");
+    let has_unsafe_memory_sink = source_lower.contains("from_raw_parts")
+        || source_lower.contains("from_ptr")
+        || source_lower.contains("transmute")
+        || source_lower.contains("copy_nonoverlapping")
+        || source_lower.contains("memcpy")
+        || source_lower.contains("memmove")
+        || source_lower.contains("box::from_raw")
+        || source_lower.contains("unsafe {")
+        || source_lower.contains("as *mut");
+
+    if ffi_memory_corruption_is_reachable(
+        has_ffi_export_boundary,
+        has_unsafe_memory_sink,
+        has_pointer_or_length_guard,
+        in_nonproduction_path,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result<()> {
     let mut content = fs::read_to_string(path).unwrap_or_default();
     let mut changed = false;
@@ -3399,6 +3608,92 @@ mod tests {
         let source = "def load_session(request):\n    payload = request.body\n    return pickle.loads(payload)";
         assert_eq!(
             super::classify_unsafe_deserialization_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn mcp_confused_deputy_test_fixture_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:mcp_confused_deputy_dispatch".to_string(),
+            file: Some("tests/mcp_dispatch_fixture.rs".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "let session = sessions.get(req.id).unwrap(); session.invoke(req.tool, req.args).await";
+        assert_eq!(
+            super::classify_mcp_confused_deputy_dispatch_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn mcp_confused_deputy_capability_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:mcp_confused_deputy_dispatch".to_string(),
+            file: Some("src/mcp/server.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "let session = sessions.get(req.id).filter(|s| verify_session(s.secret, &req.presented_secret)).unwrap(); session.invoke(req.tool, req.args).await";
+        assert_eq!(
+            super::classify_mcp_confused_deputy_dispatch_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn mcp_confused_deputy_unguarded_dispatch_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:mcp_confused_deputy_dispatch".to_string(),
+            file: Some("src/mcp/server.rs".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "let session = sessions.get(req.id).unwrap(); session.invoke(req.tool, req.args).await";
+        assert_eq!(
+            super::classify_mcp_confused_deputy_dispatch_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn ffi_memory_corruption_generated_binding_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ffi_memory_corruption".to_string(),
+            file: Some("src/generated/bindings.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "pub unsafe extern \"C\" fn read(ptr: *mut u8, len: usize) { let s = std::slice::from_raw_parts(ptr, len); }";
+        assert_eq!(
+            super::classify_ffi_memory_corruption_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ffi_memory_corruption_null_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ffi_memory_corruption".to_string(),
+            file: Some("src/ffi/export.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "pub extern \"C\" fn read(ptr: *mut u8, len: usize) { if ptr.is_null() || len == 0 { return; } let s = unsafe { std::slice::from_raw_parts(ptr, len) }; }";
+        assert_eq!(
+            super::classify_ffi_memory_corruption_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ffi_memory_corruption_unguarded_export_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:ffi_memory_corruption".to_string(),
+            file: Some("src/ffi/export.rs".to_string()),
+            ..Default::default()
+        };
+        let source = "pub extern \"C\" fn read(ptr: *mut u8, len: usize) { let s = unsafe { std::slice::from_raw_parts(ptr, len) }; process(s); }";
+        assert_eq!(
+            super::classify_ffi_memory_corruption_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }
