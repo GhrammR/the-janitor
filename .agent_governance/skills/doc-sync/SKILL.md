@@ -45,6 +45,9 @@ Mapping Matrix below.
    - If the PR is clean, arm auto-merge and run the PR Resolution Gate
      immediate/+1m/+5m/+9m watch cadence so README/default-branch visibility is
      not reported as complete before the PR actually merges.
+   - Include code-scanning alert telemetry in the same cadence. GitHub-visible
+     docs/workflow changes can create Scorecard alerts after merge; baseline
+     alerts must be reported, and net-new PR alerts must block completion.
 
 ## Abort conditions
 

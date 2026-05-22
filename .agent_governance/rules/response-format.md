@@ -61,14 +61,18 @@ If the directive involved a GitHub pull request, this section must classify the
 PR using `.agent_governance/rules/pr-resolution.md`: `MERGE`,
 `AUTO_MERGE_ARMED_WAITING_FOR_CHECKS`, `SOLO_REVIEW_POLICY_DRIFT`,
 `SOLO_REQUIRED_CHECKS_DRIFT`, `WAIT_FOR_CHECKS`, `REBASE_OR_RECREATE`,
-`CLOSE_SUPERSEDED`, or `LEAVE_OPEN`. A PR with `mergeStateStatus=DIRTY`,
-`reviewDecision=REVIEW_REQUIRED`, failed/timed-out app-owned gates, or missing
-required status-check contexts must not be described as mergeable. In this
+`CODE_SCANNING_BASELINE_OPEN`, `CODE_SCANNING_NEW_ALERTS`,
+`CODE_SCANNING_API_UNAVAILABLE`, `CLOSE_SUPERSEDED`, or `LEAVE_OPEN`. A PR
+with `mergeStateStatus=DIRTY`, `reviewDecision=REVIEW_REQUIRED`,
+failed/timed-out app-owned gates, missing required status-check contexts, or
+new code-scanning alerts must not be described as mergeable. In this
 solo-maintainer repository, a self-authored PR with required branch-protection
 review is `SOLO_REVIEW_POLICY_DRIFT`; empty or incomplete required status
-checks are `SOLO_REQUIRED_CHECKS_DRIFT`. Restore policy, verify branch
-protection, arm auto-merge only after expected checks are configured, and run
-the 1m/5m/9m watch cadence.
+checks are `SOLO_REQUIRED_CHECKS_DRIFT`. Existing main-branch code-scanning
+alerts are `CODE_SCANNING_BASELINE_OPEN` telemetry; net-new PR alerts are
+`CODE_SCANNING_NEW_ALERTS`. Restore policy, verify branch protection, arm
+auto-merge only after expected checks are configured, and run the 1m/5m/9m
+watch cadence.
 
 [TELEMETRY]
 Direct-triage backlog changes logged this session. Format:
@@ -184,7 +188,11 @@ The prompt MUST:
    on that PR is not completion until zero required reviews are restored and
    checks pass. A PR whose branch protection has empty or incomplete required
    status checks must be classified as `SOLO_REQUIRED_CHECKS_DRIFT`; auto-merge
-   must not be armed until the expected check contexts are restored.
+   must not be armed until the expected check contexts are restored. The prompt
+   must include code-scanning alert state when available; new PR alerts must be
+   classified as `CODE_SCANNING_NEW_ALERTS`, and local API denial must be
+   called out as `CODE_SCANNING_API_UNAVAILABLE` unless the GitHub workflow
+   audit succeeded.
 
 **Architectural Oracle Execution Law**: If the Architectural Oracle Tip
 identifies a legacy drift or optimization that requires fewer than 50 lines of
