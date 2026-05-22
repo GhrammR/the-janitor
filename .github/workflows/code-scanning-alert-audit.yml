@@ -48,57 +48,81 @@ jobs:
               >"${output}" 2>"${err}"
           }
 
-          main_alerts="$(mktemp)"
-          main_err="$(mktemp)"
-          if ! fetch_alerts "refs/heads/main" "${main_alerts}" "${main_err}"; then
-            echo "::error title=CODE_SCANNING_API_UNAVAILABLE::Unable to read open code-scanning alerts for refs/heads/main"
-            cat "${main_err}"
-            exit 1
-          fi
-
-          main_count="$(jq 'length' "${main_alerts}")"
-          main_high_count="$(
+          count_high_or_critical() {
+            local alerts="$1"
             jq '[.[] | select(((.rule.security_severity_level // .rule.severity // "") | ascii_downcase) | test("critical|high"))] | length' \
-              "${main_alerts}"
-          )"
+              "${alerts}"
+          }
 
-          pr_count=""
-          pr_ref=""
-          if [ -n "${PR_NUMBER}" ]; then
-            pr_ref="refs/pull/${PR_NUMBER}/merge"
-            pr_alerts="$(mktemp)"
-            pr_err="$(mktemp)"
-            if fetch_alerts "${pr_ref}" "${pr_alerts}" "${pr_err}"; then
-              pr_count="$(jq 'length' "${pr_alerts}")"
-            else
-              pr_count="unavailable"
+          render_alert_rows() {
+            local alerts="$1"
+            jq -r '.[:20][] |
+              "| #\(.number) | \(.tool.name) | \(.rule.id) | \(.rule.security_severity_level // .rule.severity // "unknown") | \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line) |"' \
+              "${alerts}"
+          }
+
+          audit_once() {
+            local label="$1"
+            local main_alerts main_err main_count main_high_count pr_alerts pr_err pr_count pr_ref
+
+            main_alerts="$(mktemp)"
+            main_err="$(mktemp)"
+            if ! fetch_alerts "refs/heads/main" "${main_alerts}" "${main_err}"; then
+              echo "::error title=CODE_SCANNING_API_UNAVAILABLE::Unable to read open code-scanning alerts for refs/heads/main at ${label}"
+              cat "${main_err}"
+              exit 1
             fi
-          fi
+
+            main_count="$(jq 'length' "${main_alerts}")"
+            main_high_count="$(count_high_or_critical "${main_alerts}")"
+            pr_count="not-applicable"
+            pr_ref=""
+
+            if [ -n "${PR_NUMBER}" ]; then
+              pr_ref="refs/pull/${PR_NUMBER}/merge"
+              pr_alerts="$(mktemp)"
+              pr_err="$(mktemp)"
+              if fetch_alerts "${pr_ref}" "${pr_alerts}" "${pr_err}"; then
+                pr_count="$(jq 'length' "${pr_alerts}")"
+              else
+                echo "::error title=CODE_SCANNING_API_UNAVAILABLE::Unable to read open code-scanning alerts for ${pr_ref} at ${label}"
+                cat "${pr_err}"
+                exit 1
+              fi
+            fi
+
+            echo "| ${label} | ${main_count} | ${main_high_count} | ${pr_ref:-not-applicable} | ${pr_count} |" >> "${GITHUB_STEP_SUMMARY}"
+
+            if [ "${pr_count}" != "not-applicable" ] && [ "${pr_count}" -gt "${main_count}" ]; then
+              echo "::error title=CODE_SCANNING_NEW_ALERTS::PR ref has ${pr_count} open alerts at ${label}; main baseline has ${main_count}"
+              exit 1
+            fi
+
+            if [ "${main_count}" -gt 0 ]; then
+              echo "::notice title=CODE_SCANNING_BASELINE_OPEN::${label}: refs/heads/main has ${main_count} open code-scanning alerts (${main_high_count} high/critical)"
+            fi
+
+            if [ "${label}" = "+9 minutes" ]; then
+              {
+                echo
+                echo "| Alert | Tool | Rule | Severity | Location |"
+                echo "| --- | --- | --- | --- | --- |"
+                render_alert_rows "${main_alerts}"
+              } >> "${GITHUB_STEP_SUMMARY}"
+            fi
+          }
 
           {
             echo "## Code Scanning Alert Audit"
             echo
-            echo "| Field | Value |"
-            echo "| --- | --- |"
-            echo "| Main open alerts | ${main_count} |"
-            echo "| Main high/critical alerts | ${main_high_count} |"
-            if [ -n "${pr_ref}" ]; then
-              echo "| PR ref | \`${pr_ref}\` |"
-              echo "| PR open alerts | ${pr_count} |"
-            fi
-            echo
-            echo "| Alert | Tool | Rule | Severity | Location |"
+            echo "| Sample | Main open alerts | Main high/critical alerts | PR ref | PR open alerts |"
             echo "| --- | --- | --- | --- | --- |"
-            jq -r '.[:20][] |
-              "| #\(.number) | \(.tool.name) | \(.rule.id) | \(.rule.security_severity_level // .rule.severity // "unknown") | \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line) |"' \
-              "${main_alerts}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          if [ "${pr_count}" != "" ] && [ "${pr_count}" != "unavailable" ] && [ "${pr_count}" -gt "${main_count}" ]; then
-            echo "::error title=CODE_SCANNING_NEW_ALERTS::PR ref has ${pr_count} open alerts; main baseline has ${main_count}"
-            exit 1
-          fi
-
-          if [ "${main_count}" -gt 0 ]; then
-            echo "::notice title=CODE_SCANNING_BASELINE_OPEN::refs/heads/main has ${main_count} open code-scanning alerts (${main_high_count} high/critical)"
-          fi
+          audit_once "immediate"
+          sleep 60
+          audit_once "+1 minute"
+          sleep 240
+          audit_once "+5 minutes"
+          sleep 240
+          audit_once "+9 minutes"
