@@ -550,6 +550,35 @@ pub fn classify_oauth_state_validation_proof(
         return ProofClass::LatticeGapProposal;
     }
 
+    // For Java files, require HTTP-handler context before emitting ReachabilityProof.
+    // Constants files, SPI interfaces, and scripting utilities (e.g., Keycloak
+    // OAuth2Constants.java, Authenticator.java, Script.java) are not callback handlers
+    // and produce false positives without this gate.
+    let is_java = finding
+        .file
+        .as_deref()
+        .map(|p| p.ends_with(".java") || p.ends_with(".kt"))
+        .unwrap_or(false);
+    if is_java {
+        let source_lower_java = source.to_ascii_lowercase();
+        let has_http_handler_path = path_lower.contains("controller")
+            || path_lower.contains("handler")
+            || path_lower.contains("endpoint")
+            || path_lower.contains("servlet")
+            || path_lower.contains("resource")
+            || path_lower.contains("filter");
+        let has_http_framework_annotation = source_lower_java.contains("javax.ws.rs")
+            || source_lower_java.contains("jakarta.ws.rs")
+            || source_lower_java.contains("@requestmapping")
+            || source_lower_java.contains("@getmapping")
+            || source_lower_java.contains("@postmapping")
+            || source_lower_java.contains("httpservletrequest")
+            || source_lower_java.contains("serverhttprequest");
+        if !has_http_handler_path && !has_http_framework_annotation {
+            return ProofClass::LatticeGapProposal;
+        }
+    }
+
     let source_lower = source.to_ascii_lowercase();
     let has_browser_callback = source_lower.contains("request.args.get(\"code\")")
         || source_lower.contains("request.args.get('code')")
@@ -2882,6 +2911,166 @@ pub fn classify_dangerous_execution_proof(source: &str, finding: &StructuredFind
     }
 }
 
+/// Pure boolean predicate for Kani verification of C/C++ bounded overflow exploitability.
+///
+/// Returns `true` when a user-controlled bound reaches an allocation or loop
+/// without a visible overflow check, outside of a test file.
+pub fn bounded_overflow_is_exploitable(
+    has_user_controlled_bound: bool,
+    has_overflow_check: bool,
+    in_test_path: bool,
+) -> bool {
+    has_user_controlled_bound && !has_overflow_check && !in_test_path
+}
+
+/// Classify proof class for `security:bounded_overflow_witness` findings.
+///
+/// - `InvariantViolationProof`: test path OR overflow check visible in ±10-line window
+/// - `ReachabilityProof`: user-controlled bound reaches allocation/loop without check
+/// - `LatticeGapProposal`: otherwise (bound origin unclear)
+pub fn classify_bounded_overflow_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let path = finding.file.as_deref().unwrap_or_default();
+    let path_lower = path.to_ascii_lowercase();
+    let in_test_path = path_lower.contains("test")
+        || path_lower.contains("spec/")
+        || path_lower.contains("bench")
+        || path_lower.contains("fixture");
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+    let overflow_check_tokens = [
+        "__builtin_add_overflow",
+        "__builtin_mul_overflow",
+        "safe_add",
+        "checked_add",
+        "int_max - ",
+        "int_max-",
+        "std::numeric_limits",
+        "assert(n <",
+        "assert(n<=",
+        "assert(size <",
+        "overflow_check",
+        "if (n > max",
+        "if (size > max",
+    ];
+    let has_overflow_check = overflow_check_tokens.iter().any(|t| lower.contains(t));
+    if has_overflow_check {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let user_bound_tokens = [
+        "argc",
+        "argv",
+        "request.",
+        "user_input",
+        "atoi(",
+        "strtol(",
+        "getenv(",
+        "scanf(",
+        "fgets(",
+        "cin >>",
+        "argv[",
+    ];
+    let has_user_controlled_bound = user_bound_tokens.iter().any(|t| lower.contains(t));
+
+    let sink_tokens = [
+        "malloc(n",
+        "malloc(size",
+        "new t[n",
+        "new char[",
+        "memcpy(",
+        "memmove(",
+        "vec.reserve(",
+        "vec.resize(",
+        "for (",
+        "while (n",
+    ];
+    let has_overflow_sink = sink_tokens.iter().any(|t| lower.contains(t));
+
+    if bounded_overflow_is_exploitable(has_user_controlled_bound && has_overflow_sink, false, false)
+    {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of LD_PRELOAD injection exploitability.
+///
+/// Returns `true` when a user-controlled string reaches `LD_PRELOAD=` assignment
+/// without a scope guard, outside of a test file.
+pub fn ld_preload_injection_is_exploitable(
+    has_user_input: bool,
+    has_env_set: bool,
+    has_scope_guard: bool,
+    in_test_path: bool,
+) -> bool {
+    has_user_input && has_env_set && !has_scope_guard && !in_test_path
+}
+
+/// Classify proof class for `security:ld_preload_injection` findings.
+///
+/// - `InvariantViolationProof`: test path OR scope guard visible in source
+/// - `ReachabilityProof`: user-controlled string reaches `LD_PRELOAD=` without guard
+/// - `LatticeGapProposal`: LD_PRELOAD set but input origin is unclear
+pub fn classify_ld_preload_injection_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path = finding.file.as_deref().unwrap_or_default();
+    let path_lower = path.to_ascii_lowercase();
+    let in_test_path = path_lower.contains("test")
+        || path_lower.contains("spec/")
+        || path_lower.contains("fixture");
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+    let scope_guard_tokens = [
+        "unsetenv(\"ld_preload\")",
+        "unsetenv('ld_preload')",
+        "env -i",
+        "sudo -e",
+        "# hardcoded",
+        "# no user input",
+        "# static",
+    ];
+    let has_scope_guard = scope_guard_tokens.iter().any(|t| lower.contains(t));
+    if has_scope_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let env_set_tokens = [
+        "ld_preload=",
+        "export ld_preload",
+        "setenv(\"ld_preload\"",
+        "putenv(\"ld_preload",
+    ];
+    let has_env_set = env_set_tokens.iter().any(|t| lower.contains(t));
+
+    let user_input_tokens = [
+        "$1",
+        "$user_input",
+        "$@",
+        "request.",
+        "argv[",
+        "${1}",
+        "getenv(",
+        "read ",
+        "read\t",
+    ];
+    let has_user_input = user_input_tokens.iter().any(|t| lower.contains(t));
+
+    if ld_preload_injection_is_exploitable(has_user_input, has_env_set, false, false) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -3372,6 +3561,41 @@ mod tests {
         assert_eq!(
             super::classify_oauth_state_validation_proof(source, &finding),
             ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_state_keycloak_java_spi_interface_yields_lattice_gap() {
+        // Regression: Keycloak OAuth2Constants.java and Authenticator.java are
+        // constants/SPI interface files — not HTTP callback handlers. Without the
+        // Java HTTP-handler gate these produced false-positive ReachabilityProof.
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("core/src/main/java/org/keycloak/OAuth2Constants.java".to_string()),
+            line: None,
+            ..Default::default()
+        };
+        let source = "public class OAuth2Constants {\n    public static final String CODE = \"code\";\n    public static final String STATE = \"state\";\n}\n";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn oauth_state_java_http_handler_with_annotation_yields_reachability() {
+        // Java controller with @GetMapping + getParameter("code") IS a callback handler
+        // with explicit code extraction → ReachabilityProof.
+        let finding = StructuredFinding {
+            id: "security:oauth_missing_state_validation".to_string(),
+            file: Some("src/main/java/com/example/OAuthCallbackController.java".to_string()),
+            line: Some(42),
+            ..Default::default()
+        };
+        let source = "@GetMapping(\"/callback\")\npublic ResponseEntity<?> callback(HttpServletRequest req) {\n    String code = req.getParameter(\"code\");\n    String token = exchangeCode(code);\n    return ResponseEntity.ok(token);\n}\n";
+        assert_eq!(
+            super::classify_oauth_state_validation_proof(source, &finding),
+            ProofClass::ReachabilityProof
         );
     }
 
@@ -4538,6 +4762,97 @@ mod tests {
         let source = "command = request.args['cmd']\nresult = subprocess.run(command, shell=True, capture_output=True)";
         assert_eq!(
             super::classify_dangerous_execution_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // --- bounded_overflow_witness classifier tests ---
+
+    #[test]
+    fn bounded_overflow_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:bounded_overflow_witness".to_string(),
+            file: Some("src/bench_ecmult.c".to_string()),
+            ..Default::default()
+        };
+        let source = "void *buf = malloc(n * sizeof(item));\n";
+        assert_eq!(
+            super::classify_bounded_overflow_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn bounded_overflow_check_visible_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:bounded_overflow_witness".to_string(),
+            file: Some("src/EOS/Asset.cpp".to_string()),
+            ..Default::default()
+        };
+        let source = "if (__builtin_add_overflow(a, b, &result)) return ERR;\nvoid *buf = malloc(result * sizeof(int));";
+        assert_eq!(
+            super::classify_bounded_overflow_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn bounded_overflow_user_controlled_bound_yields_reachability() {
+        // User-controlled bound (argv) reaches malloc without check → ReachabilityProof.
+        let finding = StructuredFinding {
+            id: "security:bounded_overflow_witness".to_string(),
+            file: Some("src/EOS/Asset.cpp".to_string()),
+            ..Default::default()
+        };
+        let source =
+            "int n = atoi(argv[1]);\nvoid *buf = malloc(n * sizeof(int));\nmemcpy(dst, src, n);";
+        assert_eq!(
+            super::classify_bounded_overflow_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // --- ld_preload_injection classifier tests ---
+
+    #[test]
+    fn ld_preload_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ld_preload_injection".to_string(),
+            file: Some("tests/install-test.sh".to_string()),
+            ..Default::default()
+        };
+        let source = "export LD_PRELOAD=/tmp/libtest.so\n./my_program\n";
+        assert_eq!(
+            super::classify_ld_preload_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ld_preload_scope_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:ld_preload_injection".to_string(),
+            file: Some("tools/install-dependencies".to_string()),
+            ..Default::default()
+        };
+        let source = "export LD_PRELOAD=$1\nunsetenv(\"ld_preload\")\n./my_program\n";
+        assert_eq!(
+            super::classify_ld_preload_injection_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn ld_preload_user_input_yields_reachability() {
+        // User-controlled $1 flows to LD_PRELOAD= without guard → ReachabilityProof.
+        let finding = StructuredFinding {
+            id: "security:ld_preload_injection".to_string(),
+            file: Some("tools/install-dependencies".to_string()),
+            ..Default::default()
+        };
+        let source = "#!/bin/bash\nLIB=$1\nexport LD_PRELOAD=$1\n./my_program\n";
+        assert_eq!(
+            super::classify_ld_preload_injection_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

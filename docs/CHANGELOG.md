@@ -6906,3 +6906,42 @@ Structural FP notes logged:
 * `.github/workflows/registry-watch.yml` *(created)* — Daily cron (`0 8 * * *`) + `workflow_dispatch`. Runs `janitor registry-watch --dry-run --output /tmp/rw_report.json`. Files GitHub issue on failure via `actions/github-script@v7`. Permissions: `contents: read`, `issues: write`.
 
 **Verification**: `cargo test -p forge` 1258 passed, 0 failed. P17-3A sqli + financial_pii eradicated from INNOVATION_LOG. 12 LOW_YIELD entries added. Vault CANDIDATE held at 50%.
+
+## 2026-05-22 — Sprint 170: Proof Obligation Cures (bounded_overflow + ld_preload), Java OAuth Gate, Secret Scanning, Hunt Sweep ×3
+
+### Phase 1: agentic_graph Resolution — Module Already Wired
+
+* `crates/forge/src/agentic_graph.rs` — confirmed 2 production callers (`forge::agentic_graph::n_escalations` in `crates/cli/src/hunt.rs:4508` and `crates/anatomist/src/chronovisor.rs`). Oracle claim of zero callers was stale. No action required.
+
+### Phase 2: Java HTTP-Handler Gate for OAuth State Classifier
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `classify_oauth_state_validation_proof`: added Java/Kotlin file-scope gate requiring file path to contain `controller`/`handler`/`endpoint`/`servlet`/`resource`/`filter` OR source to contain `javax.ws.rs`/`jakarta.ws.rs`/`@requestmapping`/`@getmapping`/`@postmapping`/`HttpServletRequest`/`ServerHttpRequest` before emitting `ReachabilityProof`. Files lacking both signals emit `LatticeGapProposal`. Eliminates Keycloak constants-file and SPI-interface false-positive class.
+* 2 regression tests: `oauth_state_keycloak_java_spi_interface_yields_lattice_gap` (constants file → `LatticeGapProposal`) and `oauth_state_java_http_handler_with_annotation_yields_reachability` (controller + `getParameter("code")` → `ReachabilityProof`).
+
+### Phase 3: P17-3A bounded_overflow_witness Proof Obligation Cure
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `bounded_overflow_is_exploitable(has_user_controlled_bound, has_overflow_check, in_test_path)` predicate + `classify_bounded_overflow_proof` classifier: test path / overflow check visible (`__builtin_add_overflow`, `SAFE_ADD`, `std::numeric_limits`, etc.) → `InvariantViolationProof`; user-controlled bound (`argc`, `argv`, `atoi(`, `strtol(`) + allocation/loop sink (`malloc(n`, `memcpy(`, `vec.reserve(`) → `ReachabilityProof`; else → `LatticeGapProposal`. 3 unit tests.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `bounded_overflow_is_exact_conjunction` Kani harness (3-arg conjunction proof).
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` new branch for `bounded_overflow_witness`.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A `security:bounded_overflow_witness` block hard-deleted.
+
+### Phase 4: P17-3A ld_preload_injection Proof Obligation Cure
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `ld_preload_injection_is_exploitable(has_user_input, has_env_set, has_scope_guard, in_test_path)` predicate + `classify_ld_preload_injection_proof` classifier: test path / scope guard visible (`unsetenv("LD_PRELOAD")`, `env -i`, `sudo -E`) → `InvariantViolationProof`; user-controlled string (`$1`, `${1}`, `argv[`) + `LD_PRELOAD=` assignment → `ReachabilityProof`; else → `LatticeGapProposal`. 3 unit tests.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — `ld_preload_injection_is_exact_conjunction` Kani harness (4-arg conjunction proof).
+* `crates/cli/src/hunt.rs` *(modified)* — `apply_proof_classification` new branch for `ld_preload_injection`.
+* `.INNOVATION_LOG.md` *(modified)* — P17-3A `security:ld_preload_injection` block hard-deleted.
+
+### Phase 5: Platform Expansion — Secret Scanning Push Protection
+
+* GitHub API: `secret_scanning_push_protection` enabled on `janitor-security/the-janitor` repository. Secret scanning was already enabled; push protection was `disabled`. Now both `secret_scanning.status = enabled` and `secret_scanning_push_protection.status = enabled`. Accidental credential commits are now blocked at push time.
+
+### Phase 6: Hunt Sweep ×3 — mattermost-plugin-boards, gotrue, superset
+
+All three hunts → LOW_YIELD only. Tri-Ledger applied.
+
+* **mattermost-plugin-boards** (Sprint 170): `ssrf_dynamic_url` in `webapp/src/octoClient.ts` (client-side TypeScript fetch, SOP/CORS blocks); `unauthenticated_debug_endpoint` in template archive JSON (not a production route); `config_taint_*` batch (React state, not HTTP input). All → LOW_YIELD.
+* **supabase/gotrue** (Sprint 170): Deprecated target (`README.md="deprecated"`). `oauth_missing_state_validation` batch all `lattice_gap_proposal` (GoTrue uses DB-backed UUID flow state in `loadFlowState`/`loadExternalStateFromUUID` — state IS validated). `jwt_validation_bypass` + `oauth_csrf_missing_state` both Informational with scope exclusion. All → LOW_YIELD.
+* **apache/superset** (Sprint 170 targeted hunt of `views/` + `utils/`): `jwt_validation_bypass` in `oauth2.py` (admin-config-bound algorithm, not user-controlled); `oauth_missing_state_validation` in `users/api.py` (user profile API, not OAuth callback); `config_taint_*` mass batch (internal form data routing, not HTTP sourced). All → LOW_YIELD.
+
+**Verification**: `cargo test -p forge` 1,360+ passed, 0 failed. P17-3A bounded_overflow + ld_preload eradicated from INNOVATION_LOG. Java OAuth gate ships with 2 regression tests. Push protection enabled on GH repo. 7 new LOW_YIELD entries.

@@ -3353,6 +3353,29 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("bounded_overflow_witness") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_bounded_overflow_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("ld_preload_injection") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof =
+                forge::proof_obligation::classify_ld_preload_injection_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         } else if finding.id.contains("ffi_memory_corruption") {
             let source = finding
                 .file

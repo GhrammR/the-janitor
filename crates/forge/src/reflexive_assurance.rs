@@ -1110,13 +1110,14 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
-        dangerous_execution_is_reachable, dynamic_import_is_exploitable,
-        embedding_trust_transposition_is_reachable, financial_pii_is_unguarded,
-        jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
+        bounded_overflow_is_exploitable, dangerous_execution_is_reachable,
+        dynamic_import_is_exploitable, embedding_trust_transposition_is_reachable,
+        financial_pii_is_unguarded, jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
-        lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, path_traversal_concat_is_exploitable,
-        protobuf_any_is_unguarded, rag_context_poisoning_is_reachable, react_xss_is_unguarded,
+        lcm_use_after_free_is_reachable, ld_preload_injection_is_exploitable,
+        oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
+        path_traversal_concat_is_exploitable, protobuf_any_is_unguarded,
+        rag_context_poisoning_is_reachable, react_xss_is_unguarded,
         saml_xsw_validation_order_is_reachable, sqli_concat_is_injectable,
         timing_comparison_is_sensitive, xxe_saml_parser_is_unguarded,
     };
@@ -1434,6 +1435,44 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (has_user_input && has_exec_sink && !has_sanitizer && !in_test_path),
             "dangerous_execution gate must be exact conjunction of four guards",
+        );
+    }
+
+    /// Prove `bounded_overflow_is_exploitable` is the exact conjunction:
+    /// has_user_controlled_bound ∧ ¬has_overflow_check ∧ ¬in_test_path.
+    #[kani::proof]
+    fn bounded_overflow_is_exact_conjunction() {
+        let has_user_controlled_bound: bool = kani::any();
+        let has_overflow_check: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result = bounded_overflow_is_exploitable(
+            has_user_controlled_bound,
+            has_overflow_check,
+            in_test_path,
+        );
+        kani::assert(
+            result == (has_user_controlled_bound && !has_overflow_check && !in_test_path),
+            "bounded_overflow gate must be exact conjunction of three guards",
+        );
+    }
+
+    /// Prove `ld_preload_injection_is_exploitable` is the exact conjunction:
+    /// has_user_input ∧ has_env_set ∧ ¬has_scope_guard ∧ ¬in_test_path.
+    #[kani::proof]
+    fn ld_preload_injection_is_exact_conjunction() {
+        let has_user_input: bool = kani::any();
+        let has_env_set: bool = kani::any();
+        let has_scope_guard: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result = ld_preload_injection_is_exploitable(
+            has_user_input,
+            has_env_set,
+            has_scope_guard,
+            in_test_path,
+        );
+        kani::assert(
+            result == (has_user_input && has_env_set && !has_scope_guard && !in_test_path),
+            "ld_preload_injection gate must be exact conjunction of four guards",
         );
     }
 
