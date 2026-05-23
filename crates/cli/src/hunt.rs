@@ -2916,12 +2916,42 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // //nolint:gosec annotation / test-fixture function). Closes the
     // chainlink SQLi FP class (Sprint 141 Tier-1 disposition).
     apply_sql_sanitizer_demotion(dir, &mut deduped);
+    // Sprint 163 — proof-obligation classifiers. Attach deterministic proof
+    // classes for detector families whose triage depends on nearby source
+    // context before the false-positive proof obligation gate runs.
+    apply_proof_classification(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
     // Sprint 138 — annotate findings whose vulnerability class does not
     // match the bounty program's stated focus areas (50% approval downgrade).
     apply_focus_area_demotion(dir, &mut deduped);
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
+}
+
+fn apply_proof_classification(dir: &Path, findings: &mut [StructuredFinding]) {
+    for finding in findings.iter_mut() {
+        let Some(rel_path) = finding.file.as_deref() else {
+            continue;
+        };
+        let proof_class = match finding.id.as_str() {
+            "security:oauth_excessive_scope" => {
+                let source = read_finding_source(dir, rel_path);
+                forge::proof_obligation::classify_oauth_excessive_scope_proof(&source, finding)
+            }
+            "security:java_deser_allowlist_bypass" => {
+                let source = read_finding_source(dir, rel_path);
+                forge::proof_obligation::classify_java_deser_allowlist_bypass_proof(
+                    &source, finding,
+                )
+            }
+            _ => continue,
+        };
+        finding.proof_class = Some(proof_class);
+    }
+}
+
+fn read_finding_source(dir: &Path, rel_path: &str) -> String {
+    std::fs::read_to_string(dir.join(rel_path)).unwrap_or_default()
 }
 
 /// Sprint 140 — Wire-in for `forge::threat_model_oracle::classify_finding`.

@@ -34,7 +34,7 @@ mod kani_proofs {
     use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
-    use crate::proof_obligation::proof_obligation_missing;
+    use crate::proof_obligation::{guarded_reachability_conjunction, proof_obligation_missing};
     use crate::slop_hunter::Severity;
 
     /// Prove that `Severity::points()` never panics and always returns a value
@@ -136,6 +136,33 @@ mod kani_proofs {
             "proof obligation gate must be exact",
         );
     }
+
+    macro_rules! exact_guarded_reachability_harness {
+        ($name:ident, $message:literal) => {
+            #[kani::proof]
+            fn $name() {
+                let has_sink: bool = kani::any();
+                let has_untrusted_origin: bool = kani::any();
+                let has_guard: bool = kani::any();
+                let fired =
+                    guarded_reachability_conjunction(has_sink, has_untrusted_origin, has_guard);
+                kani::assert(
+                    fired == (has_sink && has_untrusted_origin && !has_guard),
+                    $message,
+                );
+            }
+        };
+    }
+
+    exact_guarded_reachability_harness!(
+        oauth_excessive_scope_is_exact_conjunction,
+        "oauth excessive-scope gate must be exact conjunction"
+    );
+
+    exact_guarded_reachability_harness!(
+        java_deser_allowlist_bypass_is_exact_conjunction,
+        "java deser allowlist-bypass gate must be exact conjunction"
+    );
 
     /// Prove the DMA revocation detector fires only when revoke occurs after
     /// DMA activity and no unmap/fence dominates that revoke path.
@@ -290,7 +317,7 @@ mod tests {
     use crate::model_lineage::llm_provenance_missing;
     use crate::noninterference::declassification_gate_missing;
     use crate::oidc_scope_guard::oidc_scope_missing_audience;
-    use crate::proof_obligation::proof_obligation_missing;
+    use crate::proof_obligation::{guarded_reachability_conjunction, proof_obligation_missing};
     use crate::slop_hunter::Severity;
 
     #[test]
@@ -348,6 +375,14 @@ mod tests {
     fn proof_obligation_gate_requires_missing_class() {
         assert!(proof_obligation_missing(true, false));
         assert!(!proof_obligation_missing(true, true));
+    }
+
+    #[test]
+    fn guarded_reachability_gate_requires_sink_origin_and_missing_guard() {
+        assert!(guarded_reachability_conjunction(true, true, false));
+        assert!(!guarded_reachability_conjunction(true, true, true));
+        assert!(!guarded_reachability_conjunction(true, false, false));
+        assert!(!guarded_reachability_conjunction(false, true, false));
     }
 
     #[test]

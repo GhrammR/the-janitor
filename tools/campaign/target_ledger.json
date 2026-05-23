@@ -818,7 +818,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_s165"
     },
     {
       "engagement": "immunefi_targets",
@@ -876,7 +878,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_deprecated_ui_scope_s165"
     },
     {
       "engagement": "immunefi_targets",
@@ -1136,7 +1140,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_client_vendor_scope_s165"
     },
     {
       "engagement": "mattermost_targets",
