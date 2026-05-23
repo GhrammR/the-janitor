@@ -7,6 +7,7 @@ Mapping Matrix below.
 
 | Changed path pattern | Document to audit |
 |----------------------|-------------------|
+| `README.md` | GitHub public repository surface: repo metadata description, default-branch README, and remote branch README |
 | `crates/**` | `SOVEREIGN_BRIEFING.md` |
 | `justfile` | `RUNBOOK.md` |
 | Any new or modified CLI flag | `RUNBOOK.md` |
@@ -22,6 +23,7 @@ Mapping Matrix below.
 
    | Trigger | Verification checklist |
    |---------|----------------------|
+   | `README.md` changed | Was the commit pushed, does `origin/<branch>:README.md` contain the intended text, does `origin/<default_branch>:README.md` contain the public landing-page text or explicitly require merge, and does GitHub repository metadata `description` match the intended public positioning? |
    | `crates/**` changed | Does `SOVEREIGN_BRIEFING.md` reflect the new module, struct, or public API? |
    | `justfile` changed | Does `RUNBOOK.md` list the new/modified recipe with correct syntax? |
    | CLI flag added/renamed | Does `RUNBOOK.md` show the updated flag name and description? |

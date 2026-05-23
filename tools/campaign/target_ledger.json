@@ -772,7 +772,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_out_of_scope_docs_2026_05_22"
     },
     {
       "engagement": "immunefi_targets",
@@ -834,7 +836,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "no_findings_in_scope_s164"
     },
     {
       "engagement": "immunefi_targets",
@@ -864,7 +868,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_config_taint_client_state_2026_05_22"
     },
     {
       "engagement": "immunefi_targets",
@@ -910,7 +916,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_deprecated_metadata_informational_s164"
     },
     {
       "engagement": "immunefi_targets",
@@ -938,7 +946,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_informational_deprecated_target_s162"
     },
     {
       "engagement": "immunefi_targets",
@@ -968,7 +978,7 @@
       ],
       "priority_score": 32,
       "hunted": true,
-      "hunt_result": "p2_14_demoted_to_informational"
+      "hunt_result": "low_yield_docs_scope_mismatch_2026_05_22"
     },
     {
       "engagement": "immunefi_targets",
@@ -1112,7 +1122,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_config_dcrp_lattice_gap_s164"
     },
     {
       "engagement": "mattermost_targets",
