@@ -669,6 +669,7 @@ pub struct PatchBouncer {
     deep_scan: bool,
     require_pinned_dependencies: bool,
     execution_tier: String,
+    clone_exempt_paths: Vec<String>,
 }
 
 impl PatchBouncer {
@@ -681,6 +682,7 @@ impl PatchBouncer {
             policy.execution_tier,
         )
         .with_require_pinned_dependencies(policy.forge.require_pinned_dependencies)
+        .with_clone_exempt_paths(policy.forge.clone_exempt_paths)
     }
 
     pub fn for_workspace_with_deep_scan(root: &Path, deep_scan: bool) -> Self {
@@ -692,6 +694,7 @@ impl PatchBouncer {
             policy.execution_tier,
         )
         .with_require_pinned_dependencies(policy.forge.require_pinned_dependencies)
+        .with_clone_exempt_paths(policy.forge.clone_exempt_paths)
     }
 
     pub fn for_workspace_with_deep_scan_and_suppressions(
@@ -708,11 +711,17 @@ impl PatchBouncer {
             deep_scan,
             require_pinned_dependencies: false,
             execution_tier: execution_tier.into(),
+            clone_exempt_paths: Vec::new(),
         }
     }
 
     pub fn with_require_pinned_dependencies(mut self, require_pinned_dependencies: bool) -> Self {
         self.require_pinned_dependencies = require_pinned_dependencies;
+        self
+    }
+
+    pub fn with_clone_exempt_paths(mut self, paths: Vec<String>) -> Self {
+        self.clone_exempt_paths = paths;
         self
     }
 
@@ -819,6 +828,17 @@ impl PRBouncer for PatchBouncer {
                 // not invalidate the analysis of the remaining sections.
                 if let Ok(mut s) = self.bounce(section, registry) {
                     total.dead_symbols_added += s.dead_symbols_added;
+                    // Suppress logic-clone scoring for classifier-registry paths
+                    // where intentionally repetitive boolean-predicate functions
+                    // are the correct design (e.g. proof_obligation.rs).
+                    let section_path = extract_patch_path(section);
+                    if self
+                        .clone_exempt_paths
+                        .iter()
+                        .any(|exempt| section_path.contains(exempt.as_str()))
+                    {
+                        s.logic_clones_found = 0;
+                    }
                     total.logic_clones_found += s.logic_clones_found;
                     total.zombie_symbols_added += s.zombie_symbols_added;
                     total.antipatterns_found += s.antipatterns_found;

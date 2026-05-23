@@ -311,6 +311,17 @@ pub struct ForgeConfig {
     /// Default: `None` (no registry — use local `wasm_rules` paths only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warg_registry_url: Option<String>,
+
+    /// Paths (substring match against the diff section path) where logic-clone
+    /// scoring is suppressed.  Use for classifier-registry files that contain
+    /// intentionally repetitive predicate functions — e.g. `proof_obligation.rs`.
+    ///
+    /// ```toml
+    /// [forge]
+    /// clone_exempt_paths = ["crates/forge/src/proof_obligation.rs"]
+    /// ```
+    #[serde(default)]
+    pub clone_exempt_paths: Vec<String>,
 }
 
 impl Default for ForgeConfig {
@@ -324,6 +335,7 @@ impl Default for ForgeConfig {
             require_pinned_dependencies: false,
             corpus_stale_days: Self::default_corpus_stale_days(),
             warg_registry_url: None,
+            clone_exempt_paths: Vec::new(),
         }
     }
 }
@@ -1319,6 +1331,7 @@ mod tests {
                 require_pinned_dependencies: false,
                 corpus_stale_days: 7,
                 warg_registry_url: None,
+                clone_exempt_paths: Vec::new(),
             },
             ..Default::default()
         };
@@ -1359,6 +1372,7 @@ mod tests {
                 require_pinned_dependencies: false,
                 corpus_stale_days: 7,
                 warg_registry_url: None,
+                clone_exempt_paths: Vec::new(),
             },
             ..Default::default()
         };
