@@ -11,7 +11,22 @@ hide:
 
 # The Janitor
 
-**v10.2.2 — The Mathematical Firewall Against Autonomous AI. 23 Grammars. IFDS + Z3 SMT + AEG. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds. Zero-Upload. On-Device.**
+**v10.2.2 — A Rust static-analysis security research platform for IFDS, Z3 SMT constraints, Kani proof obligations, exploit-witness synthesis, and post-quantum provenance.**
+
+---
+
+## Research Questions and Safety Outcomes
+
+The Janitor studies how far local, zero-upload analysis can push proof-backed triage before a human writes a vulnerability claim.
+
+The research questions are narrow:
+
+- Which IFDS taint facts are sufficient to distinguish attacker-reachable exploit paths from framework noise?
+- Which Z3 constraints turn a syntactic hit into a reproducible exploit witness?
+- Which Kani proof obligations prevent KevCritical findings from reaching a ledger without a `ReachabilityProof`, `InvariantViolationProof`, or `LatticeGapProposal`?
+- Which provenance records let a reviewer reproduce evidence without uploading source code to a hosted scanner?
+
+The safety outcome is a deterministic pre-merge evidence gate: false positives are routed to proof gaps, real findings carry reproducible witnesses, and every artifact remains local to the runner unless an operator explicitly publishes it.
 
 ---
 

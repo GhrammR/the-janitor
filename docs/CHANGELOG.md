@@ -3,6 +3,12 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-22 — Research First-Viewport Docs Reset
+
+* `docs/index.md` *(modified)* — added `Research Questions and Safety Outcomes` before buyer/comparison copy and reframed the first visible page around IFDS taint facts, Z3 constraints, Kani proof obligations, exploit-witness synthesis, provenance, reproducibility, and local zero-upload evidence handling.
+
+**Verification**: docs-only scope prepared for PR Resolution Audit.
+
 ## 2026-05-22 — PR Resolution Governance Gate
 
 * `.agent_governance/rules/pr-resolution.md` *(created)* — formalizes PR terminality classification: dirty merge state, self-review deadlock, app-owned gate failures/timeouts, Structural Firewall blast radius, generated `.janitor/**` artifacts, and mixed docs/engine/campaign/workflow PRs now route to supersede/split instead of more commits.
