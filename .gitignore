@@ -50,6 +50,7 @@
 .janitor/*.log
 .janitor/*.svg
 .janitor/*.toml
+!.janitor/policy.toml
 .janitor/*.lic
 .janitor/*.hash
 .janitor/**/*.html
