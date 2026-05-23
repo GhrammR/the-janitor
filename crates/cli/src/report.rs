@@ -3,7 +3,7 @@
 //! Reads `.janitor/bounce_log.ndjson` — a newline-delimited JSON log appended
 //! by each `janitor bounce` invocation — and produces three analytical sections:
 //!
-//! 1. **Slop Top 50** — PRs ranked by composite [`SlopScore`].
+//! 1. **Slop Top 50** — PRs ranked by composite `SlopScore`.
 //! 2. **Structural Clones** — near-duplicate PR pairs detected via 64-hash
 //!    MinHash LSH (Jaccard ≥ 0.70).
 //! 3. **Zombie Dependencies** — PRs that introduced packages declared in a
@@ -615,7 +615,7 @@ pub struct BounceLogEntry {
     /// Empty for git-native bounces and pre-v6.9 log entries.
     #[serde(default)]
     pub comment_violations: Vec<String>,
-    /// MinHash sketch — 64 `u64` values — for clone detection via [`LshIndex`].
+    /// MinHash sketch — 64 `u64` values — for clone detection via `LshIndex`.
     ///
     /// Computed from raw patch bytes (patch mode) or the deterministic merkle key
     /// (git-native mode). Empty for log entries written before this field was added.
@@ -1078,7 +1078,7 @@ pub fn load_bounce_log(janitor_dir: &Path) -> Vec<BounceLogEntry> {
 /// Appends one entry as a JSON line to `.janitor/bounce_log.ndjson`.
 ///
 /// Creates the janitor directory and log file if absent.
-/// Calls [`File::sync_all`] after writing to flush the OS page cache to physical
+/// Calls `File::sync_all` after writing to flush the OS page cache to physical
 /// disk before returning — guarantees the entry survives a SIGKILL of the parent
 /// shell script between iterations.
 /// Emits a diagnostic to stderr on any I/O failure so silent log loss is detectable.
@@ -2206,7 +2206,7 @@ pub fn render_json(data: &ReportData, repo_name: &str) -> serde_json::Value {
 
 /// A single dead symbol entry for scan-mode reports.
 ///
-/// Converted from [`anatomist::Entity`] by [`cmd_report`] before rendering,
+/// Converted from `anatomist::Entity` by `cmd_report` before rendering,
 /// so this module remains free of an `anatomist` dependency.
 pub struct DeadSymbolEntry {
     /// Fully-qualified symbol name (e.g. `module::Class::method`).

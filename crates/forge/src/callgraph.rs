@@ -73,6 +73,25 @@ pub struct CallSiteArgs {
 /// double-counting.
 pub type CallEdge = SmallVec<[CallSiteArgs; 4]>;
 
+// ---------------------------------------------------------------------------
+// Cross-language ABI boundary types (P2-5)
+// ---------------------------------------------------------------------------
+
+/// A detected call that crosses a language ABI boundary.
+///
+/// Emitted by [`detect_jni_boundary_calls`], [`detect_python_ffi_calls`],
+/// and [`detect_rust_extern_c_calls`] for use by the CANDIDATE_LEDGER
+/// cross-language taint proof pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForeignEdge {
+    /// Language family of the calling code (e.g. `"java"`, `"python"`, `"rust"`).
+    pub caller_lang: &'static str,
+    /// Foreign symbol name or library being bridged across the ABI boundary.
+    pub callee_sym: String,
+    /// 1-indexed line number of the boundary declaration or call.
+    pub line: usize,
+}
+
 /// A directed call graph over a single source file.
 ///
 /// Nodes are function names (bare identifiers, not qualified paths).
@@ -347,6 +366,138 @@ fn get_language(language: &str) -> Option<tree_sitter::Language> {
 }
 
 // ---------------------------------------------------------------------------
+// P2-5 Cross-Language ABI boundary detectors
+// ---------------------------------------------------------------------------
+
+/// Detect JNI (Java Native Interface) boundary calls in Java source.
+///
+/// Returns a [`ForeignEdge`] for each:
+/// - `native` method declaration (Java → C/C++ JNI bridge)
+/// - `System.loadLibrary("libname")` or `System.load(...)` call
+pub fn detect_jni_boundary_calls(source: &str) -> Vec<ForeignEdge> {
+    let mut edges = Vec::new();
+    for (lineno, line) in source.lines().enumerate() {
+        let trimmed = line.trim();
+        // `native` method declaration — Java → JNI bridge
+        if trimmed.contains(" native ") || trimmed.starts_with("native ") {
+            // Extract the declared method name (last identifier before `(`)
+            let sym = extract_identifier_before_paren(trimmed)
+                .unwrap_or_else(|| "native_method".to_string());
+            edges.push(ForeignEdge {
+                caller_lang: "java",
+                callee_sym: sym,
+                line: lineno + 1,
+            });
+        }
+        // System.loadLibrary / System.load — dynamic native library load
+        if trimmed.contains("System.loadLibrary(") || trimmed.contains("System.load(") {
+            let sym = extract_string_arg(trimmed).unwrap_or_else(|| "native_lib".to_string());
+            edges.push(ForeignEdge {
+                caller_lang: "java",
+                callee_sym: sym,
+                line: lineno + 1,
+            });
+        }
+    }
+    edges
+}
+
+/// Detect Python ctypes / cffi foreign function interface calls.
+///
+/// Returns a [`ForeignEdge`] for each:
+/// - `ctypes.CDLL(...)` or `ctypes.cdll.LoadLibrary(...)` call
+/// - `cffi.FFI()` instantiation
+/// - `ctypes.windll.*(...)` or `ctypes.CFUNCTYPE(...)` usage
+pub fn detect_python_ffi_calls(source: &str) -> Vec<ForeignEdge> {
+    let mut edges = Vec::new();
+    for (lineno, line) in source.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.contains("ctypes.CDLL(")
+            || trimmed.contains("ctypes.cdll.LoadLibrary(")
+            || trimmed.contains("ctypes.WinDLL(")
+            || trimmed.contains("ctypes.CFUNCTYPE(")
+        {
+            let sym = extract_string_arg(trimmed).unwrap_or_else(|| "native_lib".to_string());
+            edges.push(ForeignEdge {
+                caller_lang: "python",
+                callee_sym: sym,
+                line: lineno + 1,
+            });
+        }
+        if trimmed.contains("cffi.FFI()") || trimmed.contains("FFI()") && trimmed.contains("cffi") {
+            edges.push(ForeignEdge {
+                caller_lang: "python",
+                callee_sym: "cffi_ffi".to_string(),
+                line: lineno + 1,
+            });
+        }
+    }
+    edges
+}
+
+/// Detect Rust `extern "C"` foreign function declarations.
+///
+/// Returns a [`ForeignEdge`] for each function signature inside an
+/// `extern "C"` block.
+pub fn detect_rust_extern_c_calls(source: &str) -> Vec<ForeignEdge> {
+    let mut edges = Vec::new();
+    let mut in_extern_block = false;
+    for (lineno, line) in source.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.contains("extern \"C\"") && trimmed.contains('{') {
+            in_extern_block = true;
+            continue;
+        }
+        if trimmed.contains("extern \"C\"") && trimmed.contains("fn ") {
+            // Single-line extern "C" fn declaration
+            let sym = extract_rust_fn_name(trimmed).unwrap_or_else(|| "extern_fn".to_string());
+            edges.push(ForeignEdge {
+                caller_lang: "rust",
+                callee_sym: sym,
+                line: lineno + 1,
+            });
+            continue;
+        }
+        if in_extern_block {
+            if trimmed == "}" {
+                in_extern_block = false;
+                continue;
+            }
+            if trimmed.contains("fn ") {
+                let sym = extract_rust_fn_name(trimmed).unwrap_or_else(|| "extern_fn".to_string());
+                edges.push(ForeignEdge {
+                    caller_lang: "rust",
+                    callee_sym: sym,
+                    line: lineno + 1,
+                });
+            }
+        }
+    }
+    edges
+}
+
+// --- small text helpers ---
+
+fn extract_identifier_before_paren(s: &str) -> Option<String> {
+    let paren_pos = s.find('(')?;
+    let before = s[..paren_pos].trim();
+    before.split_whitespace().last().map(str::to_string)
+}
+
+fn extract_string_arg(s: &str) -> Option<String> {
+    let start = s.find('"')?;
+    let end = s[start + 1..].find('"')?;
+    Some(s[start + 1..start + 1 + end].to_string())
+}
+
+fn extract_rust_fn_name(s: &str) -> Option<String> {
+    let fn_pos = s.find("fn ")?;
+    let after_fn = s[fn_pos + 3..].trim();
+    let name_end = after_fn.find(|c: char| !c.is_alphanumeric() && c != '_')?;
+    Some(after_fn[..name_end].to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -516,5 +667,49 @@ mod tests {
             .filter(|e| e.target() == foo_idx)
             .count();
         assert_eq!(edge_count, 1, "duplicate calls must produce only one edge");
+    }
+
+    // --- P2-5 ForeignEdge detector tests ---
+
+    #[test]
+    fn jni_native_method_produces_foreign_edge() {
+        let src =
+            "public class Crypto {\n    private native byte[] scryptDeriveKey(byte[] pass);\n}\n";
+        let edges = detect_jni_boundary_calls(src);
+        assert!(!edges.is_empty(), "must detect native method declaration");
+        assert_eq!(edges[0].caller_lang, "java");
+        assert!(
+            edges[0].callee_sym.contains("scryptDeriveKey"),
+            "symbol must capture method name, got {:?}",
+            edges[0].callee_sym
+        );
+        assert_eq!(edges[0].line, 2);
+    }
+
+    #[test]
+    fn python_ctypes_cdll_produces_foreign_edge() {
+        let src = "import ctypes\nlib = ctypes.CDLL(\"libcrypto.so\")\n";
+        let edges = detect_python_ffi_calls(src);
+        assert!(!edges.is_empty(), "must detect ctypes.CDLL call");
+        assert_eq!(edges[0].caller_lang, "python");
+        assert_eq!(edges[0].callee_sym, "libcrypto.so");
+        assert_eq!(edges[0].line, 2);
+    }
+
+    #[test]
+    fn rust_extern_c_block_produces_foreign_edges() {
+        let src = "extern \"C\" {\n    fn qdb_read(key: *const u8) -> *mut u8;\n    fn qdb_write(key: *const u8, val: *const u8);\n}\n";
+        let edges = detect_rust_extern_c_calls(src);
+        assert_eq!(edges.len(), 2, "must detect both extern fn declarations");
+        assert_eq!(edges[0].caller_lang, "rust");
+        assert_eq!(edges[0].callee_sym, "qdb_read");
+        assert_eq!(edges[1].callee_sym, "qdb_write");
+    }
+
+    #[test]
+    fn no_foreign_edges_on_plain_python() {
+        let src = "def add(a, b):\n    return a + b\n";
+        assert!(detect_python_ffi_calls(src).is_empty());
+        assert!(detect_rust_extern_c_calls(src).is_empty());
     }
 }
