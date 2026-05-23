@@ -1,0 +1,8 @@
+[forge]
+# proof_obligation.rs contains intentionally repetitive boolean-predicate
+# functions (is_exploitable, is_reachable, is_unguarded) that are structurally
+# identical after alpha-normalization.  This is a deliberate design — each
+# predicate corresponds to one proof obligation and must follow the same
+# boolean-conjunction contract for Kani formal verification.
+# Suppress logic-clone scoring for this path.
+clone_exempt_paths = ["crates/forge/src/proof_obligation.rs"]
