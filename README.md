@@ -1,6 +1,6 @@
 # The Janitor
 
-**v10.2.2 — Rust static-analysis research across 23 grammars. IFDS + Z3 SMT + Kani proof obligations. Dual-PQC attestation. Zero-upload. On-device.**
+**v10.2.2 — Rust static-analysis research across 23 grammars. IFDS + Z3 SMT + Kani proof obligations. Dual-PQC attestation. Zero-upload. On-device.**
 
 > *82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.*
 
@@ -35,6 +35,25 @@ The Janitor is an active security research platform spanning four technical fron
   scanner or model provider?
 - Where do static detectors need formal predicates, symbolic constraints, or
   explicit lattice-gap proposals instead of another rule string?
+
+## Cloud Reproducibility Track
+
+Janitor findings can be reproduced in GitHub Actions and mapped onto Google
+Cloud Build and Artifact Registry provenance without uploading source code.
+A reproducibility run emits structured findings, proof-class decisions, SARIF,
+and SHA-384 provenance metadata that can be mirrored into Cloud Build
+attestations or Artifact Registry records while keeping repository contents
+inside the operator-controlled build environment. No source upload is required
+at any step — the GitHub Actions runner executes the full analysis pipeline
+locally and pushes only signed attestation records to Cloud infrastructure.
+
+## Adversarial Robustness and Tool-Intent Safety
+
+The Janitor treats prompt injection, MCP/tool dispatch, agentic origin, and
+untrusted-context transposition as security research surfaces. The engine tests
+these paths with deterministic proof obligations for prompt/tool
+non-interference, confused-deputy dispatch, agentic-origin classification, and
+retrieval-context trust before findings reach audit ledgers.
 
 ## Research Findings
 
