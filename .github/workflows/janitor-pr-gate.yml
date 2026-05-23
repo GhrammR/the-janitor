@@ -21,15 +21,12 @@ jobs:
       # crash when a prior step left a $HOME cache dir owned by another uid.
       SCCACHE_DIR: ${{ github.workspace }}/.cache/sccache
       SCCACHE_CACHE_SIZE: 2G
-    # Job-level: read PR diff + write step summary.
-    # statuses:write is required for local-only mode to post the bounce
-    # verdict as a named commit status when no Governor URL is configured.
-    # security-events:write is required for the SARIF upload step.
+    # Job-level: read PR diff + write step summary. The downstream
+    # `integrity-check` job publishes the required Janitor Integrity Check as a
+    # native Actions check, so no commit-status write permission is needed.
     permissions:
       contents: read
       pull-requests: read
-      statuses: write
-      security-events: write
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
@@ -99,3 +96,21 @@ jobs:
         if: always()
         shell: bash
         run: sccache --show-stats || true
+
+  integrity-check:
+    name: Janitor Integrity Check
+    runs-on: ubuntu-latest
+    needs: slop-gate
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Mirror structural gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.slop-gate.result }}" != "success" ]; then
+            echo "Structural Firewall result: ${{ needs.slop-gate.result }}"
+            exit 1
+          fi
+          echo "Structural Firewall passed."

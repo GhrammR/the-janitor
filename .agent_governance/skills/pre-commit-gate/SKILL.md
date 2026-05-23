@@ -15,6 +15,10 @@
 2. **If `slop_score == 0`**, proceed to:
    - Run `just audit` (or confirm it has already passed in this session)
    - Only then finalize the commit
+   - If the finalized work is pushed to a pull request, invoke
+     `.agent_governance/skills/pr-resolution/SKILL.md` and run its Post-Push
+     Auto-Merge Watch at immediate, +1 minute, +5 minutes, and final +9
+     minutes.
 
 3. **If signed commit creation fails because GPG is locked**:
    - Stop before any fallback commit attempt.
@@ -30,6 +34,9 @@
 | `slop_score > 0` | Abort, report violations, request remediation |
 | `just audit` fails | Abort, report failing check, do not commit |
 | GPG signing key locked | Prompt for `gpg-unlock`, wait for operator confirmation, then resume the same signed commit |
+| Pushed PR is blocked by human review in solo mode | Restore zero required reviews, verify branch protection, arm auto-merge, and run the PR watch cadence |
+| Branch protection has empty required checks | Restore expected required check contexts before arming auto-merge |
+| Code-scanning alert inspection is unavailable | Require the Code Scanning Alert Audit workflow result before finalizing PR state |
 
 ## Notes
 

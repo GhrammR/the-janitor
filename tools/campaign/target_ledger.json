@@ -822,7 +822,7 @@
       ],
       "priority_score": 32,
       "hunted": true,
-      "hunt_result": "no_findings_out_of_scope_s162"
+      "hunt_result": "no_findings_s165"
     },
     {
       "engagement": "immunefi_targets",
@@ -886,7 +886,7 @@
       ],
       "priority_score": 32,
       "hunted": true,
-      "hunt_result": "low_yield_out_of_scope_ui_s162"
+      "hunt_result": "low_yield_deprecated_ui_scope_s165"
     },
     {
       "engagement": "immunefi_targets",
@@ -1152,7 +1152,9 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "low_yield_client_vendor_scope_s165"
     },
     {
       "engagement": "mattermost_targets",

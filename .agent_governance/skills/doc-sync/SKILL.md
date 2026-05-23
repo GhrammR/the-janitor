@@ -36,36 +36,20 @@ Mapping Matrix below.
 
 4. **If the document is current**: proceed to commit.
 
-5. **If `README.md` changed for a GitHub-visible directive**:
-   - After commit, push the current branch or report the exact push blocker.
-   - Verify remote branch content with:
-     `git show origin/<branch>:README.md | head -40`
-   - Verify the repository's live metadata with:
-     `gh api repos/<owner>/<repo> --jq '{description,homepage,default_branch}'`
-   - Resolve the default branch from that API response or
-     `git ls-remote --symref origin HEAD`, then verify the public landing README
-     with:
-     `git show origin/<default_branch>:README.md | head -40`
-   - If GitHub's default repository README still points at `main`, explicitly
-     state that the branch README is updated but the default GitHub landing page
-     will not show it until merge.
-   - If the repository metadata description is stale, update it immediately
-     with:
-     `gh api repos/<owner>/<repo> -X PATCH -f description='<intended one-line public description>'`
-     and re-read the metadata response. A README commit does not update this
-     field.
-   - If the GitHub-visible documentation PR is authored by the authenticated
-     user and branch protection requires an approving review, report a
-     **self-review deadlock**. Verify it with:
-     `gh api user --jq '{login,id}'`,
-     `gh pr view <pr> --json author,reviewDecision,mergeStateStatus`,
-     and
-     `gh api repos/<owner>/<repo>/branches/<default_branch>/protection --jq '{required_pull_request_reviews,enforce_admins}'`.
-     Resolution is either external write-access approval or, when the account
-     has repository-admin permission and all required checks are green, a
-     temporary `required_approving_review_count=0` bypass followed immediately
-     by restoring the original review count and re-reading branch protection.
-     Never leave branch protection weakened.
+5. **If the change is intended to be visible on GitHub** (`README.md`,
+   `docs/index.md`, repository metadata, or documentation landing pages):
+   - Run the PR Resolution Gate before finalizing the sprint.
+   - If the current PR is dirty, blocked by solo-review policy drift,
+     app-gate failed, or structurally oversized, do not continue pushing
+     documentation commits to that PR.
+   - Create a docs-only replacement branch from `origin/main` and route the
+     broken PR to `CLOSE_SUPERSEDED` or `REBASE_OR_RECREATE`.
+   - If the PR is clean, arm auto-merge and run the PR Resolution Gate
+     immediate/+1m/+5m/+9m watch cadence so README/default-branch visibility is
+     not reported as complete before the PR actually merges.
+   - Include code-scanning alert telemetry in the same cadence. GitHub-visible
+     docs/workflow changes can create Scorecard alerts after merge; baseline
+     alerts must be reported, and net-new PR alerts must block completion.
 
 ## Abort conditions
 

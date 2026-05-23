@@ -5,8 +5,8 @@ name: CISA KEV Weekly Sync
 #   - .janitor/wisdom.rkyv           (binary Wisdom Registry)
 #   - .janitor/wisdom_manifest.json  (diffable JSON manifest of all CVE entries)
 #
-# The workflow diffs the manifest against the last committed snapshot and opens
-# a PR containing:
+# The workflow diffs the manifest against the last committed snapshot and
+# uploads an operator-review artifact containing:
 #   - Updated .janitor/cisa_kev_ids.txt  (sorted CVE-ID list for future diffs)
 #   - .janitor/kev_checklist.md          (new entries + AST gate checklist)
 #
@@ -25,8 +25,7 @@ jobs:
     name: CISA KEV Sync & Gate Checklist
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # create branch with updated snapshot
-      pull-requests: write   # open the PR
+      contents: read
 
     steps:
       - name: Harden runner
@@ -174,32 +173,13 @@ jobs:
           # Promote the new snapshot.
           cp .janitor/kev_ids_new.txt .janitor/cisa_kev_ids.txt
 
-      - name: Open PR with updated snapshot and checklist
+      - name: Upload updated snapshot and checklist
         if: steps.diff.outputs.new_count != '0'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TODAY=$(date +%Y-%m-%d)
-          BRANCH="chore/cisa-kev-sync-${TODAY}"
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git checkout -b "${BRANCH}"
-          git add .janitor/cisa_kev_ids.txt .janitor/kev_checklist.md
-          git commit -m "chore: CISA KEV sync ${TODAY} — $(wc -l < .janitor/kev_added.txt | tr -d ' ') new entries"
-          git push origin "${BRANCH}"
-
-          # Idempotent PR creation — do not error if PR already exists for this branch.
-          EXISTING_PR=$(gh pr list --head "${BRANCH}" --json number --jq '.[0].number' 2>/dev/null || true)
-          if [[ -n "${EXISTING_PR}" ]]; then
-            echo "PR #${EXISTING_PR} already exists for branch ${BRANCH} — skipping creation."
-          else
-            gh pr create \
-              --title "chore: CISA KEV sync ${TODAY}" \
-              --body "$(cat .janitor/kev_checklist.md)" \
-              --base main \
-              --head "${BRANCH}" \
-              --label "security,intelligence"
-          fi
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cisa-kev-sync-${{ github.run_id }}
+          path: |
+            .janitor/cisa_kev_ids.txt
+            .janitor/kev_checklist.md
+          if-no-files-found: error
+          retention-days: 30

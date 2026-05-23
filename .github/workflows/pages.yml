@@ -27,10 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --disable-pip-version-check --user \
-            "mkdocs<2" \
-            "mkdocs-material<9.6"
-          python3 -m mkdocs build --strict
+          pipx run --spec "mkdocs-material==9.5.49" mkdocs build --strict
           if [ -f CNAME ]; then cp CNAME site/; fi
           touch site/.nojekyll
 

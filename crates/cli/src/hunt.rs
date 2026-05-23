@@ -2915,14 +2915,9 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     // //nolint:gosec annotation / test-fixture function). Closes the
     // chainlink SQLi FP class (Sprint 141 Tier-1 disposition).
     apply_sql_sanitizer_demotion(dir, &mut deduped);
-    // Sprint 147 — Phase 2B threat-model oracle extensions.
-    // Suppresses SSRF on admin-intentional URL-test functions, TLS bypass
-    // when config-gated, and dom_xss_innerHTML on zero-caller helpers.
-    apply_phase2b_suppression(dir, &mut deduped);
-    // Sprint 148 — proof-class annotation for intent_divergence and
-    // ffi_unsafe_deref findings. Attaches a ProofClass before the proof
-    // obligation gate so critical findings carry evidence rather than being
-    // suppressed as unprovable.
+    // Sprint 163 — proof-obligation classifiers. Attach deterministic proof
+    // classes for detector families whose triage depends on nearby source
+    // context before the false-positive proof obligation gate runs.
     apply_proof_classification(dir, &mut deduped);
     // Sprint 138 — demote findings on deprecated / community-only targets.
     apply_deprecation_demotion(dir, &mut deduped);
@@ -3516,77 +3511,6 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
         }
         true
     });
-}
-
-///
-/// - `security:ssrf_dynamic_url`: suppresses when the enclosing function name
-///   matches the admin-tooling pattern (Test/Validate/Ping/Health + URL/Site)
-///   and no user-request taint is present in the file.
-/// - `security:tls_verification_bypass`: suppresses when `InsecureSkipVerify: true`
-///   is inside an `if`-branch conditional on a struct-field access.
-/// - `security:dom_xss_innerHTML`: suppresses when the sink helper function has
-///   no callers in the same file (zero-caller helper → no attacker-reachable path).
-fn apply_phase2b_suppression(dir: &Path, findings: &mut Vec<StructuredFinding>) {
-    findings.retain_mut(|finding| {
-        let Some(rel_path) = finding.file.as_deref() else {
-            return true;
-        };
-        let abs_path = dir.join(rel_path);
-        let Ok(source) = std::fs::read_to_string(&abs_path) else {
-            return true;
-        };
-        let line = finding.line.unwrap_or(0) as usize;
-
-        if finding.id.contains("ssrf_dynamic_url") {
-            let fn_name = extract_enclosing_fn_name(&source, line);
-            if forge::threat_model_oracle::is_admin_intentional_url_fetch(&fn_name, &source) {
-                return false;
-            }
-        }
-        if (finding.id.contains("tls_verification_bypass")
-            || finding.id.contains("InsecureSkipVerify"))
-            && forge::threat_model_oracle::is_config_gated_tls_bypass(&source, line)
-        {
-            return false;
-        }
-        if finding.id.contains("dom_xss_innerHTML") {
-            let fn_name = extract_enclosing_fn_name(&source, line);
-            if !fn_name.is_empty()
-                && !forge::threat_model_oracle::has_external_caller(&source, &fn_name)
-            {
-                return false;
-            }
-        }
-        // Structural eradication: react_xss_dangerous_html when DOMPurify.sanitize() guards
-        // the dangerouslySetInnerHTML sink in the same file — sanitizer confirmed present.
-        if finding.id.contains("react_xss_dangerous_html") && source.contains("DOMPurify.sanitize(")
-        {
-            return false;
-        }
-        true
-    });
-}
-
-/// Extract the name of the function enclosing the given 1-based line by
-/// scanning backwards for a Go/Python/TypeScript/JavaScript function definition.
-fn extract_enclosing_fn_name(source: &str, line: usize) -> String {
-    let lines: Vec<&str> = source.lines().collect();
-    let target = line.saturating_sub(1).min(lines.len());
-    for i in (0..=target).rev() {
-        let t = lines[i].trim();
-        for prefix in &["func ", "def ", "function ", "async function "] {
-            if let Some(rest) = t.strip_prefix(prefix) {
-                let name: String = rest
-                    .chars()
-                    .take_while(|c| c.is_alphanumeric() || *c == '_')
-                    .collect();
-                if !name.is_empty() {
-                    return name;
-                }
-            }
-        }
-    }
-    String::new()
 }
 
 /// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
