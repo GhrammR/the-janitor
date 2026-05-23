@@ -43,6 +43,181 @@ pub fn proof_obligation_missing(requires_proof: bool, has_proof_class: bool) -> 
     requires_proof && !has_proof_class
 }
 
+/// Exact source/sink/guard predicate used by proof-obligation classifiers.
+pub fn guarded_reachability_conjunction(
+    has_sink: bool,
+    has_untrusted_origin: bool,
+    has_guard: bool,
+) -> bool {
+    has_sink && has_untrusted_origin && !has_guard
+}
+
+/// Classify `security:oauth_excessive_scope` proof quality.
+pub fn classify_oauth_excessive_scope_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let lower = source.to_ascii_lowercase();
+
+    if is_nonproduction_context(&path) || is_admin_manifest_context(&path, &lower) {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_oauth_context = contains_any(
+        &lower,
+        &[
+            "oauth",
+            "github",
+            "access_token",
+            "scopedtoken",
+            "permissions:",
+            "scope",
+        ],
+    );
+    let has_privileged_scope = contains_any(
+        &lower,
+        &[
+            "admin:org",
+            "admin:enterprise",
+            "id-token: write",
+            "id-token:write",
+            "write-all",
+            "contents: write",
+            "repo,",
+            "repo ",
+            "\"repo\"",
+            "'repo'",
+            "repo:*",
+            "*:*",
+        ],
+    );
+    let has_untrusted_origin = contains_any(
+        &lower,
+        &[
+            "request",
+            "req.",
+            "req_",
+            "headers",
+            "query",
+            "params",
+            "body",
+            "user",
+            "input",
+            "client_id",
+            "app_id",
+            "automation",
+            "workflow_dispatch",
+        ],
+    );
+    let has_scope_constraint = contains_any(
+        &lower,
+        &[
+            "audience",
+            "resource",
+            "allowed_scope",
+            "allowedscopes",
+            "scope_allowlist",
+            "scopeallowlist",
+            "least_privilege",
+            "least-privilege",
+            "repo:status",
+            "read-all",
+            "contents: read",
+        ],
+    );
+
+    if !has_oauth_context || !has_privileged_scope {
+        return ProofClass::LatticeGapProposal;
+    }
+    if guarded_reachability_conjunction(
+        has_privileged_scope,
+        has_untrusted_origin,
+        has_scope_constraint,
+    ) {
+        ProofClass::ReachabilityProof
+    } else if has_scope_constraint {
+        ProofClass::InvariantViolationProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Classify `security:java_deser_allowlist_bypass` proof quality.
+pub fn classify_java_deser_allowlist_bypass_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let path = finding
+        .file
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let lower = source.to_ascii_lowercase();
+
+    if is_nonproduction_context(&path) {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let has_deser_sink = contains_any(
+        &lower,
+        &[
+            "objectinputstream",
+            ".readobject(",
+            " readobject(",
+            "resolveclass",
+            "java.io.serializable",
+        ],
+    );
+    let has_untrusted_origin = contains_any(
+        &lower,
+        &[
+            "httpservletrequest",
+            "@requestbody",
+            "request.getinputstream",
+            "request.getreader",
+            "servletinputstream",
+            "headers",
+            "session",
+            "message",
+            "jms",
+            "kafka",
+            "upload",
+            "body",
+        ],
+    );
+    let has_allowlist_filter = contains_any(
+        &lower,
+        &[
+            "objectinputfilter",
+            "serialfilter",
+            "allowlist",
+            "allowedclasses",
+            "allowed_classes",
+            "whitelist",
+            "sealed",
+            "fixedtype",
+            "fixed type",
+        ],
+    );
+
+    if !has_deser_sink {
+        return ProofClass::LatticeGapProposal;
+    }
+    if guarded_reachability_conjunction(has_deser_sink, has_untrusted_origin, has_allowlist_filter)
+    {
+        ProofClass::ReachabilityProof
+    } else if has_allowlist_filter {
+        ProofClass::InvariantViolationProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 fn requires_proof_obligation(finding: &StructuredFinding) -> bool {
     matches!(
         finding.severity.as_deref(),
@@ -82,6 +257,44 @@ fn is_self_proving_invariant(finding: &StructuredFinding) -> bool {
     ]
     .iter()
     .any(|needle| id.contains(needle))
+}
+
+fn contains_any(haystack: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| haystack.contains(needle))
+}
+
+fn is_nonproduction_context(path: &str) -> bool {
+    contains_any(
+        path,
+        &[
+            "/test",
+            "_test.",
+            ".test.",
+            ".spec.",
+            "/tests/",
+            "/fixtures/",
+            "/generated/",
+            "generated",
+            "/migrations/",
+            "/docs/",
+            "/examples/",
+            "/scripts/",
+        ],
+    )
+}
+
+fn is_admin_manifest_context(path: &str, source: &str) -> bool {
+    path.starts_with(".github/workflows/")
+        || contains_any(
+            source,
+            &[
+                "admin-only",
+                "operator config",
+                "local config",
+                "maintainer only",
+                "manual approval",
+            ],
+        )
 }
 
 fn proposal_block_for(finding: &StructuredFinding) -> String {
@@ -136,7 +349,9 @@ fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result
 #[cfg(test)]
 mod tests {
     use super::{
-        append_gap_proposals_to, enforce_false_positive_proof_obligation, proof_obligation_missing,
+        append_gap_proposals_to, classify_java_deser_allowlist_bypass_proof,
+        classify_oauth_excessive_scope_proof, enforce_false_positive_proof_obligation,
+        guarded_reachability_conjunction, proof_obligation_missing,
     };
     use common::slop::{ExploitWitness, ProofClass, StructuredFinding};
     use tempfile::NamedTempFile;
@@ -249,5 +464,122 @@ mod tests {
 
         let filtered = enforce_false_positive_proof_obligation(&findings);
         assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn oauth_excessive_scope_reachability_requires_untrusted_privileged_scope() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some("server/oauth/token.go".to_string()),
+            ..Default::default()
+        };
+        let source = r#"
+            func issue(req Request) {
+                scope := req.Query("scope")
+                if scope == "repo admin:org" {
+                    mintGithubAccessToken(scope)
+                }
+            }
+        "#;
+        assert_eq!(
+            classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn oauth_excessive_scope_guarded_by_audience_is_invariant() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some("server/oauth/token.go".to_string()),
+            ..Default::default()
+        };
+        let source = r#"
+            let scope = request.body.scope;
+            let allowed_scope = scope_allowlist.for_audience(audience);
+            mint_github_token(scope.intersection(allowed_scope), "repo");
+        "#;
+        assert_eq!(
+            classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn oauth_excessive_scope_workflow_manifest_is_invariant() {
+        let finding = StructuredFinding {
+            id: "security:oauth_excessive_scope".to_string(),
+            file: Some(".github/workflows/release.yml".to_string()),
+            ..Default::default()
+        };
+        let source = "permissions:\n  id-token: write\n  contents: read\n";
+        assert_eq!(
+            classify_oauth_excessive_scope_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn java_deser_allowlist_bypass_reachability_requires_request_body() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/main/java/app/ImportServlet.java".to_string()),
+            ..Default::default()
+        };
+        let source = r#"
+            void doPost(HttpServletRequest request) {
+                ObjectInputStream in = new ObjectInputStream(request.getInputStream());
+                Object value = in.readObject();
+            }
+        "#;
+        assert_eq!(
+            classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    #[test]
+    fn java_deser_allowlist_filter_is_invariant() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/main/java/app/ImportServlet.java".to_string()),
+            ..Default::default()
+        };
+        let source = r#"
+            void doPost(HttpServletRequest request) {
+                ObjectInputStream in = new ObjectInputStream(request.getInputStream());
+                in.setObjectInputFilter(ObjectInputFilter.Config.createFilter("com.acme.Safe;!*"));
+                Object value = in.readObject();
+            }
+        "#;
+        assert_eq!(
+            classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn java_deser_unknown_origin_stays_lattice_gap() {
+        let finding = StructuredFinding {
+            id: "security:java_deser_allowlist_bypass".to_string(),
+            file: Some("src/main/java/app/CacheReader.java".to_string()),
+            ..Default::default()
+        };
+        let source = r#"
+            ObjectInputStream in = new ObjectInputStream(localCacheStream);
+            Object value = in.readObject();
+        "#;
+        assert_eq!(
+            classify_java_deser_allowlist_bypass_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
+    #[test]
+    fn proof_predicates_are_exact_conjunctions() {
+        assert!(guarded_reachability_conjunction(true, true, false));
+        assert!(!guarded_reachability_conjunction(true, true, true));
+        assert!(!guarded_reachability_conjunction(true, false, false));
+        assert!(!guarded_reachability_conjunction(false, true, false));
     }
 }
