@@ -141,11 +141,7 @@ pub fn parse_iso8601_to_unix(ts: &str) -> Option<i64> {
 
     // Days in each month (non-leap).
     const DAYS_IN_MONTH: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    for (m, &month_days) in DAYS_IN_MONTH
-        .iter()
-        .enumerate()
-        .take((month - 1) as usize)
-    {
+    for (m, &month_days) in DAYS_IN_MONTH.iter().enumerate().take((month - 1) as usize) {
         days += month_days;
         if m == 1 && is_leap_year(year) {
             days += 1;

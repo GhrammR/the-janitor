@@ -146,7 +146,8 @@ pub enum ThreatModelVerdict {
 pub fn is_admin_intentional_url_fetch(fn_name: &str, source: &str) -> bool {
     // Admin-tooling name pattern.
     let lower_fn = fn_name.to_lowercase();
-    let is_admin_name = (lower_fn.contains("test") || lower_fn.contains("validate")
+    let is_admin_name = (lower_fn.contains("test")
+        || lower_fn.contains("validate")
         || lower_fn.contains("ping")
         || lower_fn.contains("health")
         || lower_fn.contains("check"))
@@ -195,7 +196,10 @@ pub fn is_config_gated_tls_bypass(source: &str, tls_line: usize) -> bool {
         // Condition is a struct field access when it contains `.` and does not
         // use `== true` / `!= false` literals (which would indicate a
         // non-config-gated boolean toggle).
-        let cond = trimmed.trim_start_matches("if ").trim_end_matches('{').trim();
+        let cond = trimmed
+            .trim_start_matches("if ")
+            .trim_end_matches('{')
+            .trim();
         if cond.contains('.') && !cond.contains("== true") && !cond.contains("!= false") {
             return true;
         }
@@ -523,7 +527,8 @@ mod tests {
 
     #[test]
     fn if_struct_field_guard_suppresses_tls_bypass() {
-        let source = "if cfg.InsecureTLS {\n    tlsCfg := &tls.Config{InsecureSkipVerify: true}\n}\n";
+        let source =
+            "if cfg.InsecureTLS {\n    tlsCfg := &tls.Config{InsecureSkipVerify: true}\n}\n";
         // `InsecureSkipVerify: true` is on line 2; guard is on line 1.
         assert!(is_config_gated_tls_bypass(source, 2));
     }

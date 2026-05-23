@@ -536,7 +536,10 @@ fn extract_vue_router_routes(
         };
         let raw_end = tail.find('}').unwrap_or(tail.len()).min(256);
         // Walk back to the nearest valid UTF-8 char boundary.
-        let window_end = (0..=raw_end).rev().find(|&i| tail.is_char_boundary(i)).unwrap_or(0);
+        let window_end = (0..=raw_end)
+            .rev()
+            .find(|&i| tail.is_char_boundary(i))
+            .unwrap_or(0);
         let window = &tail[..window_end];
         let component = extract_vue_component_name(window);
         let component_file = if let Some(dynamic_import) = extract_dynamic_import_path(window) {

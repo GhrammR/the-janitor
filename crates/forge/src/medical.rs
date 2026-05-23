@@ -219,7 +219,10 @@ mod tests {
     fn phi_llm_cooccurrence_emits_finding() {
         let src = "def analyze(patient):\n    data = patient.diagnosis\n    response = openai.ChatCompletion.create(model='gpt-4', messages=[{'content': data}])\n    return response\n";
         let findings = emit_phi_sink_findings(src, "analyze.py");
-        assert!(!findings.is_empty(), "expected a PHI+LLM co-occurrence finding");
+        assert!(
+            !findings.is_empty(),
+            "expected a PHI+LLM co-occurrence finding"
+        );
         assert_eq!(findings[0].severity.as_deref(), Some("KevCritical"));
         assert!(findings[0].id.contains("phi_data_in_llm_sink"));
     }

@@ -673,7 +673,8 @@ mod tests {
 
     #[test]
     fn jni_native_method_produces_foreign_edge() {
-        let src = "public class Crypto {\n    private native byte[] scryptDeriveKey(byte[] pass);\n}\n";
+        let src =
+            "public class Crypto {\n    private native byte[] scryptDeriveKey(byte[] pass);\n}\n";
         let edges = detect_jni_boundary_calls(src);
         assert!(!edges.is_empty(), "must detect native method declaration");
         assert_eq!(edges[0].caller_lang, "java");
