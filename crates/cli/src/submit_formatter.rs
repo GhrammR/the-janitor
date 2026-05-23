@@ -795,13 +795,10 @@ mod tests {
         let count = write_submissions(&annotated, dir.path(), "test_program").unwrap();
         assert_eq!(count, 1, "in-scope finding with repro must produce 1 file");
         let reports_dir = dir.path().join(".janitor").join("hunt_reports");
-        let found = std::fs::read_dir(&reports_dir)
-            .unwrap()
-            .flatten()
-            .any(|e| {
-                let name = e.file_name().to_string_lossy().into_owned();
-                name.contains("SUBMISSION_security_rce") && name.ends_with(".md")
-            });
+        let found = std::fs::read_dir(&reports_dir).unwrap().flatten().any(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.contains("SUBMISSION_security_rce") && name.ends_with(".md")
+        });
         assert!(found, "SUBMISSION file must be created");
     }
 

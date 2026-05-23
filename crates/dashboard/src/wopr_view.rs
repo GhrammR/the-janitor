@@ -689,14 +689,18 @@ where
         // ── Tab content ───────────────────────────────────────────────────────
         match active_tab {
             0 => render_telemetry(f, chunks[2], entries, border_style, text_style, muted_style),
-            1 => render_topology(f, chunks[2], RenderTopologyParams {
-                ranked,
-                graph_ready,
-                border_style,
-                header_style,
-                text_style,
-                muted_style,
-            }),
+            1 => render_topology(
+                f,
+                chunks[2],
+                RenderTopologyParams {
+                    ranked,
+                    graph_ready,
+                    border_style,
+                    header_style,
+                    text_style,
+                    muted_style,
+                },
+            ),
             2 => render_swarm(
                 f,
                 chunks[2],

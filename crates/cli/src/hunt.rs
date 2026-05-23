@@ -3094,425 +3094,104 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 /// For `security:non_constant_time_comparison`: attaches `ReachabilityProof`
 /// when the source contains HMAC/session-key markers outside a test path;
 /// otherwise `LatticeGapProposal`.
+fn classify_one_proof(dir: &Path, finding: &StructuredFinding) -> Option<ProofClass> {
+    use forge::proof_obligation as po;
+    let id = finding.id.as_str();
+    let src = || {
+        finding
+            .file
+            .as_deref()
+            .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+            .unwrap_or_default()
+    };
+    let line = finding.line.unwrap_or(1) as usize;
+    Some(if id.contains("intent_divergence") {
+        po::classify_intent_divergence_proof(finding, &src())
+    } else if id.contains("ffi_unsafe_deref") || id.contains("raw_pointer_deref") {
+        po::classify_ffi_deref_proof(&src(), line)
+    } else if id.contains("lcm_double_free") {
+        po::classify_lcm_double_free_proof(&src(), line)
+    } else if id.contains("non_constant_time_comparison") {
+        po::classify_timing_comparison_proof(&src(), finding)
+    } else if id.contains("lcm_use_after_free") {
+        po::classify_lcm_use_after_free_proof(&src(), line)
+    } else if id.contains("lcm_malloc_integer_truncation") {
+        po::classify_lcm_malloc_integer_truncation_proof(&src(), finding)
+    } else if id.contains("lcm_off_by_one_loop") {
+        po::classify_lcm_off_by_one_loop_proof(&src(), finding)
+    } else if id.contains("oauth_missing_state_validation") {
+        po::classify_oauth_state_validation_proof(&src(), finding)
+    } else if id.contains("oauth_excessive_scope") {
+        po::classify_oauth_excessive_scope_proof(&src(), finding)
+    } else if id.contains("pqc_hybrid_downgrade") {
+        po::classify_pqc_hybrid_downgrade_proof(&src(), finding)
+    } else if id.contains("unverified_provenance") {
+        po::classify_unverified_provenance_proof(&src(), finding)
+    } else if id.contains("cargo_build_worm") {
+        po::classify_cargo_build_worm_proof(&src(), finding)
+    } else if id.contains("ci_persistence_vector") {
+        po::classify_ci_persistence_vector_proof(&src(), finding)
+    } else if id.contains("java_deser_allowlist_bypass") {
+        po::classify_java_deser_allowlist_bypass_proof(&src(), finding)
+    } else if id.contains("unsafe_deserialization") {
+        po::classify_unsafe_deserialization_proof(&src(), finding)
+    } else if id.contains("mcp_confused_deputy_dispatch") {
+        po::classify_mcp_confused_deputy_dispatch_proof(&src(), finding)
+    } else if id.contains("embedding_trust_transposition") {
+        po::classify_embedding_trust_transposition_proof(&src(), finding)
+    } else if id.contains("rag_context_poisoning") {
+        po::classify_rag_context_poisoning_proof(&src(), finding)
+    } else if id.contains("path_traversal_concatenation") {
+        po::classify_path_traversal_concat_proof(&src(), finding)
+    } else if id.contains("dynamic_import") {
+        po::classify_dynamic_import_proof(&src(), finding)
+    } else if id.contains("dangerous_execution") {
+        po::classify_dangerous_execution_proof(&src(), finding)
+    } else if id.contains("bounded_overflow_witness") {
+        po::classify_bounded_overflow_proof(&src(), finding)
+    } else if id.contains("ld_preload_injection") {
+        po::classify_ld_preload_injection_proof(&src(), finding)
+    } else if id.contains("ffi_memory_corruption") {
+        po::classify_ffi_memory_corruption_proof(&src(), finding)
+    } else if id.contains("xxe_saml_parser") {
+        po::classify_xxe_saml_parser_proof(&src(), finding)
+    } else if id.contains("saml_xsw_validation_order") {
+        po::classify_saml_xsw_validation_order_proof(&src(), finding)
+    } else if id.contains("jndi_injection") {
+        po::classify_jndi_injection_proof(&src(), finding)
+    } else if id.contains("eval_injection") {
+        po::classify_eval_injection_proof(&src(), finding)
+    } else if id.contains("process_builder_injection") {
+        po::classify_process_builder_injection_proof(&src(), finding)
+    } else if id.contains("oauth_account_fusion") {
+        po::classify_oauth_account_fusion_proof(&src(), finding)
+    } else if id.contains("protobuf_any_unguarded_decode") {
+        po::classify_protobuf_any_proof(&src(), finding)
+    } else if id.contains("sqli_concatenation") {
+        po::classify_sqli_concatenation_proof(&src(), finding)
+    } else if id.contains("financial_pii_to_external_llm") {
+        po::classify_financial_pii_proof(&src(), finding)
+    } else if id.contains("react_xss_dangerous_html") {
+        po::classify_react_xss_proof(&src(), finding)
+    } else if id.contains("unauthenticated_debug_endpoint") {
+        po::classify_debug_endpoint_proof(&src(), finding)
+    } else {
+        return None;
+    })
+}
+
 fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>) {
     findings.retain_mut(|finding| {
-        if finding.id.contains("intent_divergence") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            finding.proof_class = Some(forge::proof_obligation::classify_intent_divergence_proof(
-                finding, &source,
-            ));
-        } else if finding.id.contains("ffi_unsafe_deref")
-            || finding.id.contains("raw_pointer_deref")
-        {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let line = finding.line.unwrap_or(1) as usize;
-            let proof = forge::proof_obligation::classify_ffi_deref_proof(&source, line);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("lcm_double_free") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let line = finding.line.unwrap_or(1) as usize;
-            let proof = forge::proof_obligation::classify_lcm_double_free_proof(&source, line);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("non_constant_time_comparison") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_timing_comparison_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("lcm_use_after_free") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let line = finding.line.unwrap_or(1) as usize;
-            let proof = forge::proof_obligation::classify_lcm_use_after_free_proof(&source, line);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("lcm_malloc_integer_truncation") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_lcm_malloc_integer_truncation_proof(
-                &source, finding,
-            );
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("lcm_off_by_one_loop") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_lcm_off_by_one_loop_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("oauth_missing_state_validation") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_oauth_state_validation_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("oauth_excessive_scope") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_oauth_excessive_scope_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("pqc_hybrid_downgrade") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_pqc_hybrid_downgrade_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("unverified_provenance") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_unverified_provenance_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("cargo_build_worm") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_cargo_build_worm_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("ci_persistence_vector") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_ci_persistence_vector_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("java_deser_allowlist_bypass") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_java_deser_allowlist_bypass_proof(
-                &source, finding,
-            );
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("unsafe_deserialization") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_unsafe_deserialization_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("mcp_confused_deputy_dispatch") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_mcp_confused_deputy_dispatch_proof(
-                &source, finding,
-            );
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("embedding_trust_transposition") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_embedding_trust_transposition_proof(
-                &source, finding,
-            );
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("rag_context_poisoning") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_rag_context_poisoning_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("path_traversal_concatenation") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_path_traversal_concat_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("dynamic_import") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_dynamic_import_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("dangerous_execution") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_dangerous_execution_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("bounded_overflow_witness") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_bounded_overflow_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("ld_preload_injection") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_ld_preload_injection_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("ffi_memory_corruption") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_ffi_memory_corruption_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("xxe_saml_parser") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_xxe_saml_parser_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("saml_xsw_validation_order") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_saml_xsw_validation_order_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("jndi_injection") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_jndi_injection_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("eval_injection") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_eval_injection_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("process_builder_injection") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_process_builder_injection_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("oauth_account_fusion") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_oauth_account_fusion_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("protobuf_any_unguarded_decode") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_protobuf_any_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("sqli_concatenation") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof =
-                forge::proof_obligation::classify_sqli_concatenation_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("financial_pii_to_external_llm") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_financial_pii_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("react_xss_dangerous_html") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_react_xss_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
-        } else if finding.id.contains("unauthenticated_debug_endpoint") {
-            let source = finding
-                .file
-                .as_deref()
-                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
-                .unwrap_or_default();
-            let proof = forge::proof_obligation::classify_debug_endpoint_proof(&source, finding);
-            if proof == ProofClass::InvariantViolationProof {
-                return false;
-            }
-            finding.proof_class = Some(proof);
+        let Some(proof) = classify_one_proof(dir, finding) else {
+            return true;
+        };
+        if proof == ProofClass::InvariantViolationProof {
+            return false;
         }
+        finding.proof_class = Some(proof);
         true
     });
 }
-
 /// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
 /// detector emitted a 36% approval CANDIDATE for `core/utils/jwt.go:230`
 /// without inspecting the keyfunc body at lines 258-266, which contains

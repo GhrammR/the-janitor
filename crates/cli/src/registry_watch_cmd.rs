@@ -156,8 +156,10 @@ pub fn cmd_watch_registries(
                     enqueued += 1;
                 }
             }
-            eprintln!("[watch-registries] {reg}: {} {enqueued} new candidates",
-                if dry_run { "dry-run found" } else { "enqueued" });
+            eprintln!(
+                "[watch-registries] {reg}: {} {enqueued} new candidates",
+                if dry_run { "dry-run found" } else { "enqueued" }
+            );
             // Per /goal rate limits: ≤1 req/sec npm, ≤2 req/sec crates, ≤1 req/sec pypi.
             // We do one poll per registry per cycle, so a 1-second sleep between
             // registries comfortably honours all three.
@@ -194,7 +196,9 @@ pub fn cmd_triage_registry_queue(
 
 fn poll_one(reg: &str, popular: &[&str]) -> anyhow::Result<Vec<PackageUpload>> {
     match reg {
-        "npm" => NpmAdapter::new().with_popular(popular).poll_recent_uploads(),
+        "npm" => NpmAdapter::new()
+            .with_popular(popular)
+            .poll_recent_uploads(),
         "crates" => CratesIoAdapter::new().poll_recent_uploads(),
         "pypi" => PyPiAdapter::new().poll_recent_uploads(),
         _ => unreachable!("registry filter is validated upstream"),
@@ -410,8 +414,7 @@ mod tests {
         // Bug fixed on 2026-05-19: format string had {minute:02}-{second:02}.
         let s = format_iso8601(1_767_225_600 + 3661); // +1h 1m 1s
         assert_eq!(
-            s,
-            "2026-01-01T01:01:01Z",
+            s, "2026-01-01T01:01:01Z",
             "full ISO 8601 timestamp must use colon separators, got {s}"
         );
     }
