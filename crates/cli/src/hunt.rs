@@ -3293,6 +3293,19 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("embedding_trust_transposition") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_embedding_trust_transposition_proof(
+                &source, finding,
+            );
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         } else if finding.id.contains("ffi_memory_corruption") {
             let source = finding
                 .file

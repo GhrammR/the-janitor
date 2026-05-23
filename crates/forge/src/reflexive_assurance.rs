@@ -1110,7 +1110,8 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
-        financial_pii_is_unguarded, jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
+        embedding_trust_transposition_is_reachable, financial_pii_is_unguarded,
+        jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
         oauth_state_validation_is_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
@@ -1351,6 +1352,30 @@ mod compliance_oracle_kani {
         kani::assert(
             result == (has_dangerous && !has_sanitizer),
             "react_xss guard must be exact conjunction",
+        );
+    }
+
+    /// Prove `embedding_trust_transposition_is_reachable` is the exact conjunction:
+    /// retrieval_sink ∧ untrusted_input ∧ ¬trust_guard ∧ ¬in_test_path.
+    #[kani::proof]
+    fn embedding_trust_transposition_is_exact_conjunction() {
+        let has_retrieval_sink: bool = kani::any();
+        let has_untrusted_input: bool = kani::any();
+        let has_trust_guard: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result = embedding_trust_transposition_is_reachable(
+            has_retrieval_sink,
+            has_untrusted_input,
+            has_trust_guard,
+            in_test_path,
+        );
+        kani::assert(
+            result
+                == (has_retrieval_sink
+                    && has_untrusted_input
+                    && !has_trust_guard
+                    && !in_test_path),
+            "embedding_trust_transposition gate must be exact conjunction of four guards",
         );
     }
 }

@@ -2348,6 +2348,115 @@ fn append_gap_proposals_to(path: &Path, proposals: &[String]) -> std::io::Result
     Ok(())
 }
 
+/// Pure boolean predicate for Kani verification of embedding trust transposition logic.
+///
+/// Returns `true` iff untrusted input reaches a vector-similarity retrieval sink and
+/// no source-trust guard, tenant allowlist, or provenance filter is present outside
+/// a test/example/notebook path.
+pub fn embedding_trust_transposition_is_reachable(
+    has_retrieval_sink: bool,
+    has_untrusted_input: bool,
+    has_trust_guard: bool,
+    in_test_path: bool,
+) -> bool {
+    has_retrieval_sink && has_untrusted_input && !has_trust_guard && !in_test_path
+}
+
+/// Classify the proof state for a `security:embedding_trust_transposition` finding.
+///
+/// `ReachabilityProof` — production RAG path where untrusted user/session input
+/// reaches a vector-similarity retrieval sink and no source-trust ranking,
+/// tenant/source allowlist, policy-context separation, or provenance filter is
+/// visible in the ±20-line window.
+///
+/// `InvariantViolationProof` — a trust-prioritization guard (`trusted_sources`,
+/// `rerank_trusted`, `source_allowlist`, `provenance_filter`, `trust_rank`) is
+/// visible, or the file is a test/example/notebook path.
+///
+/// `LatticeGapProposal` — retrieval sink present but input origin unclear.
+pub fn classify_embedding_trust_transposition_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("spec")
+                || p.contains("example")
+                || p.contains("notebook")
+                || p.ends_with("_test.py")
+                || p.ends_with(".ipynb")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+
+    let trust_guard_tokens = [
+        "trusted_sources",
+        "source_allowlist",
+        "rerank_trusted",
+        "trust_rank",
+        "provenance_filter",
+        "source_filter",
+        "allowed_sources",
+        "source in trusted",
+        "source_trust",
+        "metadata['source']",
+        "metadata[\"source\"]",
+        "filter_by_source",
+    ];
+    let has_trust_guard = trust_guard_tokens
+        .iter()
+        .any(|t| lower.contains(t));
+
+    if has_trust_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let retrieval_tokens = [
+        "similarity_search",
+        "similaritysearch",
+        "vectorstore.query",
+        "as_retriever",
+        "retrieval_qa",
+        "retrieverqa",
+        "vector_store.search",
+        "query_vector",
+        "retrieve(",
+    ];
+    let has_retrieval_sink = retrieval_tokens.iter().any(|t| lower.contains(t));
+
+    let untrusted_tokens = [
+        "request.",
+        "req.",
+        "user_input",
+        "message.content",
+        "query = ",
+        "prompt = ",
+        "chat_input",
+        "body[",
+        "params[",
+        "args[",
+    ];
+    let has_untrusted_input = untrusted_tokens.iter().any(|t| lower.contains(t));
+
+    if embedding_trust_transposition_is_reachable(
+        has_retrieval_sink,
+        has_untrusted_input,
+        false,
+        false,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -3765,6 +3874,50 @@ mod tests {
         let source = "payload := req.credit_card\nws.WriteMessage(websocket.TextMessage, payload)";
         assert_eq!(
             super::classify_financial_pii_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // ── embedding_trust_transposition proof tests ──────────────────────────
+
+    #[test]
+    fn embedding_trust_test_fixture_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:embedding_trust_transposition".to_string(),
+            file: Some("tests/rag_test.py".to_string()),
+            ..Default::default()
+        };
+        let source = "results = vector_store.similarity_search(query)";
+        assert_eq!(
+            super::classify_embedding_trust_transposition_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn embedding_trust_source_allowlist_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:embedding_trust_transposition".to_string(),
+            file: Some("app/rag/retriever.py".to_string()),
+            ..Default::default()
+        };
+        let source = "results = vector_store.similarity_search(query)\nresults = [r for r in results if r.metadata['source'] in trusted_sources]";
+        assert_eq!(
+            super::classify_embedding_trust_transposition_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn embedding_trust_unguarded_production_retrieval_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:embedding_trust_transposition".to_string(),
+            file: Some("app/rag/retriever.py".to_string()),
+            ..Default::default()
+        };
+        let source = "user_input = request.json['query']\nresults = vector_store.similarity_search(user_input)\ncontext = '\\n'.join([r.page_content for r in results])\nresponse = llm.invoke(context)";
+        assert_eq!(
+            super::classify_embedding_trust_transposition_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }
