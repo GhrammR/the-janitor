@@ -9,7 +9,7 @@
 //! 2. **Base detection**: resolve `refs/remotes/origin/master` or `.../main`.
 //! 3. **Rayon matrix**: `.par_iter()` over collected PR refs.  Each rayon
 //!    task opens its own `git2::Repository` (not `Send`) and calls the
-//!    existing [`bounce_git`][forge::slop_filter::bounce_git] engine.
+//!    existing [`forge::slop_filter::bounce_git`] engine.
 //! 4. **Log flush**: collect results in memory, write sequentially to
 //!    `.janitor/bounce_log.ndjson`.
 //!

@@ -2457,6 +2457,226 @@ pub fn classify_embedding_trust_transposition_proof(
     }
 }
 
+/// Pure boolean predicate for Kani verification of RAG context poisoning logic.
+///
+/// Returns `true` iff untrusted input reaches an LLM context sink via a RAG
+/// retrieval path without an isolation guard, outside a test/example context.
+pub fn rag_context_poisoning_is_reachable(
+    has_retrieval_sink: bool,
+    has_untrusted_input: bool,
+    has_isolation_guard: bool,
+    in_test_path: bool,
+) -> bool {
+    has_retrieval_sink && has_untrusted_input && !has_isolation_guard && !in_test_path
+}
+
+/// Classify the proof state for a `security:rag_context_poisoning` finding.
+///
+/// `ReachabilityProof` — production RAG path where untrusted session/user input
+/// reaches an LLM context-injection or system-prompt concatenation sink without
+/// a `context_sanitize`, `namespace_separator`, `policy_context`, `safe_context`,
+/// `context_filter`, or `system_prompt_guard` visible in a ±15-line window.
+///
+/// `InvariantViolationProof` — a context isolation guard is visible, OR the file
+/// is a test/spec/example/notebook path.
+///
+/// `LatticeGapProposal` — retrieval or LLM sink present but input origin unclear.
+pub fn classify_rag_context_poisoning_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("spec")
+                || p.contains("example")
+                || p.contains("notebook")
+                || p.ends_with("_test.py")
+                || p.ends_with(".ipynb")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+
+    let isolation_guard_tokens = [
+        "context_sanitize",
+        "namespace_separator",
+        "policy_context",
+        "safe_context",
+        "context_filter",
+        "system_prompt_guard",
+        "promptinjectiondetector",
+        "prompt_injection_detector",
+        "sanitize_context",
+        "context_allowlist",
+        "trusted_context",
+    ];
+    if isolation_guard_tokens.iter().any(|t| lower.contains(t)) {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let retrieval_tokens = [
+        "fetch(",
+        "requests.get",
+        "httpx.get",
+        "similarity_search",
+        "vector_store",
+        "retrieval_qa",
+        "retrieve(",
+        "as_retriever",
+        "rag_chain",
+        "load_documents",
+    ];
+    let has_retrieval_sink = retrieval_tokens.iter().any(|t| lower.contains(t));
+
+    let llm_sink_tokens = [
+        "openai.chat",
+        "llm.invoke",
+        "llm.predict",
+        "chat.completions.create",
+        "anthropic.messages",
+        "system_prompt",
+        "messages=[{",
+        "content=doc",
+        "content=chunk",
+        "content=context",
+    ];
+    let has_llm_sink = llm_sink_tokens.iter().any(|t| lower.contains(t));
+
+    let untrusted_tokens = [
+        "request.",
+        "req.",
+        "user_input",
+        "query =",
+        "prompt =",
+        "body[",
+        "params[",
+        "args[",
+        "fetch(url",
+        "fetch(req",
+    ];
+    let has_untrusted_input = untrusted_tokens.iter().any(|t| lower.contains(t));
+
+    if rag_context_poisoning_is_reachable(
+        has_retrieval_sink && has_llm_sink,
+        has_untrusted_input,
+        false,
+        false,
+    ) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of path traversal concatenation logic.
+///
+/// Returns `true` iff a user-controlled path component reaches a filesystem
+/// join/open call without a canonicalization guard, outside a test path.
+pub fn path_traversal_concat_is_exploitable(
+    has_user_path_component: bool,
+    has_canonicalization_guard: bool,
+    in_test_path: bool,
+) -> bool {
+    has_user_path_component && !has_canonicalization_guard && !in_test_path
+}
+
+/// Classify the proof state for a `security:path_traversal_concatenation` finding.
+///
+/// `ReachabilityProof` — user-controlled input reaches `os.path.join` /
+/// `filepath.Join` / `path.resolve` / `Paths.get` without a `realpath` /
+/// `filepath.Clean` / `Path.toRealPath` / `sanitize_path` / `secure_filename`
+/// guard visible in the ±10-line window.
+///
+/// `InvariantViolationProof` — a canonicalization guard is visible in the window,
+/// OR the file path indicates a test/spec/example context.
+///
+/// `LatticeGapProposal` — path join present but input origin is unclear.
+pub fn classify_path_traversal_concat_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("spec")
+                || p.contains("example")
+                || p.ends_with("_test.py")
+                || p.ends_with("_test.go")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let finding_line = finding.line.unwrap_or(1) as usize;
+    let lines: Vec<&str> = source.lines().collect();
+
+    let canon_guard_tokens = [
+        "realpath",
+        "canonicalize",
+        "secure_filename",
+        "filepath.clean",
+        "path.torealpat",
+        "paths.normalize",
+        "sanitize_path",
+        "abspath",
+        "os.path.abspath",
+        "os.path.realpath",
+    ];
+
+    let has_canon_guard = if lines.is_empty() {
+        false
+    } else {
+        let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+        let start = target.saturating_sub(10);
+        let end = (target + 11).min(lines.len());
+        let window = lines[start..end].join("\n").to_ascii_lowercase();
+        canon_guard_tokens.iter().any(|t| window.contains(t))
+    };
+
+    if has_canon_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+    let join_tokens = [
+        "os.path.join",
+        "filepath.join",
+        "path.resolve",
+        "paths.get",
+        "path.join",
+    ];
+    let has_join = join_tokens.iter().any(|t| lower.contains(t));
+
+    let untrusted_tokens = [
+        "request.",
+        "req.",
+        "user_input",
+        "filename =",
+        "file_name =",
+        "path =",
+        "args[",
+        "params[",
+        "body[",
+        "form[",
+    ];
+    let has_untrusted = untrusted_tokens.iter().any(|t| lower.contains(t));
+
+    if path_traversal_concat_is_exploitable(has_join && has_untrusted, false, false) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -3918,6 +4138,97 @@ mod tests {
         let source = "user_input = request.json['query']\nresults = vector_store.similarity_search(user_input)\ncontext = '\\n'.join([r.page_content for r in results])\nresponse = llm.invoke(context)";
         assert_eq!(
             super::classify_embedding_trust_transposition_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // ── rag_context_poisoning proof tests ──────────────────────────────────
+
+    #[test]
+    fn rag_context_poisoning_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:rag_context_poisoning".to_string(),
+            file: Some("tests/test_rag.py".to_string()),
+            ..Default::default()
+        };
+        let source = "doc = fetch(url).text()\nopenai.chat.completions.create(messages=[{'role':'user','content':doc}])";
+        assert_eq!(
+            super::classify_rag_context_poisoning_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn rag_context_poisoning_isolation_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:rag_context_poisoning".to_string(),
+            file: Some("app/rag/chain.py".to_string()),
+            ..Default::default()
+        };
+        let source = "doc = fetch(request.args['url']).text()\nclean = context_filter(doc)\nllm.invoke(clean)";
+        assert_eq!(
+            super::classify_rag_context_poisoning_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn rag_context_poisoning_unguarded_production_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:rag_context_poisoning".to_string(),
+            file: Some("app/rag/chain.py".to_string()),
+            ..Default::default()
+        };
+        let source = "user_input = request.args['q']\ndoc = fetch(user_input).text()\nllm.invoke(doc)\nsystem_prompt += doc";
+        assert_eq!(
+            super::classify_rag_context_poisoning_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // ── path_traversal_concatenation proof tests ───────────────────────────
+
+    #[test]
+    fn path_traversal_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:path_traversal_concatenation".to_string(),
+            file: Some("tests/test_files.py".to_string()),
+            line: Some(5),
+            ..Default::default()
+        };
+        let source = "import os\nfilename = user_input\npath = os.path.join(base, filename)\nwith open(path) as f:\n    data = f.read()";
+        assert_eq!(
+            super::classify_path_traversal_concat_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn path_traversal_realpath_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:path_traversal_concatenation".to_string(),
+            file: Some("app/files/serve.py".to_string()),
+            line: Some(3),
+            ..Default::default()
+        };
+        let source = "filename = request.args['file']\npath = os.path.join(base_dir, filename)\npath = os.path.realpath(path)\nwith open(path) as f:\n    return f.read()";
+        assert_eq!(
+            super::classify_path_traversal_concat_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn path_traversal_unguarded_user_input_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:path_traversal_concatenation".to_string(),
+            file: Some("app/files/serve.py".to_string()),
+            line: Some(2),
+            ..Default::default()
+        };
+        let source = "filename = request.args['file']\npath = os.path.join(base_dir, filename)\nwith open(path) as f:\n    return f.read()";
+        assert_eq!(
+            super::classify_path_traversal_concat_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

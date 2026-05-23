@@ -298,7 +298,7 @@ enum Commands {
         /// Patterns are matched against directory name components of each file path.
         #[arg(long, default_values = ["thirdparty/", "vendor/", "node_modules/", "target/"])]
         exclude: Vec<String>,
-        /// [DANGEROUS] Bypass the C++/C#/GLSL dedup safety hard-gate.
+        /// DANGEROUS: Bypass the C++/C#/GLSL dedup safety hard-gate.
         ///
         /// By default, dedup --apply refuses to rewrite C++, C, header, C#, and GLSL
         /// files to prevent SIMD/template corruption. This flag disables that gate.
@@ -540,7 +540,7 @@ enum Commands {
     Badge {
         /// Project root (reads .janitor/symbols.rkyv).
         path: PathBuf,
-        /// Output path for the SVG file. Default: <path>/.janitor/badge.svg.
+        /// Output path for the SVG file. Default: `<project-root>/.janitor/badge.svg`.
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -818,14 +818,14 @@ enum Commands {
         repo: PathBuf,
     },
 
-    /// [INTERNAL] Print a one-line clinical engine health summary.
+    /// INTERNAL: Print a one-line clinical engine health summary.
     ///
     /// Intended for operator use during incident triage or after environment
     /// disruptions.  Not listed in `--help` output.
     #[command(hide = true)]
     OperatorStatus,
 
-    /// [INTERNAL] Controlled Conflict Simulation — verify the lockfile silo detector fires correctly.
+    /// INTERNAL: Controlled Conflict Simulation — verify the lockfile silo detector fires correctly.
     ///
     /// Generates a synthetic `Cargo.lock` containing two versions of `serde`, runs
     /// [`anatomist::manifest::find_version_silos_from_lockfile`] against it, and
@@ -836,7 +836,7 @@ enum Commands {
     #[command(hide = true)]
     DebugSilo,
 
-    /// [INTERNAL] Sovereign Integrity Audit — verify the engine intercepts its own synthetic threats.
+    /// INTERNAL: Sovereign Integrity Audit — verify the engine intercepts its own synthetic threats.
     ///
     /// Executes a Ghost Attack: injects a cryptominer string and a version silo into
     /// synthetic diff/manifest fixtures and verifies the engine flags them with the
@@ -847,7 +847,7 @@ enum Commands {
     #[command(hide = true)]
     SelfTest,
 
-    /// [INTERNAL] Emit a GitHub Actions Step Summary dashboard for the last bounce result.
+    /// INTERNAL: Emit a GitHub Actions Step Summary dashboard for the last bounce result.
     ///
     /// Reads the most recent entry from `.janitor/bounce_log.ndjson` and prints a
     /// high-density Markdown dashboard to stdout.  Append the output to
