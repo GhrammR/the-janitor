@@ -30,7 +30,7 @@ pub fn diff_binaries(patched: &[u8], customer: &[u8]) -> BinaryDiffResult {
 
     let mut changed: Vec<String> = patched_hashes
         .iter()
-        .filter(|(name, hash)| customer_hashes.get(*name).map_or(true, |ch| ch != *hash))
+        .filter(|(name, hash)| customer_hashes.get(*name) != Some(*hash))
         .map(|(name, _)| name.clone())
         .collect();
     changed.sort_unstable();
@@ -93,14 +93,12 @@ fn extract_elf_hashes(
     }
 }
 
-fn extract_pe_hashes(
-    bytes: &[u8],
-    pe: &goblin::pe::PE<'_>,
-    out: &mut HashMap<String, [u8; 32]>,
-) {
+fn extract_pe_hashes(bytes: &[u8], pe: &goblin::pe::PE<'_>, out: &mut HashMap<String, [u8; 32]>) {
     for export in &pe.exports {
         let Some(name) = export.name else { continue };
-        let Some(offset) = export.offset else { continue };
+        let Some(offset) = export.offset else {
+            continue;
+        };
         // Conservative stub window: 64 bytes for export-table entries.
         let end = offset.saturating_add(64).min(bytes.len());
         if let Some(fb) = bytes.get(offset..end) {
@@ -155,7 +153,11 @@ pub(crate) fn compute_urgency_score(changed_count: usize, has_class: bool) -> u8
         5..=9 => 60,
         _ => 80,
     };
-    if has_class { base.saturating_add(20).min(100) } else { base }
+    if has_class {
+        base.saturating_add(20).min(100)
+    } else {
+        base
+    }
 }
 
 #[cfg(kani)]
@@ -193,11 +195,11 @@ mod tests {
 
     #[test]
     fn classify_auth_takes_priority_over_memory() {
-        let names = vec![
-            "validate_auth_token".to_string(),
-            "free_buffer".to_string(),
-        ];
-        assert_eq!(classify_changed_functions(&names).as_deref(), Some("auth_bypass"));
+        let names = vec!["validate_auth_token".to_string(), "free_buffer".to_string()];
+        assert_eq!(
+            classify_changed_functions(&names).as_deref(),
+            Some("auth_bypass")
+        );
     }
 
     #[test]

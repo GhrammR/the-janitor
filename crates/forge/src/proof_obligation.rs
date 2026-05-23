@@ -2365,15 +2365,16 @@ pub fn embedding_trust_transposition_is_reachable(
 /// Classify the proof state for a `security:embedding_trust_transposition` finding.
 ///
 /// `ReachabilityProof` — production RAG path where untrusted user/session input
-/// reaches a vector-similarity retrieval sink and no source-trust ranking,
-/// tenant/source allowlist, policy-context separation, or provenance filter is
-/// visible in the ±20-line window.
+/// reaches a vector-similarity retrieval sink AND an LLM API call is present in
+/// the same file, with no source-trust ranking, tenant/source allowlist,
+/// policy-context separation, or provenance filter visible in the ±20-line window.
 ///
 /// `InvariantViolationProof` — a trust-prioritization guard (`trusted_sources`,
 /// `rerank_trusted`, `source_allowlist`, `provenance_filter`, `trust_rank`) is
 /// visible, or the file is a test/example/notebook path.
 ///
-/// `LatticeGapProposal` — retrieval sink present but input origin unclear.
+/// `LatticeGapProposal` — retrieval sink present but no LLM sink found (e.g.,
+/// Go utility/auth code) or input origin unclear.
 pub fn classify_embedding_trust_transposition_proof(
     source: &str,
     finding: &StructuredFinding,
@@ -2410,9 +2411,7 @@ pub fn classify_embedding_trust_transposition_proof(
         "metadata[\"source\"]",
         "filter_by_source",
     ];
-    let has_trust_guard = trust_guard_tokens
-        .iter()
-        .any(|t| lower.contains(t));
+    let has_trust_guard = trust_guard_tokens.iter().any(|t| lower.contains(t));
 
     if has_trust_guard {
         return ProofClass::InvariantViolationProof;
@@ -2445,8 +2444,25 @@ pub fn classify_embedding_trust_transposition_proof(
     ];
     let has_untrusted_input = untrusted_tokens.iter().any(|t| lower.contains(t));
 
+    // Require an LLM API call token to be present in the same file.
+    // Without this gate, Go utility code (DB auth, AWS signing) with
+    // vector-like patterns produces false-positive reachability proofs.
+    let llm_sink_tokens = [
+        "openai",
+        "anthropic",
+        "llm.invoke",
+        "llm.predict",
+        "chat.completions",
+        "claude.",
+        "gemini.",
+        "vertex_ai",
+        "bedrock",
+        "langchain",
+    ];
+    let has_llm_sink = llm_sink_tokens.iter().any(|t| lower.contains(t));
+
     if embedding_trust_transposition_is_reachable(
-        has_retrieval_sink,
+        has_retrieval_sink && has_llm_sink,
         has_untrusted_input,
         false,
         false,
@@ -2635,7 +2651,9 @@ pub fn classify_path_traversal_concat_proof(
     let has_canon_guard = if lines.is_empty() {
         false
     } else {
-        let target = finding_line.saturating_sub(1).min(lines.len().saturating_sub(1));
+        let target = finding_line
+            .saturating_sub(1)
+            .min(lines.len().saturating_sub(1));
         let start = target.saturating_sub(10);
         let end = (target + 11).min(lines.len());
         let window = lines[start..end].join("\n").to_ascii_lowercase();
@@ -2671,6 +2689,193 @@ pub fn classify_path_traversal_concat_proof(
     let has_untrusted = untrusted_tokens.iter().any(|t| lower.contains(t));
 
     if path_traversal_concat_is_exploitable(has_join && has_untrusted, false, false) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of dynamic import exploitability.
+///
+/// Returns `true` iff a user-controlled module string reaches a dynamic import
+/// function without an allowlist gate, outside a test context.
+pub fn dynamic_import_is_exploitable(
+    has_user_controlled_module: bool,
+    has_import_allowlist: bool,
+    in_test_path: bool,
+) -> bool {
+    has_user_controlled_module && !has_import_allowlist && !in_test_path
+}
+
+/// Classify the proof state for a `security:dynamic_import` finding.
+///
+/// `ReachabilityProof` — user/session-controlled string reaches `importlib.import_module`,
+/// `__import__`, `require(variable)`, or `import()` without an allowlist check in ±10 lines.
+///
+/// `InvariantViolationProof` — `ALLOWED_MODULES`, `module_allowlist`,
+/// `importlib.util.find_spec` with comparison, or `PERMITTED_PLUGINS` visible, or test/spec path.
+///
+/// `LatticeGapProposal` — dynamic import present but input origin unclear.
+pub fn classify_dynamic_import_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("spec")
+                || p.contains("example")
+                || p.ends_with("_test.py")
+                || p.ends_with("_test.js")
+                || p.ends_with(".spec.ts")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+
+    let allowlist_tokens = [
+        "allowed_modules",
+        "module_allowlist",
+        "permitted_plugins",
+        "find_spec",
+        "allowedplugins",
+        "allowed_plugins",
+    ];
+    let has_import_allowlist = allowlist_tokens.iter().any(|t| lower.contains(t));
+    if has_import_allowlist {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let import_sink_tokens = [
+        "importlib.import_module",
+        "__import__(",
+        "require(variable",
+        "require(module",
+        "require(plugin",
+        "import(",
+        "dynamicimport",
+    ];
+    let has_import_sink = import_sink_tokens.iter().any(|t| lower.contains(t));
+
+    let user_input_tokens = [
+        "request.",
+        "req.",
+        "user_input",
+        "params[",
+        "args[",
+        "query[",
+        "body[",
+        "getparam",
+        "getattribute",
+    ];
+    let has_user_controlled_module = user_input_tokens.iter().any(|t| lower.contains(t));
+
+    if dynamic_import_is_exploitable(has_import_sink && has_user_controlled_module, false, false) {
+        ProofClass::ReachabilityProof
+    } else {
+        ProofClass::LatticeGapProposal
+    }
+}
+
+/// Pure boolean predicate for Kani verification of dangerous execution exploitability.
+///
+/// Returns `true` iff user-controlled input reaches an exec/eval/shell sink
+/// without a sanitizer guard, outside a test context.
+pub fn dangerous_execution_is_reachable(
+    has_user_input: bool,
+    has_exec_sink: bool,
+    has_sanitizer: bool,
+    in_test_path: bool,
+) -> bool {
+    has_user_input && has_exec_sink && !has_sanitizer && !in_test_path
+}
+
+/// Classify the proof state for a `security:dangerous_execution` finding.
+///
+/// `ReachabilityProof` — user/external input reaches `exec()`, `eval()`, `system()`,
+/// `popen()`, or `subprocess.run(shell=True)` without a `shlex.quote`, `shellescape`,
+/// or `validate_command` guard in ±10 lines.
+///
+/// `InvariantViolationProof` — a sanitizer guard is visible, or file is in
+/// `script/`/`bin/`/`tools/` with only hardcoded args, or test path.
+///
+/// `LatticeGapProposal` — exec sink found but input origin unclear.
+pub fn classify_dangerous_execution_proof(source: &str, finding: &StructuredFinding) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.contains("spec")
+                || p.contains("example")
+                || p.ends_with("_test.py")
+                || p.ends_with("_test.sh")
+        })
+        .unwrap_or(false);
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let lower = source.to_ascii_lowercase();
+
+    let sanitizer_tokens = [
+        "shlex.quote",
+        "pipes.quote",
+        "shellescape",
+        "validate_command",
+        "escape_shell",
+        "sanitize_input",
+        "shlex.split",
+    ];
+    let has_sanitizer = sanitizer_tokens.iter().any(|t| lower.contains(t));
+    if has_sanitizer {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    // Script directories with hardcoded-only patterns are low risk
+    let is_hardcoded_script = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            (p.contains("/script/") || p.contains("/bin/") || p.contains("/tools/"))
+                && !lower.contains("request.")
+                && !lower.contains("user_input")
+                && !lower.contains("args[")
+        })
+        .unwrap_or(false);
+    if is_hardcoded_script {
+        return ProofClass::InvariantViolationProof;
+    }
+
+    let exec_sink_tokens = [
+        "exec(",
+        "eval(",
+        "system(",
+        "popen(",
+        "shell=true",
+        "subprocess.run",
+        "subprocess.call",
+        "os.system(",
+        "child_process.exec",
+    ];
+    let has_exec_sink = exec_sink_tokens.iter().any(|t| lower.contains(t));
+
+    let user_input_tokens = [
+        "request.",
+        "req.",
+        "user_input",
+        "params[",
+        "args[",
+        "query[",
+        "body[",
+        "stdin",
+        "sys.argv",
+    ];
+    let has_user_input = user_input_tokens.iter().any(|t| lower.contains(t));
+
+    if dangerous_execution_is_reachable(has_user_input, has_exec_sink, false, false) {
         ProofClass::ReachabilityProof
     } else {
         ProofClass::LatticeGapProposal
@@ -4142,6 +4347,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn embedding_trust_go_utility_no_llm_sink_yields_lattice_gap() {
+        // Regression: teleport lib/srv/db/common/auth.go and lib/utils/aws/signing.go
+        // have no LLM API call — must NOT yield ReachabilityProof.
+        let finding = StructuredFinding {
+            id: "security:embedding_trust_transposition".to_string(),
+            file: Some("lib/srv/db/common/auth.go".to_string()),
+            ..Default::default()
+        };
+        let source = "results := db.similarity_search(query)\nreq.Header.Set(\"Authorization\", token)\nuser_input := r.URL.Query().Get(\"q\")";
+        assert_eq!(
+            super::classify_embedding_trust_transposition_proof(source, &finding),
+            ProofClass::LatticeGapProposal
+        );
+    }
+
     // ── rag_context_poisoning proof tests ──────────────────────────────────
 
     #[test]
@@ -4229,6 +4450,94 @@ mod tests {
         let source = "filename = request.args['file']\npath = os.path.join(base_dir, filename)\nwith open(path) as f:\n    return f.read()";
         assert_eq!(
             super::classify_path_traversal_concat_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // ── dynamic_import proof tests ─────────────────────────────────────────
+
+    #[test]
+    fn dynamic_import_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:dynamic_import".to_string(),
+            file: Some("tests/test_plugins.py".to_string()),
+            ..Default::default()
+        };
+        let source = "module = request.args['module']\nplugin = importlib.import_module(module)";
+        assert_eq!(
+            super::classify_dynamic_import_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn dynamic_import_allowlist_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:dynamic_import".to_string(),
+            file: Some("app/plugins/loader.py".to_string()),
+            ..Default::default()
+        };
+        let source = "module_name = request.args['plugin']\nif module_name not in ALLOWED_MODULES:\n    raise ValueError\nplugin = importlib.import_module(module_name)";
+        assert_eq!(
+            super::classify_dynamic_import_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn dynamic_import_unguarded_user_input_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:dynamic_import".to_string(),
+            file: Some("app/plugins/loader.py".to_string()),
+            ..Default::default()
+        };
+        let source = "module_name = request.args['plugin']\nplugin = importlib.import_module(module_name)\nresult = plugin.run()";
+        assert_eq!(
+            super::classify_dynamic_import_proof(source, &finding),
+            ProofClass::ReachabilityProof
+        );
+    }
+
+    // ── dangerous_execution proof tests ────────────────────────────────────
+
+    #[test]
+    fn dangerous_execution_test_path_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:dangerous_execution".to_string(),
+            file: Some("tests/test_shell.py".to_string()),
+            ..Default::default()
+        };
+        let source = "cmd = request.args['command']\nos.system(cmd)";
+        assert_eq!(
+            super::classify_dangerous_execution_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn dangerous_execution_shlex_quote_guard_yields_invariant_violation() {
+        let finding = StructuredFinding {
+            id: "security:dangerous_execution".to_string(),
+            file: Some("app/utils/runner.py".to_string()),
+            ..Default::default()
+        };
+        let source = "cmd_arg = request.args['input']\nsafe_arg = shlex.quote(cmd_arg)\nsubprocess.run(['ls', safe_arg], shell=True)";
+        assert_eq!(
+            super::classify_dangerous_execution_proof(source, &finding),
+            ProofClass::InvariantViolationProof
+        );
+    }
+
+    #[test]
+    fn dangerous_execution_unguarded_user_input_yields_reachability() {
+        let finding = StructuredFinding {
+            id: "security:dangerous_execution".to_string(),
+            file: Some("app/api/execute.py".to_string()),
+            ..Default::default()
+        };
+        let source = "command = request.args['cmd']\nresult = subprocess.run(command, shell=True, capture_output=True)";
+        assert_eq!(
+            super::classify_dangerous_execution_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
     }

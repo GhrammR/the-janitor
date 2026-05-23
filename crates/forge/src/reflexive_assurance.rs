@@ -1110,12 +1110,13 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
+        dangerous_execution_is_reachable, dynamic_import_is_exploitable,
         embedding_trust_transposition_is_reachable, financial_pii_is_unguarded,
-        path_traversal_concat_is_exploitable, rag_context_poisoning_is_reachable,
         jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, oauth_account_fusion_is_missing_email_guard,
-        oauth_state_validation_is_missing, protobuf_any_is_unguarded, react_xss_is_unguarded,
+        oauth_state_validation_is_missing, path_traversal_concat_is_exploitable,
+        protobuf_any_is_unguarded, rag_context_poisoning_is_reachable, react_xss_is_unguarded,
         saml_xsw_validation_order_is_reachable, sqli_concat_is_injectable,
         timing_comparison_is_sensitive, xxe_saml_parser_is_unguarded,
     };
@@ -1398,8 +1399,47 @@ mod compliance_oracle_kani {
         );
     }
 
+    /// Prove `dynamic_import_is_exploitable` is the exact conjunction:
+    /// user_controlled_module ∧ ¬import_allowlist ∧ ¬in_test_path.
+    #[kani::proof]
+    fn dynamic_import_is_exact_conjunction() {
+        let has_user_controlled_module: bool = kani::any();
+        let has_import_allowlist: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result = dynamic_import_is_exploitable(
+            has_user_controlled_module,
+            has_import_allowlist,
+            in_test_path,
+        );
+        kani::assert(
+            result == (has_user_controlled_module && !has_import_allowlist && !in_test_path),
+            "dynamic_import gate must be exact conjunction of three guards",
+        );
+    }
+
+    /// Prove `dangerous_execution_is_reachable` is the exact conjunction:
+    /// user_input ∧ exec_sink ∧ ¬sanitizer ∧ ¬in_test_path.
+    #[kani::proof]
+    fn dangerous_execution_is_exact_conjunction() {
+        let has_user_input: bool = kani::any();
+        let has_exec_sink: bool = kani::any();
+        let has_sanitizer: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result = dangerous_execution_is_reachable(
+            has_user_input,
+            has_exec_sink,
+            has_sanitizer,
+            in_test_path,
+        );
+        kani::assert(
+            result == (has_user_input && has_exec_sink && !has_sanitizer && !in_test_path),
+            "dangerous_execution gate must be exact conjunction of four guards",
+        );
+    }
+
     /// Prove `embedding_trust_transposition_is_reachable` is the exact conjunction:
-    /// retrieval_sink ∧ untrusted_input ∧ ¬trust_guard ∧ ¬in_test_path.
+    /// (retrieval_sink ∧ llm_sink) ∧ untrusted_input ∧ ¬trust_guard ∧ ¬in_test_path.
+    /// At the call site, the first arg is `has_retrieval_sink && has_llm_sink`.
     #[kani::proof]
     fn embedding_trust_transposition_is_exact_conjunction() {
         let has_retrieval_sink: bool = kani::any();
@@ -1414,10 +1454,7 @@ mod compliance_oracle_kani {
         );
         kani::assert(
             result
-                == (has_retrieval_sink
-                    && has_untrusted_input
-                    && !has_trust_guard
-                    && !in_test_path),
+                == (has_retrieval_sink && has_untrusted_input && !has_trust_guard && !in_test_path),
             "embedding_trust_transposition gate must be exact conjunction of four guards",
         );
     }

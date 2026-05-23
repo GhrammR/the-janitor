@@ -3330,6 +3330,29 @@ fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>)
                 return false;
             }
             finding.proof_class = Some(proof);
+        } else if finding.id.contains("dynamic_import") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof = forge::proof_obligation::classify_dynamic_import_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
+        } else if finding.id.contains("dangerous_execution") {
+            let source = finding
+                .file
+                .as_deref()
+                .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+                .unwrap_or_default();
+            let proof =
+                forge::proof_obligation::classify_dangerous_execution_proof(&source, finding);
+            if proof == ProofClass::InvariantViolationProof {
+                return false;
+            }
+            finding.proof_class = Some(proof);
         } else if finding.id.contains("ffi_memory_corruption") {
             let source = finding
                 .file
@@ -3497,12 +3520,11 @@ fn apply_phase2b_suppression(dir: &Path, findings: &mut Vec<StructuredFinding>) 
                 return false;
             }
         }
-        if finding.id.contains("tls_verification_bypass")
-            || finding.id.contains("InsecureSkipVerify")
+        if (finding.id.contains("tls_verification_bypass")
+            || finding.id.contains("InsecureSkipVerify"))
+            && forge::threat_model_oracle::is_config_gated_tls_bypass(&source, line)
         {
-            if forge::threat_model_oracle::is_config_gated_tls_bypass(&source, line) {
-                return false;
-            }
+            return false;
         }
         if finding.id.contains("dom_xss_innerHTML") {
             let fn_name = extract_enclosing_fn_name(&source, line);
