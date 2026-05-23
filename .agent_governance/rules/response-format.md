@@ -112,6 +112,26 @@ Direct-triage backlog changes logged this session. Format:
 If none: <!-- no triage changes this session -->
 
 [NEXT RECOMMENDED ACTION]
+**MANDATORY PRE-DRAFT ORDER — violating this is a governance error**:
+
+Before writing a single word of this section, you MUST complete the following
+three steps in order. The NRA section appears before [OPERATOR INTELLIGENCE]
+in the output, but the mirroring contract requires OI tips to be reflected
+here. The only way to satisfy both constraints simultaneously is to draft OI
+content first, internally, before sealing the NRA.
+
+1. **Draft [OPERATOR INTELLIGENCE] content in full** — compose the Entropy
+   Modulator Tip, Systems Health Signal, ARTICLE_REVIEW Summary, and Platform
+   Expansion Tip completely, internally. Do NOT write them to output yet.
+2. **Identify all mirrorable tips** — apply the Mirroring Pre-Emission
+   Checklist (below) to the fully drafted OI content. For each tip that names
+   a concrete file, function, or command, note the required Phase block.
+3. **Write the NRA prompt WITH all mirrors already included** — seal the
+   quadruple-backtick fence only after verifying all required Phase blocks
+   are present. Then output the NRA section, followed by [SOVEREIGN
+   TRANSLATION], followed by [OPERATOR INTELLIGENCE] (using the already-drafted
+   content), followed by [SHOWCASE ATTESTATION].
+
 Emit exactly ONE fully formatted, copy-pasteable `Sovereign Directive` prompt
 for the operator to feed back into the agent for the next sprint.
 
@@ -218,11 +238,16 @@ sprint. Trivial optimizations (e.g., eliminating a `String::clone()`, pinning a
 deprecated action version, collapsing a redundant loop) MUST NOT be deferred to
 a future sprint.
 
-**Mirroring Pre-Emission Checklist** (run BEFORE sealing the NRA prompt):
+**Mirroring Pre-Emission Checklist** (run on the ALREADY-DRAFTED OI content,
+BEFORE writing a single word of the NRA prompt):
 
-Before writing the closing `"` of the sovereign directive, explicitly verify
-each of the following. A missing mirror is a governance violation — add the
-phase rather than emit and rationalize the omission.
+The most common governance failure is writing the NRA, then drafting OI, then
+discovering the mirrors are absent. The MANDATORY PRE-DRAFT ORDER above exists
+precisely to prevent this. By the time you reach this checklist, [OPERATOR
+INTELLIGENCE] must already be fully composed internally. Verify each item
+against that drafted content before writing the NRA. A missing mirror is a
+governance violation — add the phase rather than emit and rationalize the
+omission.
 
 1. **Systems Health Signal mirror**: Did the `[OPERATOR INTELLIGENCE]` Systems
    Health Signal name a remediation step (not a pure observation)? If yes, is
