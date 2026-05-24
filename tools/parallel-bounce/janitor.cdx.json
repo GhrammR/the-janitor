@@ -2,9 +2,8 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:6ba265ba-fa33-4b05-bb15-1954af8b103f",
   "metadata": {
-    "timestamp": "2026-05-15T19:17:49.359004344Z",
+    "timestamp": "1980-01-01T00:00:00.000000000Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +13,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.2",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.6",
       "name": "parallel-bounce",
-      "version": "10.2.2",
+      "version": "10.2.6",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/parallel-bounce@10.2.2?download_url=file://.",
+      "purl": "pkg:cargo/parallel-bounce@10.2.6?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +32,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.2 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.6 bin-target-0",
           "name": "parallel-bounce",
-          "version": "10.2.2",
-          "purl": "pkg:cargo/parallel-bounce@10.2.2?download_url=file://.#src/main.rs"
+          "version": "10.2.6",
+          "purl": "pkg:cargo/parallel-bounce@10.2.6?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -734,7 +733,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.2",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.6",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#rayon@1.12.0",

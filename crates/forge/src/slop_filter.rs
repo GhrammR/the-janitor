@@ -2282,6 +2282,7 @@ pub fn semantic_null_pr_check(repo_path: &Path, merge_base_sha: &str, pr_sha: &s
 /// # Errors
 /// Returns `Err` if the repository cannot be opened, the OIDs are invalid, or
 /// libgit2 cannot read a blob from the pack.
+#[allow(clippy::too_many_arguments)]
 pub fn bounce_git(
     repo_path: &Path,
     base_sha: &str,
