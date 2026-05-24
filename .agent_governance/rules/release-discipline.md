@@ -19,6 +19,29 @@ grep '^version' Cargo.toml | head -1
 # Must match: version = "X.Y.Z"  (no leading v)
 ```
 
+## Law I-B — Release on the Correct Branch
+
+`just release` commits and pushes from whichever branch is CURRENTLY CHECKED OUT.
+Always ensure `main` is the active branch before running a release.
+**Never run `just release` as a background task** — branch switches during the run
+corrupt the release commit (it lands on the wrong branch, Cargo.toml reverts, etc.).
+
+```bash
+# Pre-release check — MUST be on main, no background jobs modifying working tree
+git branch --show-current   # Must print: main
+git status --short           # Must be clean
+```
+
+## Law I-C — No Concurrent Working-Tree Mutations
+
+`just release` modifies Cargo.toml, README.md, docs/index.md, and Cargo.lock in
+the working tree. Running it in the background while doing `git checkout`, `git stash`,
+or `git commit` in the foreground corrupts the release commit (race condition on the
+working tree files).
+
+**Required**: run `just release` in the FOREGROUND, on `main`, with no other git
+operations in progress.
+
 ## Law II — Bootstrap Dependency
 
 The Structural Firewall bootstraps from the **latest published GH Release binary**.
@@ -35,6 +58,24 @@ cannot be validated by the gate itself until a new release is cut.
 ```bash
 git diff --name-only origin/main...HEAD | grep -E "slop_filter|policy\.rs"
 # If non-empty: plan a hotfix release before the main feature PR.
+```
+
+## Law II-B — CDN Propagation Window
+
+After `just release` completes, GitHub's release asset CDN takes **2–5 minutes** to
+propagate the new binary to all edge nodes. The Structural Firewall downloads the
+binary from CDN on cache miss. If CI starts within this window, the download returns
+404 and the run fails.
+
+**Required after any release**: wait ≥5 minutes before pushing any PR that will
+trigger a cache-miss Structural Firewall run (i.e., the first CI run with the new
+release version).
+
+**Verification**:
+```bash
+curl --fail --silent --location \
+  "https://github.com/janitor-security/the-janitor/releases/download/v<VER>/janitor.sha384"
+# Must return the SHA-384 hex string (not empty / not error) before pushing.
 ```
 
 ## Law III — PR Rebase After Hotfix
