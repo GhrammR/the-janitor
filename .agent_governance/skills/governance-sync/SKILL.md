@@ -63,8 +63,9 @@ git diff --name-only origin/main...HEAD | sed 's|/.*||' | sort -u
 grep -c 'else if finding\.id\.contains' crates/cli/src/hunt.rs
 # Must be 0 — all dispatch goes through classify_one_proof
 ```
-**Policy**: `.janitor/policy.toml` must list `clone_exempt_paths` for
-classifier-registry files with intentional predicate repetition.
+**Policy**: `janitor.toml` at repo root must list `clone_exempt_paths` under
+`[forge]` for classifier-registry files with intentional predicate repetition.
+`JanitorPolicy::load` reads `janitor.toml` — **not** `.janitor/policy.toml`.
 
 ### CI Failure Not Caught Locally
 
@@ -123,5 +124,5 @@ After every sprint directive, before marking complete:
 |---|---|---|
 | `.agent_governance/rules/*.md` | Durable rules | `sprint*/infra` |
 | `.agent_governance/skills/*/SKILL.md` | Auto-enforcement | `sprint*/infra` |
-| `.janitor/policy.toml` | Gate configuration | `sprint*/code` |
+| `janitor.toml` | Gate configuration (`[forge]`, `[billing]`, etc.) | `sprint*/code` |
 | `CLAUDE.md` index | Navigation | `sprint*/infra` |
