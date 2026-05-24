@@ -3909,6 +3909,7 @@ fn cmd_bounce(
                 policy.suppressions.clone().unwrap_or_default(),
                 deep_scan,
                 &mut scan_state,
+                policy.forge.clone_exempt_paths.clone(),
             )?;
             // Fetch base Cargo.lock for silo delta (subtract pre-existing splits).
             let base_lock = fetch_base_lockfile_from_odb(repo_path, base_sha);
