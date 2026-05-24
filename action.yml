@@ -101,17 +101,25 @@ runs:
         # Normalize: ensure the tag starts with 'v' for the GitHub Release URL.
         [[ "${ACTION_TAG}" == v* ]] || ACTION_TAG="v${ACTION_TAG}"
         mkdir -p "${CURRENT_DIR}" "${BOOTSTRAP_DIR}"
-        BASE_URL="https://github.com/janitor-security/the-janitor/releases/download/${ACTION_TAG}"
-        BOOTSTRAP_URL="https://github.com/janitor-security/the-janitor/releases/download/${BOOTSTRAP_TAG}"
-        CURL_OPTS=(--fail --show-error --silent --location --connect-timeout 10 --max-time 120 --retry 2 --retry-delay 1 --header "Authorization: token ${GH_TOKEN}")
+        # Use `gh release download` (authenticated GitHub API) rather than raw curl.
+        # Direct curl follows a 302 redirect to S3 with a URL-signed token
+        # (X-Amz-SignedHeaders=host).  Forwarding an Authorization header to S3
+        # causes 401 because X-Amz-SignedHeaders=host means only `host` is signed —
+        # any additional header breaks the S3 signature check.  `gh` uses the API
+        # endpoint and handles auth+redirect correctly without forwarding the token.
 
         # ── Download current release artifacts.
-        curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor" -o "${CURRENT_DIR}/janitor" &
-        curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor.sha384" -o "${CURRENT_DIR}/janitor.sha384" &
-        (
-          curl "${CURL_OPTS[@]}" "${BASE_URL}/janitor.sig" -o "${CURRENT_DIR}/janitor.sig" || true
-        ) &
-        wait
+        gh release download "${ACTION_TAG}" \
+          --repo janitor-security/the-janitor \
+          --pattern "janitor" \
+          --pattern "janitor.sha384" \
+          --dir "${CURRENT_DIR}" \
+          --clobber
+        gh release download "${ACTION_TAG}" \
+          --repo janitor-security/the-janitor \
+          --pattern "janitor.sig" \
+          --dir "${CURRENT_DIR}" \
+          --clobber 2>/dev/null || true
 
         # ── Bootstrap: fetch the previous known-good Janitor binary as the verifier.
         # This binary is from a prior release cycle whose integrity was already
@@ -119,12 +127,17 @@ runs:
         # authenticate the current release artifact without relying on any asset
         # co-hosted with the binary under verification (circular trust eliminated).
         if [ ! -x "${BOOTSTRAP_DIR}/janitor" ]; then
-          curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor" -o "${BOOTSTRAP_DIR}/janitor" &
-          curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor.sha384" -o "${BOOTSTRAP_DIR}/janitor.sha384" &
-          (
-            curl "${CURL_OPTS[@]}" "${BOOTSTRAP_URL}/janitor.sig" -o "${BOOTSTRAP_DIR}/janitor.sig" || true
-          ) &
-          wait
+          gh release download "${BOOTSTRAP_TAG}" \
+            --repo janitor-security/the-janitor \
+            --pattern "janitor" \
+            --pattern "janitor.sha384" \
+            --dir "${BOOTSTRAP_DIR}" \
+            --clobber
+          gh release download "${BOOTSTRAP_TAG}" \
+            --repo janitor-security/the-janitor \
+            --pattern "janitor.sig" \
+            --dir "${BOOTSTRAP_DIR}" \
+            --clobber 2>/dev/null || true
         fi
 
         BOOTSTRAP_BIN="${BOOTSTRAP_DIR}/janitor"
