@@ -84,6 +84,14 @@ jobs:
           compression-level: 0
           retention-days: 30
 
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4.35.4
+        with:
+          sarif_file: .janitor/janitor-results.sarif
+          category: janitor
+        continue-on-error: true
+
       - name: sccache stats
         if: always()
         shell: bash

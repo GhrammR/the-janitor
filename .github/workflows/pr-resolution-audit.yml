@@ -64,7 +64,8 @@ jobs:
             | wc -l \
             | tr -d ' ')"
           has_janitor_artifact="false"
-          if printf '%s\n' "${FILES}" | grep -q '^\.janitor/'; then
+          if printf '%s\n' "${FILES}" | grep -q '^\.janitor/' \
+            && printf '%s\n' "${FILES}" | grep '^\.janitor/' | grep -qv '^\.janitor/policy\.toml$'; then
             has_janitor_artifact="true"
           fi
 
