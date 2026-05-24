@@ -98,6 +98,35 @@ grep 'curl.*releases/download' action.yml
 
 If `action.yml` is ever modified, verify both invariants before merging.
 
+## Law II-D — Release Binary Must Use Standard glibc Interpreter
+
+The release binary **must** link against standard glibc (`/lib64/ld-linux-x86-64.so.2`),
+not a Nix store glibc (`/nix/store/.../ld-linux-x86-64.so.2`).  A Nix-linked binary
+cannot execute on GitHub Actions Ubuntu runners and causes "cannot execute: required
+file not found" exit code 127 in the Structural Firewall.
+
+**Root cause**: Nix-managed Rust toolchains (`/nix/store/.../cargo`) produce binaries
+that embed Nix store library paths.  The build MUST run in a Docker container with a
+standard glibc Rust image:
+
+```bash
+# Required build command for releases (run from workspace root):
+docker run --rm \
+  -v "$(pwd)":/workspace \
+  -v "$HOME/.cargo/registry":/usr/local/cargo/registry \
+  -w /workspace \
+  rust:1.92-slim-bookworm \
+  bash -c "apt-get update -q && apt-get install -y -q libgit2-dev libssl-dev pkg-config \
+    && cargo build -p cli --release"
+# Then copy the binary from target/release/janitor (inside Docker → /workspace/target/release/)
+```
+
+**Pre-release verification** (run after build, before uploading):
+```bash
+readelf -l target/release/janitor | grep "interpreter"
+# Must NOT contain /nix/store — must show /lib64/ld-linux-x86-64.so.2
+```
+
 ## Law III — PR Rebase After Hotfix
 
 After any hotfix merges to main, ALL open feature PRs are BEHIND.
