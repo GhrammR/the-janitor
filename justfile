@@ -210,6 +210,13 @@ fast-release version:
 	    just audit
 	fi
 	cargo build --release -p cli
+	# Law II-D guard: fail fast if the binary was linked against Nix glibc.
+	# Nix-linked binaries cannot execute on GitHub Actions Ubuntu runners.
+	# Build in Docker instead: docker run --rm -v $(pwd):/workspace -v $HOME/.cargo/registry:/usr/local/cargo/registry -w /workspace rust:1.92-slim-bookworm bash -c "apt-get update -q && apt-get install -y -q libgit2-dev libssl-dev pkg-config && cargo build -p cli --release"
+	if readelf -l target/release/janitor 2>/dev/null | grep -q 'nix/store'; then
+	    echo "FATAL: Release binary is linked against Nix glibc. Use Docker build as described in .agent_governance/rules/release-discipline.md Law II-D." >&2
+	    exit 1
+	fi
 	mkdir -p .janitor
 	CARGO_LOCK_HASH_PATH=".janitor/cargo_lock.hash"
 	CURRENT_CARGO_LOCK_HASH="$(sha256sum Cargo.lock | awk '{print $1}')"
