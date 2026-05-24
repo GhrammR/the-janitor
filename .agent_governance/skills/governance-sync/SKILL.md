@@ -21,6 +21,8 @@ the root cause.  If none exists, create one.
 - Bug from missing CI monitoring? → `rules/pr-topology.md` (CI Monitoring Cadence)
 - Bug from unsafe code pattern? → `rules/failure-modes.md`
 - Bug from missing proof gate? → `rules/evolution.md`
+- Bug from gate bootstrap dependency (new gate feature can't self-validate)? → `rules/release-discipline.md`
+- Bug from wrong `just release` invocation (version with `v` prefix)? → `rules/release-discipline.md`
 
 ### 2. Does a skill auto-enforce the rule?
 
@@ -72,6 +74,40 @@ classifier-registry files with intentional predicate repetition.
 just audit  # Must exit 0 before any git push
 ```
 **Post-push monitoring**: Check `gh pr checks <N>` at 1 min, 5 min, 9 min.
+
+### Gate Engine Bootstrap Dependency
+
+**Rule**: `rules/release-discipline.md` (Law II)
+**Pre-push verification** (when touching gate engine files):
+```bash
+git diff --name-only origin/main...HEAD | grep -E "slop_filter|policy\.rs"
+# If non-empty: create a minimal hotfix PR first, release it, then push the feature PR
+```
+**Sequence**: hotfix PR (no clone issues) → merge → release → feature PR CI uses new binary.
+
+### Release Version Format
+
+**Rule**: `rules/release-discipline.md` (Law I)
+**Verification**:
+```bash
+just release 10.2.3   # CORRECT — bare version
+just release v10.2.3  # WRONG — causes version = "v10.2.3" in Cargo.toml
+```
+**Post-release check**:
+```bash
+grep '^version' Cargo.toml | head -1
+# Must be: version = "X.Y.Z" (no v prefix)
+```
+
+### PR BEHIND After Hotfix Merge
+
+**Rule**: `rules/release-discipline.md` (Law III)
+**Verification**:
+```bash
+gh pr list --json headRefName,mergeStateStatus | jq '.[] | select(.mergeStateStatus == "BEHIND")'
+# Must be empty before closing any directive
+```
+**Fix**: `git rebase origin/main && git push --force-with-lease origin <branch>`
 
 ### Missing Governance Update (this skill's own trigger)
 
