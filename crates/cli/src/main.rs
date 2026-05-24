@@ -4010,6 +4010,7 @@ fn cmd_bounce(
                 policy.execution_tier.clone(),
             )
             .with_require_pinned_dependencies(policy.forge.require_pinned_dependencies)
+            .with_clone_exempt_paths(policy.forge.clone_exempt_paths.clone())
             .bounce(&patch, &registry)?;
             let merkle_root = blake3::hash(patch.as_bytes()).to_hex().to_string();
             let sig = forge::pr_collider::PrDeltaSignature::from_bytes(patch.as_bytes());
