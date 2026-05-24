@@ -2290,6 +2290,7 @@ pub fn bounce_git(
     suppressions: Vec<Suppression>,
     deep_scan: bool,
     scan_state: &mut common::scan_state::ScanState,
+    clone_exempt_paths: Vec<String>,
 ) -> Result<(SlopScore, HashMap<std::path::PathBuf, Vec<u8>>)> {
     let repo = git2::Repository::open(repo_path).map_err(|e| {
         anyhow::anyhow!("bounce_git: cannot open repo {}: {e}", repo_path.display())
@@ -2405,6 +2406,7 @@ pub fn bounce_git(
             deep_scan,
             "Community",
         )
+        .with_clone_exempt_paths(clone_exempt_paths.clone())
         .bounce(patch, registry)
         {
             total.dead_symbols_added += score.dead_symbols_added;

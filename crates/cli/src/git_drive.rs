@@ -755,6 +755,7 @@ fn bounce_one(
         policy.suppressions.unwrap_or_default(),
         false,
         &mut scan_state,
+        policy.forge.clone_exempt_paths,
     )
     .map_err(|e| {
         eprintln!("hyper-drive PR#{pr_num}: {e}");
