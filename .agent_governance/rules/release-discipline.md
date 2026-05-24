@@ -127,6 +127,24 @@ readelf -l target/release/janitor | grep "interpreter"
 # Must NOT contain /nix/store — must show /lib64/ld-linux-x86-64.so.2
 ```
 
+## Law II-E — Gate Configuration Surface is `janitor.toml`, NOT `.janitor/policy.toml`
+
+`JanitorPolicy::load(root)` reads `janitor.toml` at the repository root.
+The file `.janitor/policy.toml` does **not** exist as a config surface — writing
+gate configuration there silently has no effect.
+
+**Root cause of a real incident (Sprint 170):** `clone_exempt_paths` was written
+to `.janitor/policy.toml` instead of `janitor.toml [forge]`.  The gate read empty
+`ForgeConfig`, scored 34 structurally-identical Kani predicate functions as logic
+clones, and blocked PR #130 with slop_score 170 for multiple CI cycles.
+
+**Invariant** (check any `[forge]` config change):
+```bash
+grep 'clone_exempt_paths\|require_pinned_dependencies' janitor.toml
+# Must appear in janitor.toml — never in .janitor/policy.toml
+ls .janitor/policy.toml 2>/dev/null && echo "ERROR: wrong policy surface" || echo "ok"
+```
+
 ## Law III — PR Rebase After Hotfix
 
 After any hotfix merges to main, ALL open feature PRs are BEHIND.
