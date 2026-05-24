@@ -78,19 +78,25 @@ curl --fail --silent --location \
 # Must return the SHA-384 hex string (not empty / not error) before pushing.
 ```
 
-## Law II-C — Authenticated Release Asset Download
+## Law II-C — Use `gh release download` for Release Asset Fetches
 
-The Structural Firewall `action.yml` **must** pass an `Authorization: token` header
-when downloading release assets via curl.  Unauthenticated downloads hit the CDN and
-return 404 during the propagation window; authenticated API requests bypass the CDN.
+The Structural Firewall `action.yml` **must** use `gh release download` (not raw
+`curl`) to fetch release binaries.  Raw curl follows GitHub's 302 redirect to S3.
+S3's URL-signed token specifies `X-Amz-SignedHeaders=host` — any additional request
+header (e.g., `Authorization: token`) breaks the HMAC-SHA256 signature check and
+returns 401/403 (manifests as exit code 127 in Actions logs).  `gh release download`
+uses the GitHub API endpoint and handles the auth+redirect correctly without
+forwarding the token to S3.
 
 **Invariant** (check any action.yml modification):
 ```bash
-grep 'Authorization: token' action.yml
-# Must return a match inside the CURL_OPTS definition.
+grep 'gh release download' action.yml
+# Must return matches for both the current and bootstrap binary downloads.
+grep 'curl.*releases/download' action.yml
+# Must return NO matches — curl must not be used for release asset downloads.
 ```
 
-If `action.yml` is ever modified, verify this invariant is preserved before merging.
+If `action.yml` is ever modified, verify both invariants before merging.
 
 ## Law III — PR Rebase After Hotfix
 
