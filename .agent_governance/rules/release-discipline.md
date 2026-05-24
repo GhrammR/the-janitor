@@ -160,3 +160,23 @@ Auto-merge will not fire on a BEHIND PR.
 gh pr list --json headRefName,mergeStateStatus | jq '.[] | select(.mergeStateStatus == "BEHIND")'
 # Must be empty before marking any directive complete.
 ```
+
+## Law II-F — CLI Builder Must Chain All Policy Fields
+
+When `JanitorPolicy::load` is used to load policy in `cmd_bounce`, ALL
+`ForgeConfig` fields that are used by `PatchBouncer` must be explicitly
+wired via builder methods.  The raw constructor
+`for_workspace_with_deep_scan_and_suppressions` does NOT auto-load any
+fields; `for_workspace()` does.
+
+**Invariant** (check before adding any new `ForgeConfig` field that affects bounce):
+```bash
+grep 'with_clone_exempt_paths\|with_require_pinned_dependencies' crates/cli/src/main.rs
+# Both must be present — every ForgeConfig field used by PatchBouncer must be wired here
+```
+
+**Root cause of Sprint 170 incident**: `clone_exempt_paths` was added to
+`ForgeConfig` and `PatchBouncer` but the CLI's `cmd_bounce` was not updated
+to chain `.with_clone_exempt_paths(...)`.  Result: 34 Kani predicates in
+`proof_obligation.rs` scored as logic clones (slop_score 170, PR #130 blocked
+for multiple CI cycles).

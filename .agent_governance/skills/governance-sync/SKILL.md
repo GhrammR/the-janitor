@@ -67,6 +67,15 @@ grep -c 'else if finding\.id\.contains' crates/cli/src/hunt.rs
 `[forge]` for classifier-registry files with intentional predicate repetition.
 `JanitorPolicy::load` reads `janitor.toml` — **not** `.janitor/policy.toml`.
 
+**CLI wiring invariant**: `cmd_bounce` in `crates/cli/src/main.rs` must chain
+`.with_clone_exempt_paths(policy.forge.clone_exempt_paths.clone())` on the
+`PatchBouncer` builder — `for_workspace_with_deep_scan_and_suppressions` does
+NOT auto-load it.  The convenience function `for_workspace` does.
+```bash
+grep 'with_clone_exempt_paths' crates/cli/src/main.rs
+# Must return a match — verifies the wiring is present
+```
+
 ### CI Failure Not Caught Locally
 
 **Rule**: `rules/pr-topology.md` (CI Monitoring Cadence)
