@@ -2,9 +2,8 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:5b3cfb1c-3ed3-43a7-aa50-25a4def53e8f",
   "metadata": {
-    "timestamp": "2026-05-15T19:17:49.188450070Z",
+    "timestamp": "1980-01-01T00:00:00.000000000Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -15124,16 +15123,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.45",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.46",
       "author": "Alex Crichton <alex@alexcrichton.com>",
       "name": "tar",
-      "version": "0.4.45",
+      "version": "0.4.46",
       "description": "A Rust implementation of a TAR file reader and writer. This library does not currently handle compression, but it is abstract over all I/O readers and writers. Additionally, great lengths are taken to ensure that the entire contents are never required to be entirely resident in memory all at once. ",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+          "content": "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
         }
       ],
       "licenses": [
@@ -15141,7 +15140,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/tar@0.4.45",
+      "purl": "pkg:cargo/tar@0.4.46",
       "externalReferences": [
         {
           "type": "documentation",
@@ -15149,11 +15148,11 @@
         },
         {
           "type": "website",
-          "url": "https://github.com/alexcrichton/tar-rs"
+          "url": "https://github.com/composefs/tar-rs"
         },
         {
           "type": "vcs",
-          "url": "https://github.com/alexcrichton/tar-rs"
+          "url": "https://github.com/composefs/tar-rs"
         }
       ]
     },
@@ -19592,7 +19591,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#serde_yaml@0.9.34+deprecated",
         "registry+https://github.com/rust-lang/crates.io-index#sha2@0.11.0",
         "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.2",
-        "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.45",
+        "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.46",
         "registry+https://github.com/rust-lang/crates.io-index#tempfile@3.27.0",
         "registry+https://github.com/rust-lang/crates.io-index#tokio@1.52.2",
         "registry+https://github.com/rust-lang/crates.io-index#ureq@3.3.0",
@@ -23190,7 +23189,7 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#tap@1.0.1"
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.45",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#tar@0.4.46",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#filetime@0.2.27",
         "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.186",
