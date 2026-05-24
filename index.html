@@ -316,9 +316,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-enforcement-layer" class="md-nav__link">
+  <a href="#research-questions-and-safety-outcomes" class="md-nav__link">
     <span class="md-ellipsis">
-      THE ENFORCEMENT LAYER
+      Research Questions and Safety Outcomes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adversarial-robustness-and-tool-intent-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adversarial Robustness and Tool-Intent Safety
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cloud-reproducibility-track" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cloud Reproducibility Track
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-foundation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Research Foundation
     </span>
   </a>
   
@@ -927,9 +954,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-enforcement-layer" class="md-nav__link">
+  <a href="#research-questions-and-safety-outcomes" class="md-nav__link">
     <span class="md-ellipsis">
-      THE ENFORCEMENT LAYER
+      Research Questions and Safety Outcomes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adversarial-robustness-and-tool-intent-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adversarial Robustness and Tool-Intent Safety
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cloud-reproducibility-track" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cloud Reproducibility Track
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-foundation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Research Foundation
     </span>
   </a>
   
@@ -1278,16 +1332,29 @@
 <p><img alt="Janitor Terminal Demo" src="assets/janitor_demo.webp" /></p>
 <h1 id="the-janitor">The Janitor</h1>
 <p><strong>v10.2.2
- — The Mathematical Firewall Against Autonomous AI. 23 Grammars. IFDS + Z3 SMT + AEG. Dual-PQC Attestation. SLSA Level 4 Reproducible Builds. Zero-Upload. On-Device.</strong></p>
+ — Rust static-analysis security research platform. 23 grammars. IFDS + Z3 SMT. Kani proof obligations. Exploit-witness synthesis. Post-quantum provenance. Zero-upload local execution.</strong></p>
 <hr />
 <blockquote>
-<p><strong>Sonar finds style violations.</strong>
-<strong>The Janitor enforces structural integrity.</strong></p>
+<p><strong>Research question:</strong> can static analysis turn AI-assisted code review from prose trust into reproducible proof obligations?</p>
 <p><em>82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.</em></p>
 </blockquote>
 <hr />
-<h2 id="the-enforcement-layer">THE ENFORCEMENT LAYER</h2>
-<p>The Janitor is not a linter. It is not a SAST scanner. It is a <strong>structural enforcement layer</strong> that runs on your hardware, in your pipeline, on every pull request — before the merge button is available. The Janitor is a deterministic pre-merge defense for autonomous and AI-assisted pull requests, verifying structural policy before code enters the repository. Looking ahead, our decadal roadmap pioneers Zero-Knowledge AST proofs and Labyrinth Deception to neutralize adversarial agents at the structural level.</p>
+<h2 id="research-questions-and-safety-outcomes">Research Questions and Safety Outcomes</h2>
+<p>The Janitor is an active Rust static-analysis research platform studying whether IFDS dataflow, Z3 path feasibility, Kani proof obligations, exploit-witness synthesis, and post-quantum provenance can make security triage reproducible under AI-assisted development. The research outcome is a local, zero-upload pipeline that classifies findings by proof strength before they reach audit ledgers or human review.</p>
+<p>The empirical method is deterministic: run the same detector corpus across real repositories, preserve proof-class decisions as structured findings, verify critical predicates with Kani, and attach reproducible command evidence where a vulnerability claim is strong enough to leave research triage. The project is currently best understood as a research artifact and collaboration surface, not a procurement-ready enterprise product.</p>
+<h2 id="adversarial-robustness-and-tool-intent-safety">Adversarial Robustness and Tool-Intent Safety</h2>
+<p>The Janitor treats prompt injection, MCP/tool dispatch, agentic origin, and untrusted-context transposition as security research surfaces. Detectors attach deterministic proof obligations for prompt/tool non-interference, confused-deputy dispatch, agentic-origin classification, and retrieval-context trust so tool-intent claims are evaluated by reproducible evidence rather than narrative confidence.</p>
+<h2 id="cloud-reproducibility-track">Cloud Reproducibility Track</h2>
+<p>Janitor evidence can be reproduced in GitHub Actions and mapped onto Google Cloud Build and Artifact Registry provenance without uploading source code to a hosted scanner. A reproducibility run emits local findings, proof-class decisions, SARIF, and provenance metadata that can be mirrored into Cloud Build attestations or Artifact Registry records while keeping repository contents inside the operator-controlled build environment.</p>
+<h2 id="research-foundation">Research Foundation</h2>
+<p>The Janitor is an active security research platform spanning four technical frontiers:</p>
+<ul>
+<li><strong>Interprocedural Taint Analysis (IFDS)</strong> — context-sensitive dataflow across 14 languages with sanitizer-registry suppression and Z3 SMT path-feasibility refinement.</li>
+<li><strong>Formal Verification (Kani + Z3)</strong> — every security-critical predicate ships with a <code>#[kani::proof]</code> harness proving absence of panics and integer overflow across all symbolic inputs. Z3-backed exploit witnesses synthesize <code>curl</code>-form reproduction commands from model-extracted payloads.</li>
+<li><strong>Post-Quantum Provenance (ML-DSA-65 + SHA-384)</strong> — all findings are sealed into SLSA Level 4 <code>DecisionCapsule</code> records with dual-PQC attestation, verifiable offline without source upload.</li>
+<li><strong>ZK AST Attestation (roadmap)</strong> — in-progress Halo2/Plonky3 circuit design for absence-of-bad-pattern proofs, enabling FedRAMP High and DoD IL6 compliance attestation without revealing source.</li>
+</ul>
+<p>Peer-reviewed collaborations and research partnerships welcome. Contact: reghramm@gmail.com.</p>
 <h2 id="why-not-codeql-snyk-or-sonarqube">Why Not CodeQL, Snyk, or SonarQube?</h2>
 <p><strong>CodeQL</strong> is a graph-query engine optimised for known CVE patterns. It does not detect AI-generated structural anomalies, Swarm clone behaviour, or zombie dependency hallucinations — patterns that have no prior CVE record. It also adds 10–45 minutes to CI runtime on large repositories.</p>
 <p><strong>Snyk</strong> excels at known vulnerability databases. It generates false positives at scale on AI-assisted code because it is trained on pre-AI codebases. Teams that have deployed Copilot broadly report Snyk alert fatigue as the primary reason policies get disabled.</p>
