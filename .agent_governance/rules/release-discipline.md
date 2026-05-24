@@ -78,6 +78,20 @@ curl --fail --silent --location \
 # Must return the SHA-384 hex string (not empty / not error) before pushing.
 ```
 
+## Law II-C — Authenticated Release Asset Download
+
+The Structural Firewall `action.yml` **must** pass an `Authorization: token` header
+when downloading release assets via curl.  Unauthenticated downloads hit the CDN and
+return 404 during the propagation window; authenticated API requests bypass the CDN.
+
+**Invariant** (check any action.yml modification):
+```bash
+grep 'Authorization: token' action.yml
+# Must return a match inside the CURL_OPTS definition.
+```
+
+If `action.yml` is ever modified, verify this invariant is preserved before merging.
+
 ## Law III — PR Rebase After Hotfix
 
 After any hotfix merges to main, ALL open feature PRs are BEHIND.
