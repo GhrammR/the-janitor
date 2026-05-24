@@ -134,6 +134,94 @@ pub enum ThreatModelVerdict {
     Emit,
 }
 
+/// Returns `true` when an enclosing Go/Python function whose name matches the
+/// admin-tooling pattern (`Test`, `Validate`, `Ping`, `Health`, `Check` +
+/// `URL`/`Url`/`Site`) is performing the URL fetch and no user-controlled HTTP
+/// body or query-param taint is present within ±30 lines.
+///
+/// Suppresses `security:ssrf_dynamic_url` on admin-intentional URL validation
+/// functions such as Mattermost's `TestSiteURL` / `ValidateSiteURL`, which
+/// construct URLs from admin-config values, not from attacker-controlled request
+/// bodies.
+pub fn is_admin_intentional_url_fetch(fn_name: &str, source: &str) -> bool {
+    // Admin-tooling name pattern.
+    let lower_fn = fn_name.to_lowercase();
+    let is_admin_name = (lower_fn.contains("test")
+        || lower_fn.contains("validate")
+        || lower_fn.contains("ping")
+        || lower_fn.contains("health")
+        || lower_fn.contains("check"))
+        && (lower_fn.contains("url") || lower_fn.contains("site") || lower_fn.contains("addr"));
+    if !is_admin_name {
+        return false;
+    }
+    // If user-request taint patterns are present, the function may handle
+    // attacker input — do not suppress.
+    const USER_TAINT: &[&str] = &[
+        "req.Body",
+        "r.FormValue",
+        "r.URL.Query",
+        "r.PostForm",
+        "request.json()",
+        "request.form[",
+        "request.args[",
+        "c.Query(",
+        "c.PostForm(",
+        "ctx.Query(",
+    ];
+    !USER_TAINT.iter().any(|t| source.contains(t))
+}
+
+/// Returns `true` when `InsecureSkipVerify: true` at the given byte offset is
+/// inside an `if`-branch conditional on a struct-field access (indicating the
+/// bypass is config-gated with a `false` default) rather than an unconditional
+/// literal assignment.
+///
+/// Suppresses `security:tls_verification_bypass` for the common
+/// `if cfg.InsecureTLS { tls.Config{InsecureSkipVerify: true} }` pattern where
+/// the field defaults to `false` and requires explicit admin opt-in.
+pub fn is_config_gated_tls_bypass(source: &str, tls_line: usize) -> bool {
+    let lines: Vec<&str> = source.lines().collect();
+    let target_idx = tls_line.saturating_sub(1);
+    // Scan 10 lines above the InsecureSkipVerify site for an if-guard whose
+    // condition is a struct-field access (contains a `.` but not a literal
+    // `true`/`false` comparison).
+    let scan_start = target_idx.saturating_sub(10);
+    let scan_end = target_idx.min(lines.len());
+    for line in &lines[scan_start..scan_end] {
+        let trimmed = line.trim();
+        if !trimmed.starts_with("if ") {
+            continue;
+        }
+        // Condition is a struct field access when it contains `.` and does not
+        // use `== true` / `!= false` literals (which would indicate a
+        // non-config-gated boolean toggle).
+        let cond = trimmed
+            .trim_start_matches("if ")
+            .trim_end_matches('{')
+            .trim();
+        if cond.contains('.') && !cond.contains("== true") && !cond.contains("!= false") {
+            return true;
+        }
+    }
+    false
+}
+
+/// Returns `true` when the named function has zero callers in `source` outside
+/// its own definition line.
+///
+/// Suppresses `security:dom_xss_innerHTML` on helper functions with no proven
+/// attacker-controlled reflection path — a function that is never called from
+/// the scanned source cannot reach an attacker-reachable sink.
+pub fn has_external_caller(source: &str, fn_name: &str) -> bool {
+    // Count occurrences of fn_name followed by `(` in the source.
+    // Subtract 1 to exclude the definition itself (which appears as `fn_name(`
+    // or `function fn_name(` or `def fn_name(`).
+    let call_pattern = format!("{fn_name}(");
+    let occurrences = source.matches(&call_pattern).count();
+    occurrences > 1
+}
+
 /// Classify a single finding against the target's auth surface.
 ///
 /// `dir` is the scan root passed to `janitor hunt`; `finding` is a
@@ -411,6 +499,58 @@ mod tests {
         .unwrap();
         let f = finding("security:missing_ownership_check", "bare.py", 1);
         assert_eq!(classify_finding(dir.path(), &f), ThreatModelVerdict::Emit);
+    }
+
+    // --- Phase 2B: is_admin_intentional_url_fetch ---
+
+    #[test]
+    fn admin_named_fn_without_user_taint_suppresses_ssrf() {
+        let source = "func TestSiteURL(siteURL string) error {\n    resp, err := http.Get(siteURL)\n    return err\n}";
+        assert!(is_admin_intentional_url_fetch("TestSiteURL", source));
+    }
+
+    #[test]
+    fn user_request_taint_prevents_ssrf_suppression() {
+        // Even with an admin-looking name, if user request taint is present
+        // the finding must not be suppressed.
+        let source = "func ValidateSiteURL(r *http.Request) error {\n    u := r.FormValue(\"url\")\n    return http.Get(u)\n}";
+        assert!(!is_admin_intentional_url_fetch("ValidateSiteURL", source));
+    }
+
+    #[test]
+    fn non_admin_function_name_does_not_suppress() {
+        let source = "func fetchData(url string) error {\n    return http.Get(url)\n}";
+        assert!(!is_admin_intentional_url_fetch("fetchData", source));
+    }
+
+    // --- Phase 2B: is_config_gated_tls_bypass ---
+
+    #[test]
+    fn if_struct_field_guard_suppresses_tls_bypass() {
+        let source =
+            "if cfg.InsecureTLS {\n    tlsCfg := &tls.Config{InsecureSkipVerify: true}\n}\n";
+        // `InsecureSkipVerify: true` is on line 2; guard is on line 1.
+        assert!(is_config_gated_tls_bypass(source, 2));
+    }
+
+    #[test]
+    fn unconditional_tls_bypass_is_not_suppressed() {
+        let source = "tlsCfg := &tls.Config{InsecureSkipVerify: true}\n";
+        assert!(!is_config_gated_tls_bypass(source, 1));
+    }
+
+    // --- Phase 2B: has_external_caller ---
+
+    #[test]
+    fn function_with_caller_is_reachable() {
+        let source = "function renderHtml(el, content) {\n    el.innerHTML = content;\n}\nrenderHtml(div, userInput);\n";
+        assert!(has_external_caller(source, "renderHtml"));
+    }
+
+    #[test]
+    fn function_with_no_callers_is_unreachable() {
+        let source = "function renderHtml(el, content) {\n    el.innerHTML = content;\n}\n";
+        assert!(!has_external_caller(source, "renderHtml"));
     }
 
     #[test]

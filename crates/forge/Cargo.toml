@@ -13,6 +13,7 @@ advanced_threats = { path = "../experimental/advanced_threats" }
 serde.workspace = true
 blake3.workspace = true
 hex.workspace = true
+ureq.workspace = true
 tree-sitter.workspace = true
 tree-sitter-python.workspace = true
 tree-sitter-rust.workspace = true
@@ -63,6 +64,7 @@ toml.workspace = true
 base64.workspace = true
 rsmt2 = "0.16"
 ndarray = "0.17"
+sha2.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

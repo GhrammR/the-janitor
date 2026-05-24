@@ -1,3 +1,7 @@
+//! Detects steganographic or poisoned data embedded in media carrier files
+//! (PNG, JPEG, PDF, WAV) passed to an LLM multimodal input path.
+//! Called from `crates/forge/src/slop_hunter.rs` via `detect_multimodal_rag_poisoning`.
+
 use crate::metadata::DOMAIN_FIRST_PARTY;
 use crate::slop_hunter::{Severity, SlopFinding};
 

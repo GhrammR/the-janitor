@@ -692,12 +692,14 @@ where
             1 => render_topology(
                 f,
                 chunks[2],
-                ranked,
-                graph_ready,
-                border_style,
-                header_style,
-                text_style,
-                muted_style,
+                RenderTopologyParams {
+                    ranked,
+                    graph_ready,
+                    border_style,
+                    header_style,
+                    text_style,
+                    muted_style,
+                },
             ),
             2 => render_swarm(
                 f,
@@ -826,17 +828,24 @@ fn render_telemetry(
 
 // ─── Tab 2: Structural Topology ───────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
-fn render_topology(
-    f: &mut Frame<'_>,
-    area: Rect,
-    ranked: &[(String, usize, usize)],
+struct RenderTopologyParams<'a> {
+    ranked: &'a [(String, usize, usize)],
     graph_ready: bool,
     border_style: Style,
     header_style: Style,
     text_style: Style,
     muted_style: Style,
-) {
+}
+
+fn render_topology(f: &mut Frame<'_>, area: Rect, params: RenderTopologyParams<'_>) {
+    let RenderTopologyParams {
+        ranked,
+        graph_ready,
+        border_style,
+        header_style,
+        text_style,
+        muted_style,
+    } = params;
     let header = Row::new(vec![
         Cell::from("HEADER PATH").style(header_style),
         Cell::from("DIRECT IMPORTS").style(header_style),

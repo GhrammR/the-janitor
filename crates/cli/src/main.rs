@@ -21,6 +21,7 @@ mod git_drive;
 mod hunt;
 mod jira;
 mod nuclei_templates;
+mod registry_watch_cmd;
 mod report;
 mod sarif_enterprise;
 mod submit_formatter;
@@ -297,7 +298,7 @@ enum Commands {
         /// Patterns are matched against directory name components of each file path.
         #[arg(long, default_values = ["thirdparty/", "vendor/", "node_modules/", "target/"])]
         exclude: Vec<String>,
-        /// [DANGEROUS] Bypass the C++/C#/GLSL dedup safety hard-gate.
+        /// DANGEROUS: Bypass the C++/C#/GLSL dedup safety hard-gate.
         ///
         /// By default, dedup --apply refuses to rewrite C++, C, header, C#, and GLSL
         /// files to prevent SIMD/template corruption. This flag disables that gate.
@@ -539,7 +540,7 @@ enum Commands {
     Badge {
         /// Project root (reads .janitor/symbols.rkyv).
         path: PathBuf,
-        /// Output path for the SVG file. Default: <path>/.janitor/badge.svg.
+        /// Output path for the SVG file. Default: `<project-root>/.janitor/badge.svg`.
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -670,6 +671,43 @@ enum Commands {
         /// Project root (writes .janitor/slopsquat_corpus.rkyv).
         path: PathBuf,
     },
+    /// Poll live registry feeds (npm / crates.io / pypi) and append scored
+    /// candidates to `.janitor/registry_watch_queue.ndjson`.
+    WatchRegistries {
+        /// Which registry to poll: `npm`, `crates`, `pypi`, or `all`.
+        #[arg(long, default_value = "all")]
+        registry: String,
+        /// Run a single poll cycle and exit (no continuous loop).
+        #[arg(long, default_value_t = false)]
+        once: bool,
+        /// Project root (writes .janitor/registry_watch_queue.ndjson).
+        #[arg(long, default_value = ".")]
+        project_root: PathBuf,
+        /// Optional newline-separated popular-packages override file.
+        #[arg(long)]
+        popular_list: Option<PathBuf>,
+        /// Print findings to stdout as NDJSON without writing to the queue.
+        /// Safe for CI pipelines where side-effects are forbidden.
+        #[arg(long, default_value_t = false)]
+        dry_run: bool,
+        /// Skip packages with a `published_at` timestamp older than this many
+        /// hours. Prevents re-triaging already-seen packages on repeated CI runs.
+        #[arg(long, default_value_t = 24)]
+        max_age_hours: u64,
+    },
+    /// Read `.janitor/registry_watch_queue.ndjson` and render entries
+    /// above `--min-score` as text or markdown.
+    TriageRegistryQueue {
+        /// Minimum score to include in output.
+        #[arg(long, default_value_t = 60)]
+        min_score: i32,
+        /// Output format: `text` or `markdown`.
+        #[arg(long, default_value = "text")]
+        render: String,
+        /// Project root (reads .janitor/registry_watch_queue.ndjson).
+        #[arg(long, default_value = ".")]
+        project_root: PathBuf,
+    },
     /// Parse offline campaign markdown into a ranked target ledger.
     IngestCampaigns {
         /// Directory containing campaign markdown files.
@@ -780,14 +818,14 @@ enum Commands {
         repo: PathBuf,
     },
 
-    /// [INTERNAL] Print a one-line clinical engine health summary.
+    /// INTERNAL: Print a one-line clinical engine health summary.
     ///
     /// Intended for operator use during incident triage or after environment
     /// disruptions.  Not listed in `--help` output.
     #[command(hide = true)]
     OperatorStatus,
 
-    /// [INTERNAL] Controlled Conflict Simulation — verify the lockfile silo detector fires correctly.
+    /// INTERNAL: Controlled Conflict Simulation — verify the lockfile silo detector fires correctly.
     ///
     /// Generates a synthetic `Cargo.lock` containing two versions of `serde`, runs
     /// [`anatomist::manifest::find_version_silos_from_lockfile`] against it, and
@@ -798,7 +836,7 @@ enum Commands {
     #[command(hide = true)]
     DebugSilo,
 
-    /// [INTERNAL] Sovereign Integrity Audit — verify the engine intercepts its own synthetic threats.
+    /// INTERNAL: Sovereign Integrity Audit — verify the engine intercepts its own synthetic threats.
     ///
     /// Executes a Ghost Attack: injects a cryptominer string and a version silo into
     /// synthetic diff/manifest fixtures and verifies the engine flags them with the
@@ -809,7 +847,7 @@ enum Commands {
     #[command(hide = true)]
     SelfTest,
 
-    /// [INTERNAL] Emit a GitHub Actions Step Summary dashboard for the last bounce result.
+    /// INTERNAL: Emit a GitHub Actions Step Summary dashboard for the last bounce result.
     ///
     /// Reads the most recent entry from `.janitor/bounce_log.ndjson` and prints a
     /// high-density Markdown dashboard to stdout.  Append the output to
@@ -1456,28 +1494,28 @@ async fn main() -> anyhow::Result<()> {
             let timeout_pr_number = pr_number.or(scm_context.pr_number);
 
             let task = tokio::task::spawn_blocking(move || {
-                cmd_bounce(
-                    &path,
-                    patch.as_deref(),
-                    registry.as_deref(),
-                    &format,
-                    repo.as_deref(),
-                    base.as_deref(),
-                    head.as_deref(),
+                cmd_bounce(BounceConfig {
+                    project_root: &path,
+                    patch_file: patch.as_deref(),
+                    registry_override: registry.as_deref(),
+                    format: &format,
+                    repo: repo.as_deref(),
+                    base: base.as_deref(),
+                    head: head.as_deref(),
                     pr_number,
-                    author.as_deref(),
-                    pr_body.as_deref(),
-                    repo_slug.as_deref(),
-                    pr_state.as_str(),
-                    governor_url.as_deref(),
-                    analysis_token.as_deref(),
-                    head_sha.as_deref(),
-                    soft_fail,
-                    deep_scan,
-                    pqc_key.as_deref(),
-                    &wasm_rules,
-                    &execution_tier,
-                )
+                    author: author.as_deref(),
+                    pr_body: pr_body.as_deref(),
+                    repo_slug: repo_slug.as_deref(),
+                    pr_state_str: pr_state.as_str(),
+                    governor_url: governor_url.as_deref(),
+                    analysis_token: analysis_token.as_deref(),
+                    head_sha: head_sha.as_deref(),
+                    soft_fail_flag: soft_fail,
+                    deep_scan_flag: deep_scan,
+                    pqc_key: pqc_key.as_deref(),
+                    wasm_rules_flag: &wasm_rules,
+                    execution_tier: &execution_tier,
+                })
             });
 
             match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), task).await {
@@ -1597,6 +1635,26 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::UpdateSlopsquat { path } => cmd_update_slopsquat(path, &execution_tier)?,
+        Commands::WatchRegistries {
+            registry,
+            once,
+            project_root,
+            popular_list,
+            dry_run,
+            max_age_hours,
+        } => registry_watch_cmd::cmd_watch_registries(
+            registry,
+            *once,
+            project_root,
+            popular_list.as_deref(),
+            *dry_run,
+            *max_age_hours,
+        )?,
+        Commands::TriageRegistryQueue {
+            min_score,
+            render,
+            project_root,
+        } => registry_watch_cmd::cmd_triage_registry_queue(*min_score, render, project_root)?,
         Commands::IngestCampaigns { dir } => campaign_ingest::cmd_ingest_campaigns(dir)?,
         Commands::Export {
             repo,
@@ -3758,29 +3816,52 @@ fn enforce_pqc_key_age(
 /// from the git pack index via `shadow_git::simulate_merge`, no diff file needed.
 ///
 /// Loads the symbol registry from `registry_override` or `.janitor/symbols.rkyv`.
-#[allow(clippy::too_many_arguments)]
-fn cmd_bounce(
-    project_root: &Path,
-    patch_file: Option<&Path>,
-    registry_override: Option<&Path>,
-    format: &str,
-    repo: Option<&Path>,
-    base: Option<&str>,
-    head: Option<&str>,
+struct BounceConfig<'a> {
+    project_root: &'a Path,
+    patch_file: Option<&'a Path>,
+    registry_override: Option<&'a Path>,
+    format: &'a str,
+    repo: Option<&'a Path>,
+    base: Option<&'a str>,
+    head: Option<&'a str>,
     pr_number: Option<u64>,
-    author: Option<&str>,
-    pr_body: Option<&str>,
-    repo_slug: Option<&str>,
-    pr_state_str: &str,
-    governor_url: Option<&str>,
-    analysis_token: Option<&str>,
-    head_sha: Option<&str>,
+    author: Option<&'a str>,
+    pr_body: Option<&'a str>,
+    repo_slug: Option<&'a str>,
+    pr_state_str: &'a str,
+    governor_url: Option<&'a str>,
+    analysis_token: Option<&'a str>,
+    head_sha: Option<&'a str>,
     soft_fail_flag: bool,
     deep_scan_flag: bool,
-    pqc_key: Option<&str>,
-    wasm_rules_flag: &[String],
-    execution_tier: &str,
-) -> anyhow::Result<()> {
+    pqc_key: Option<&'a str>,
+    wasm_rules_flag: &'a [String],
+    execution_tier: &'a str,
+}
+
+fn cmd_bounce(cfg: BounceConfig<'_>) -> anyhow::Result<()> {
+    let BounceConfig {
+        project_root,
+        patch_file,
+        registry_override,
+        format,
+        repo,
+        base,
+        head,
+        pr_number,
+        author,
+        pr_body,
+        repo_slug,
+        pr_state_str,
+        governor_url,
+        analysis_token,
+        head_sha,
+        soft_fail_flag,
+        deep_scan_flag,
+        pqc_key,
+        wasm_rules_flag,
+        execution_tier,
+    } = cfg;
     use common::policy::JanitorPolicy;
     use common::registry::{MappedRegistry, SymbolRegistry};
     use forge::slop_filter::{bounce_git, PRBouncer, PatchBouncer};
@@ -6982,7 +7063,7 @@ mod replay_receipt_tests {
 
 #[cfg(test)]
 mod governor_routing_tests {
-    use super::cmd_bounce;
+    use super::{cmd_bounce, BounceConfig};
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
@@ -7058,28 +7139,28 @@ mod governor_routing_tests {
         .expect("write patch");
 
         let governor_url = format!("http://{addr}");
-        let result = cmd_bounce(
-            &temp_root,
-            Some(&patch_path),
-            None,
-            "json",
-            None,
-            None,
-            None,
-            Some(42),
-            Some("operator"),
-            None,
-            Some("acme/repo"),
-            "open",
-            Some(&governor_url),
-            Some("stub-token"),
-            Some("deadbeef"),
-            false,
-            false,
-            None,
-            &[],
-            "Community",
-        );
+        let result = cmd_bounce(BounceConfig {
+            project_root: &temp_root,
+            patch_file: Some(&patch_path),
+            registry_override: None,
+            format: "json",
+            repo: None,
+            base: None,
+            head: None,
+            pr_number: Some(42),
+            author: Some("operator"),
+            pr_body: None,
+            repo_slug: Some("acme/repo"),
+            pr_state_str: "open",
+            governor_url: Some(&governor_url),
+            analysis_token: Some("stub-token"),
+            head_sha: Some("deadbeef"),
+            soft_fail_flag: false,
+            deep_scan_flag: false,
+            pqc_key: None,
+            wasm_rules_flag: &[],
+            execution_tier: "Community",
+        });
         assert!(result.is_ok(), "cmd_bounce should POST to custom governor");
 
         let (request_line, authorization, body) = rx

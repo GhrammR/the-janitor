@@ -243,7 +243,7 @@ pub fn cmd_hunt(args: HuntArgs<'_>) -> anyhow::Result<()> {
             let submission = common::receipt::BountySubmission {
                 title: format!("{top_rule} findings in {target_label}"),
                 target: target_label.to_string(),
-                markdown_body: report.clone(),
+                markdown_body: report,
                 custom_field_vrt: findings
                     .first()
                     .map(|f| vrt_category(&f.id))
@@ -747,8 +747,7 @@ fn format_auth0_report_with_component(
     }
 
     let mut reports = Vec::with_capacity(grouped.len());
-    for (rule_id, group) in &grouped {
-        let mut sorted_group = group.clone();
+    for (rule_id, mut sorted_group) in grouped {
         sorted_group.sort_by(|left, right| {
             let left_key = (
                 left.file.as_deref().unwrap_or("~"),
@@ -2928,32 +2927,6 @@ pub(crate) fn scan_directory(dir: &Path) -> anyhow::Result<Vec<StructuredFinding
     Ok(forge::proof_obligation::enforce_false_positive_proof_obligation(&deduped))
 }
 
-fn apply_proof_classification(dir: &Path, findings: &mut [StructuredFinding]) {
-    for finding in findings.iter_mut() {
-        let Some(rel_path) = finding.file.as_deref() else {
-            continue;
-        };
-        let proof_class = match finding.id.as_str() {
-            "security:oauth_excessive_scope" => {
-                let source = read_finding_source(dir, rel_path);
-                forge::proof_obligation::classify_oauth_excessive_scope_proof(&source, finding)
-            }
-            "security:java_deser_allowlist_bypass" => {
-                let source = read_finding_source(dir, rel_path);
-                forge::proof_obligation::classify_java_deser_allowlist_bypass_proof(
-                    &source, finding,
-                )
-            }
-            _ => continue,
-        };
-        finding.proof_class = Some(proof_class);
-    }
-}
-
-fn read_finding_source(dir: &Path, rel_path: &str) -> String {
-    std::fs::read_to_string(dir.join(rel_path)).unwrap_or_default()
-}
-
 /// Sprint 140 — Wire-in for `forge::threat_model_oracle::classify_finding`.
 ///
 /// Iterates the candidate finding set, asks the oracle for a verdict on
@@ -3101,6 +3074,124 @@ fn apply_sql_sanitizer_demotion(dir: &Path, findings: &mut [StructuredFinding]) 
 /// finding is demoted to `Informational` severity with an annotation
 /// citing the guard.
 ///
+/// Sprint 147 — Phase 2B: Wire-in for the three new `forge::threat_model_oracle`
+/// suppression predicates.
+/// Attach proof classes to findings before the proof-obligation gate.
+///
+/// For `security:intent_divergence`: attaches `ReachabilityProof` when the
+/// source file contains a zero-auth provider indicator outside a test path;
+/// otherwise attaches `LatticeGapProposal`.
+///
+/// For `security:ffi_unsafe_deref` and `security:raw_pointer_deref`: attaches
+/// `InvariantViolationProof` (and drops the finding as a FP) when a null guard
+/// is visible within ±5 lines; attaches `ReachabilityProof` when `extern "C"`
+/// is visible; otherwise attaches `LatticeGapProposal`.
+///
+/// For `security:lcm_double_free`: attaches `InvariantViolationProof` (drops as FP)
+/// when a dominance-verified free guard is present; `ReachabilityProof` when an
+/// exported C symbol is visible; otherwise `LatticeGapProposal`.
+///
+/// For `security:non_constant_time_comparison`: attaches `ReachabilityProof`
+/// when the source contains HMAC/session-key markers outside a test path;
+/// otherwise `LatticeGapProposal`.
+fn classify_one_proof(dir: &Path, finding: &StructuredFinding) -> Option<ProofClass> {
+    use forge::proof_obligation as po;
+    let id = finding.id.as_str();
+    let src = || {
+        finding
+            .file
+            .as_deref()
+            .and_then(|p| std::fs::read_to_string(dir.join(p)).ok())
+            .unwrap_or_default()
+    };
+    let line = finding.line.unwrap_or(1) as usize;
+    Some(if id.contains("intent_divergence") {
+        po::classify_intent_divergence_proof(finding, &src())
+    } else if id.contains("ffi_unsafe_deref") || id.contains("raw_pointer_deref") {
+        po::classify_ffi_deref_proof(&src(), line)
+    } else if id.contains("lcm_double_free") {
+        po::classify_lcm_double_free_proof(&src(), line)
+    } else if id.contains("non_constant_time_comparison") {
+        po::classify_timing_comparison_proof(&src(), finding)
+    } else if id.contains("lcm_use_after_free") {
+        po::classify_lcm_use_after_free_proof(&src(), line)
+    } else if id.contains("lcm_malloc_integer_truncation") {
+        po::classify_lcm_malloc_integer_truncation_proof(&src(), finding)
+    } else if id.contains("lcm_off_by_one_loop") {
+        po::classify_lcm_off_by_one_loop_proof(&src(), finding)
+    } else if id.contains("oauth_missing_state_validation") {
+        po::classify_oauth_state_validation_proof(&src(), finding)
+    } else if id.contains("oauth_excessive_scope") {
+        po::classify_oauth_excessive_scope_proof(&src(), finding)
+    } else if id.contains("pqc_hybrid_downgrade") {
+        po::classify_pqc_hybrid_downgrade_proof(&src(), finding)
+    } else if id.contains("unverified_provenance") {
+        po::classify_unverified_provenance_proof(&src(), finding)
+    } else if id.contains("cargo_build_worm") {
+        po::classify_cargo_build_worm_proof(&src(), finding)
+    } else if id.contains("ci_persistence_vector") {
+        po::classify_ci_persistence_vector_proof(&src(), finding)
+    } else if id.contains("java_deser_allowlist_bypass") {
+        po::classify_java_deser_allowlist_bypass_proof(&src(), finding)
+    } else if id.contains("unsafe_deserialization") {
+        po::classify_unsafe_deserialization_proof(&src(), finding)
+    } else if id.contains("mcp_confused_deputy_dispatch") {
+        po::classify_mcp_confused_deputy_dispatch_proof(&src(), finding)
+    } else if id.contains("embedding_trust_transposition") {
+        po::classify_embedding_trust_transposition_proof(&src(), finding)
+    } else if id.contains("rag_context_poisoning") {
+        po::classify_rag_context_poisoning_proof(&src(), finding)
+    } else if id.contains("path_traversal_concatenation") {
+        po::classify_path_traversal_concat_proof(&src(), finding)
+    } else if id.contains("dynamic_import") {
+        po::classify_dynamic_import_proof(&src(), finding)
+    } else if id.contains("dangerous_execution") {
+        po::classify_dangerous_execution_proof(&src(), finding)
+    } else if id.contains("bounded_overflow_witness") {
+        po::classify_bounded_overflow_proof(&src(), finding)
+    } else if id.contains("ld_preload_injection") {
+        po::classify_ld_preload_injection_proof(&src(), finding)
+    } else if id.contains("ffi_memory_corruption") {
+        po::classify_ffi_memory_corruption_proof(&src(), finding)
+    } else if id.contains("xxe_saml_parser") {
+        po::classify_xxe_saml_parser_proof(&src(), finding)
+    } else if id.contains("saml_xsw_validation_order") {
+        po::classify_saml_xsw_validation_order_proof(&src(), finding)
+    } else if id.contains("jndi_injection") {
+        po::classify_jndi_injection_proof(&src(), finding)
+    } else if id.contains("eval_injection") {
+        po::classify_eval_injection_proof(&src(), finding)
+    } else if id.contains("process_builder_injection") {
+        po::classify_process_builder_injection_proof(&src(), finding)
+    } else if id.contains("oauth_account_fusion") {
+        po::classify_oauth_account_fusion_proof(&src(), finding)
+    } else if id.contains("protobuf_any_unguarded_decode") {
+        po::classify_protobuf_any_proof(&src(), finding)
+    } else if id.contains("sqli_concatenation") {
+        po::classify_sqli_concatenation_proof(&src(), finding)
+    } else if id.contains("financial_pii_to_external_llm") {
+        po::classify_financial_pii_proof(&src(), finding)
+    } else if id.contains("react_xss_dangerous_html") {
+        po::classify_react_xss_proof(&src(), finding)
+    } else if id.contains("unauthenticated_debug_endpoint") {
+        po::classify_debug_endpoint_proof(&src(), finding)
+    } else {
+        return None;
+    })
+}
+
+fn apply_proof_classification(dir: &Path, findings: &mut Vec<StructuredFinding>) {
+    findings.retain_mut(|finding| {
+        let Some(proof) = classify_one_proof(dir, finding) else {
+            return true;
+        };
+        if proof == ProofClass::InvariantViolationProof {
+            return false;
+        }
+        finding.proof_class = Some(proof);
+        true
+    });
+}
 /// Motivating regression (Sprint 141 chainlink JWT FP): the upstream
 /// detector emitted a 36% approval CANDIDATE for `core/utils/jwt.go:230`
 /// without inspecting the keyfunc body at lines 258-266, which contains
@@ -3760,7 +3851,7 @@ fn scan_buffer(
                 || rule_id.contains("flash_loan_callback")
                 || rule_id == "security:react_xss_dangerous_html";
             let mut structured = StructuredFinding {
-                id: rule_id.clone(),
+                id: rule_id.to_string(),
                 file: Some(label.to_string()),
                 line: Some(line),
                 fingerprint: fingerprint_finding(source, finding.start_byte, finding.end_byte),
@@ -4022,6 +4113,15 @@ fn scan_buffer(
     findings.extend(forge::automotive::detect_can_bus_unvalidated_actuation(
         ext, source, label,
     ));
+    // P8-3: Medical Device Pack — PHI-to-LLM taint + FDA audit-log absence.
+    // Wired for Python, JavaScript, TypeScript, Java, Kotlin, C#.
+    if matches!(ext, "py" | "js" | "ts" | "java" | "kt" | "cs") {
+        let src_str = std::str::from_utf8(source).unwrap_or("");
+        findings.extend(forge::medical::emit_phi_sink_findings(src_str, label));
+        findings.extend(forge::medical::emit_audit_log_absence_findings(
+            src_str, label,
+        ));
+    }
     let filename = std::path::Path::new(label)
         .file_name()
         .and_then(|n| n.to_str())
@@ -4234,7 +4334,7 @@ fn scan_buffer(
             let line = byte_to_line(source, f.start_byte);
             let rule_id = extract_rule_id(&f.description);
             let mut structured = StructuredFinding {
-                id: rule_id.clone(),
+                id: rule_id.to_string(),
                 file: Some(label.to_string()),
                 line: Some(line),
                 fingerprint: fingerprint_finding(source, f.start_byte, f.end_byte),
