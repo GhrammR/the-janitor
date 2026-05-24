@@ -119,6 +119,50 @@ gh pr list --json headRefName,mergeStateStatus | jq '.[] | select(.mergeStateSta
 ```
 **Fix**: `git rebase origin/main && git push --force-with-lease origin <branch>`
 
+### Release PR Docs Isolation Violation
+
+**Rule**: `rules/release-discipline.md` (Law II-H)
+**Pre-push verification** (before opening any release PR):
+```bash
+gh pr diff <PR> --name-only | awk -F/ 'NF {print $1}' | sort -u | wc -l
+# Must be ≤ 5
+gh pr diff <PR> --name-only | grep -E '^(README\.md|docs/)'
+# Must be empty — docs go in a separate docs/vX.Y.Z PR
+```
+**Fix if violated**: strip docs files from release branch with a new commit,
+create `docs/vX.Y.Z` branch off main, open docs-only PR.
+
+### Workflow Permissions Violation (top-level write scope)
+
+**Rule**: `rules/workflow-permissions.md` (Law W-I)
+**Pre-push verification** (before any PR touching `.github/`):
+```bash
+for f in .github/workflows/*.yml; do
+  python3 - "$f" <<'PY'
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+top = doc.get('permissions', {})
+if isinstance(top, dict):
+    bad = [k for k, v in top.items() if v == 'write']
+    if bad: print(f"FAIL {sys.argv[1]}: top-level write: {bad}")
+PY
+done
+# Zero FAIL lines required
+```
+**Fix**: set `permissions: read-all` at top level; move write scopes to job block.
+
+### Registry Watch Spurious Issue (step-failure trigger, ephemeral /tmp)
+
+**Rule**: `rules/workflow-permissions.md` (Laws W-II and W-III)
+**Pre-push verification** (before any PR touching `registry-watch.yml`):
+```bash
+grep 'if: failure()' .github/workflows/registry-watch.yml
+# Must be absent — use named step output instead
+
+grep 'upload-artifact' .github/workflows/registry-watch.yml
+# Must be present — report must persist as artifact
+```
+
 ### Missing Governance Update (this skill's own trigger)
 
 After every sprint directive, before marking complete:
