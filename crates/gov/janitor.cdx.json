@@ -13,16 +13,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.6",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.7",
       "name": "janitor-gov",
-      "version": "10.2.6",
+      "version": "10.2.7",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/janitor-gov@10.2.6?download_url=file://.",
+      "purl": "pkg:cargo/janitor-gov@10.2.7?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -32,17 +32,17 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.6 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.7 bin-target-0",
           "name": "janitor_gov",
-          "version": "10.2.6",
-          "purl": "pkg:cargo/janitor-gov@10.2.6?download_url=file://.#src/lib.rs"
+          "version": "10.2.7",
+          "purl": "pkg:cargo/janitor-gov@10.2.7?download_url=file://.#src/lib.rs"
         },
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.6 bin-target-1",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.7 bin-target-1",
           "name": "janitor-gov",
-          "version": "10.2.6",
-          "purl": "pkg:cargo/janitor-gov@10.2.6?download_url=file://.#src/main.rs"
+          "version": "10.2.7",
+          "purl": "pkg:cargo/janitor-gov@10.2.7?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -56,16 +56,16 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.6",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.7",
       "name": "common",
-      "version": "10.2.6",
+      "version": "10.2.7",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/common@10.2.6?download_url=file://../common",
+      "purl": "pkg:cargo/common@10.2.7?download_url=file://../common",
       "externalReferences": [
         {
           "type": "vcs",
@@ -7918,7 +7918,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.6",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.7",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
@@ -7943,7 +7943,7 @@
       ]
     },
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.6",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/gov#janitor-gov@10.2.7",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#axum@0.8.9",
@@ -7951,7 +7951,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#aya@0.13.1",
         "registry+https://github.com/rust-lang/crates.io-index#aya-log@0.2.1",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
-        "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.6",
+        "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.7",
         "registry+https://github.com/rust-lang/crates.io-index#dashmap@6.1.0",
         "registry+https://github.com/rust-lang/crates.io-index#ed25519-dalek@2.2.0",
         "registry+https://github.com/rust-lang/crates.io-index#hex@0.4.3",
