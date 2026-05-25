@@ -754,7 +754,8 @@ mod tests {
         let ts_ms = u64::MAX;
         // Same cast as build_otlp_payload — must not panic.
         let ts_ns: u128 = ts_ms as u128 * 1_000_000u128;
-        assert!(ts_ns <= u128::MAX, "u64::MAX * 1_000_000 must fit in u128");
+        // u64::MAX * 1_000_000 = 1.844e25, well within u128::MAX (3.4e38).
+        let _ = ts_ns;
     }
 
     #[test]

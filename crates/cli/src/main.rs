@@ -4085,15 +4085,52 @@ fn cmd_bounce(cfg: BounceConfig<'_>) -> anyhow::Result<()> {
                     }
                 }
             };
-            let mut score = PatchBouncer::for_workspace_with_deep_scan_and_suppressions(
+            // Resolve branch name for release-PR exemption in the blast-radius gate.
+            // Best source: `gh pr view` when a PR number + repo slug are available.
+            // Fallback: `git rev-parse --abbrev-ref HEAD` from the project root.
+            let resolved_branch: Option<String> = resolved_pr_number
+                .zip(resolved_repo_slug.as_ref())
+                .and_then(|(pn, slug)| {
+                    std::process::Command::new("gh")
+                        .args([
+                            "pr",
+                            "view",
+                            &pn.to_string(),
+                            "--repo",
+                            slug,
+                            "--json",
+                            "headRefName",
+                            "-q",
+                            ".headRefName",
+                        ])
+                        .output()
+                        .ok()
+                        .filter(|o| o.status.success())
+                        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                        .filter(|s| !s.is_empty())
+                })
+                .or_else(|| {
+                    std::process::Command::new("git")
+                        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+                        .current_dir(project_root)
+                        .output()
+                        .ok()
+                        .filter(|o| o.status.success())
+                        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                        .filter(|s| !s.is_empty() && s != "HEAD")
+                });
+            let mut bouncer = PatchBouncer::for_workspace_with_deep_scan_and_suppressions(
                 project_root,
                 policy.suppressions.clone().unwrap_or_default(),
                 deep_scan,
                 policy.execution_tier.clone(),
             )
             .with_require_pinned_dependencies(policy.forge.require_pinned_dependencies)
-            .with_clone_exempt_paths(policy.forge.clone_exempt_paths.clone())
-            .bounce(&patch, &registry)?;
+            .with_clone_exempt_paths(policy.forge.clone_exempt_paths.clone());
+            if let Some(branch) = resolved_branch {
+                bouncer = bouncer.with_branch_name(branch);
+            }
+            let mut score = bouncer.bounce(&patch, &registry)?;
             let merkle_root = blake3::hash(patch.as_bytes()).to_hex().to_string();
             let sig = forge::pr_collider::PrDeltaSignature::from_bytes(patch.as_bytes());
 

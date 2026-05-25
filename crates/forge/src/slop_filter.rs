@@ -670,6 +670,9 @@ pub struct PatchBouncer {
     require_pinned_dependencies: bool,
     execution_tier: String,
     clone_exempt_paths: Vec<String>,
+    /// Branch name of the PR head — used to exempt `release/v*` branches from the
+    /// blast-radius gate without depending on CHANGELOG.md appearing in the diff.
+    branch_name: Option<String>,
 }
 
 impl PatchBouncer {
@@ -712,6 +715,7 @@ impl PatchBouncer {
             require_pinned_dependencies: false,
             execution_tier: execution_tier.into(),
             clone_exempt_paths: Vec::new(),
+            branch_name: None,
         }
     }
 
@@ -722,6 +726,13 @@ impl PatchBouncer {
 
     pub fn with_clone_exempt_paths(mut self, paths: Vec<String>) -> Self {
         self.clone_exempt_paths = paths;
+        self
+    }
+
+    /// Set the head branch name so the blast-radius gate can exempt `release/v*`
+    /// branches without relying on `CHANGELOG.md` appearing in the diff.
+    pub fn with_branch_name(mut self, branch: impl Into<String>) -> Self {
+        self.branch_name = Some(branch.into());
         self
     }
 
@@ -817,12 +828,17 @@ impl PRBouncer for PatchBouncer {
             };
             // A release PR legitimately spans many top-level directories:
             // crates/, docs/, .github/, Cargo.toml, README.md, justfile, etc.
-            // Presence of both Cargo.toml and a CHANGELOG uniquely identifies
-            // a coordinated version-bump changeset — exempt it from the gate.
+            // Primary signal: branch name starts with `release/v` (set by `just fast-release`).
+            // Fallback: Cargo.toml + CHANGELOG.md both present in the diff (brittle when
+            // CHANGELOG is committed to main by sprint PRs before the release branch is cut).
             let section_paths: Vec<String> =
                 sections.iter().map(|s| extract_patch_path(s)).collect();
-            let is_release_pr = section_paths.iter().any(|p| p == "Cargo.toml")
-                && section_paths.iter().any(|p| p.ends_with("CHANGELOG.md"));
+            let is_release_pr = self
+                .branch_name
+                .as_deref()
+                .map_or(false, |b| b.starts_with("release/v"))
+                || (section_paths.iter().any(|p| p == "Cargo.toml")
+                    && section_paths.iter().any(|p| p.ends_with("CHANGELOG.md")));
             for section in sections {
                 // Errors are non-fatal: a parse failure in one file section does
                 // not invalidate the analysis of the remaining sections.
@@ -3780,6 +3796,35 @@ diff --git a/docs/review.md b/docs/review.md
                 .iter()
                 .any(|d| d.contains("blast_radius_violation")),
             "6-dir PR without CHANGELOG.md must still fire blast_radius_violation: {:?}",
+            score.antipattern_details
+        );
+    }
+
+    #[test]
+    fn test_blast_radius_gate_exempt_for_release_branch_name() {
+        // A 7-dir release PR diff WITHOUT CHANGELOG.md must not fire blast_radius_violation
+        // when the branch name is `release/v*`.  This exercises the primary heuristic
+        // that does not depend on CHANGELOG.md appearing in the PR diff — which fails
+        // when CHANGELOG is committed to main by sprint PRs before the release branch is cut.
+        let patch = make_multi_dir_patch(&[
+            "Cargo.toml",
+            "crates/forge/src/lib.rs",
+            "crates/cli/src/main.rs",
+            ".github/workflows/janitor.yml",
+            ".agent_governance/rules/release-discipline.md",
+            "tools/campaign/CANDIDATE_LEDGER.md",
+            "README.md",
+        ]);
+        let score = PatchBouncer::default()
+            .with_branch_name("release/v10.3.0")
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        assert!(
+            !score
+                .antipattern_details
+                .iter()
+                .any(|d| d.contains("blast_radius_violation")),
+            "release/v* branch must be exempt from blast_radius gate even without CHANGELOG.md: {:?}",
             score.antipattern_details
         );
     }
