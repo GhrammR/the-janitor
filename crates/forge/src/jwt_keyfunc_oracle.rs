@@ -233,6 +233,45 @@ mod tests {
     }
 
     #[test]
+    fn jwt_keyfunc_with_valid_methods_guard_yields_invariant_violation() {
+        // Pure predicate: algorithm-restriction guard → InvariantViolationProof.
+        use common::slop::ProofClass;
+        let result = crate::proof_obligation::classify_jwt_keyfunc_proof(true, false, false);
+        assert_eq!(result, ProofClass::InvariantViolationProof);
+    }
+
+    #[test]
+    fn jwt_keyfunc_nil_nil_return_yields_reachability() {
+        // Pure predicate: keyfunc returns nil,nil without any guard → ReachabilityProof.
+        use common::slop::ProofClass;
+        let result = crate::proof_obligation::classify_jwt_keyfunc_proof(false, true, false);
+        assert_eq!(result, ProofClass::ReachabilityProof);
+    }
+
+    #[test]
+    fn jwt_keyfunc_grafana_fp_class_yields_invariant_violation() {
+        // Grafana FP class: ParseWithClaims + WithValidMethods guard on a real file.
+        // The source-reading classify_jwt_validation_bypass_proof must return
+        // InvariantViolationProof, suppressing the finding.
+        use common::slop::ProofClass;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("jwt_handler.go");
+        fs::write(
+            &path,
+            b"package node\n\nfunc (h *jwtHandler) verify(w http.ResponseWriter, r *http.Request) {\n\
+              token, err := jwt.ParseWithClaims(strToken, &claims, h.keyFunc,\n\
+              \t\t\tjwt.WithValidMethods([]string{\"RS256\"}),\n\
+              \t\t\tjwt.WithoutClaimsValidation())\n\
+              _ = token; _ = err\n}\n",
+        )
+        .unwrap();
+        let source = std::fs::read_to_string(&path).unwrap();
+        let f = finding("security:jwt_validation_bypass", 4);
+        let result = crate::proof_obligation::classify_jwt_validation_bypass_proof(&source, &f);
+        assert_eq!(result, ProofClass::InvariantViolationProof);
+    }
+
+    #[test]
     fn with_valid_methods_option_is_guarded() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("jwt_handler.go");

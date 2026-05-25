@@ -1110,9 +1110,10 @@ mod medical_kani {
 mod compliance_oracle_kani {
     use crate::compliance_oracle::map_finding_to_controls;
     use crate::proof_obligation::{
-        bounded_overflow_is_exploitable, dangerous_execution_is_reachable,
-        dynamic_import_is_exploitable, embedding_trust_transposition_is_reachable,
-        financial_pii_is_unguarded, jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
+        bounded_overflow_is_exploitable, classify_jwt_keyfunc_proof,
+        dangerous_execution_is_reachable, dynamic_import_is_exploitable,
+        embedding_trust_transposition_is_reachable, financial_pii_is_unguarded,
+        jndi_lookup_is_untrusted, lcm_double_free_is_reachable,
         lcm_malloc_integer_truncation_is_exploitable, lcm_off_by_one_loop_is_exploitable,
         lcm_use_after_free_is_reachable, ld_preload_injection_is_exploitable,
         oauth_account_fusion_is_missing_email_guard, oauth_state_validation_is_missing,
@@ -1474,6 +1475,36 @@ mod compliance_oracle_kani {
             result == (has_user_input && has_env_set && !has_scope_guard && !in_test_path),
             "ld_preload_injection gate must be exact conjunction of four guards",
         );
+    }
+
+    /// Prove `classify_jwt_keyfunc_proof` is the exact priority-ordered predicate:
+    /// in_test_path ∨ has_valid_methods_guard → InvariantViolationProof;
+    /// has_nil_nil_return (without either above guard) → ReachabilityProof;
+    /// otherwise → LatticeGapProposal.
+    #[kani::proof]
+    fn jwt_keyfunc_is_exact_conjunction() {
+        use common::slop::ProofClass;
+        let has_valid_methods_guard: bool = kani::any();
+        let has_nil_nil_return: bool = kani::any();
+        let in_test_path: bool = kani::any();
+        let result =
+            classify_jwt_keyfunc_proof(has_valid_methods_guard, has_nil_nil_return, in_test_path);
+        if in_test_path || has_valid_methods_guard {
+            kani::assert(
+                result == ProofClass::InvariantViolationProof,
+                "guarded or test-path JWT must yield InvariantViolationProof",
+            );
+        } else if has_nil_nil_return {
+            kani::assert(
+                result == ProofClass::ReachabilityProof,
+                "nil/nil keyfunc without guard must yield ReachabilityProof",
+            );
+        } else {
+            kani::assert(
+                result == ProofClass::LatticeGapProposal,
+                "unclassified JWT keyfunc must yield LatticeGapProposal",
+            );
+        }
     }
 
     /// Prove `embedding_trust_transposition_is_reachable` is the exact conjunction:

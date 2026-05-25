@@ -3071,6 +3071,59 @@ pub fn classify_ld_preload_injection_proof(
     }
 }
 
+/// Pure boolean predicate for Kani verification of JWT keyfunc proof logic.
+///
+/// | `in_test_path` | `has_valid_methods_guard` | `has_nil_nil_return` | returns                   |
+/// |---|---|---|---|
+/// | `true`  | any   | any   | `InvariantViolationProof` |
+/// | `false` | `true`| any   | `InvariantViolationProof` |
+/// | `false` | `false`| `true` | `ReachabilityProof`      |
+/// | `false` | `false`| `false`| `LatticeGapProposal`    |
+pub fn classify_jwt_keyfunc_proof(
+    has_valid_methods_guard: bool,
+    has_nil_nil_return: bool,
+    in_test_path: bool,
+) -> ProofClass {
+    if in_test_path {
+        return ProofClass::InvariantViolationProof;
+    }
+    if has_valid_methods_guard {
+        return ProofClass::InvariantViolationProof;
+    }
+    if has_nil_nil_return {
+        return ProofClass::ReachabilityProof;
+    }
+    ProofClass::LatticeGapProposal
+}
+
+/// Classify the proof state for a `security:jwt_validation_bypass` finding.
+///
+/// Reads source to detect algorithm-restriction guards (`WithValidMethods`,
+/// `token.Method.Alg()`, type assertions on `token.Method`) and nil/nil
+/// keyfunc returns. Delegates classification to [`classify_jwt_keyfunc_proof`].
+pub fn classify_jwt_validation_bypass_proof(
+    source: &str,
+    finding: &StructuredFinding,
+) -> ProofClass {
+    let in_test_path = finding
+        .file
+        .as_deref()
+        .map(|p| {
+            p.contains("test")
+                || p.ends_with("_test.go")
+                || p.contains("spec")
+                || p.ends_with("_test.rs")
+        })
+        .unwrap_or(false);
+    let has_valid_methods_guard = source.contains("WithValidMethods(")
+        || source.contains("token.Method.Alg()")
+        || source.contains("token.Method.(*")
+        || source.contains("*jwt.SigningMethod")
+        || source.contains("*SigningMethod");
+    let has_nil_nil_return = source.contains("return nil, nil");
+    classify_jwt_keyfunc_proof(has_valid_methods_guard, has_nil_nil_return, in_test_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

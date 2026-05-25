@@ -34,7 +34,6 @@ use common::deps::{DependencyEcosystem, DependencyEntry, DependencyRegistry};
 use common::wisdom::find_kev_dependency_hits;
 use forge::slop_hunter::{Severity, SlopFinding};
 use std::collections::{HashMap, HashSet};
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -50,6 +49,10 @@ const SPIN_MANIFEST: &str = "spin.toml";
 const WRANGLER_MANIFEST: &str = "wrangler.toml";
 const GO_MOD: &str = "go.mod";
 const GEMFILE: &str = "Gemfile";
+const MAVEN_MANIFEST: &str = "pom.xml";
+const GRADLE_MANIFEST: &str = "build.gradle";
+const GRADLE_KTS_MANIFEST: &str = "build.gradle.kts";
+const GEMFILE_LOCK: &str = "Gemfile.lock";
 
 /// All manifest filenames — used to skip manifest blobs during source scanning.
 const MANIFEST_NAMES: &[&str] = &[
@@ -61,6 +64,10 @@ const MANIFEST_NAMES: &[&str] = &[
     WRANGLER_MANIFEST,
     GO_MOD,
     GEMFILE,
+    MAVEN_MANIFEST,
+    GRADLE_MANIFEST,
+    GRADLE_KTS_MANIFEST,
+    GEMFILE_LOCK,
 ];
 
 /// Cross-reference a resolved `Cargo.lock` payload against the KEV dependency
@@ -156,11 +163,15 @@ pub fn scan_manifests(project_root: &Path) -> DependencyRegistry {
             PIP_PYPROJECT => parse_pyproject_toml(path, &mut registry),
             SPIN_MANIFEST => parse_spin_toml(path, &mut registry),
             WRANGLER_MANIFEST => parse_wrangler_toml(path, &mut registry),
+            MAVEN_MANIFEST => parse_pom_xml(path, &mut registry),
+            GRADLE_MANIFEST | GRADLE_KTS_MANIFEST => parse_gradle(path, &mut registry),
+            GEMFILE_LOCK => parse_gemfile_lock(path, &mut registry),
             _ => {
-                if path.extension() == Some(OsStr::new("sh"))
-                    || path.extension() == Some(OsStr::new("bash"))
-                {
-                    parse_shell_script(path, &mut registry);
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                match ext {
+                    "sh" | "bash" => parse_shell_script(path, &mut registry),
+                    "csproj" | "fsproj" => parse_csproj(path, &mut registry),
+                    _ => {}
                 }
             }
         }
@@ -293,9 +304,15 @@ pub fn find_zombie_deps_in_blobs(blobs: &HashMap<PathBuf, Vec<u8>>) -> Vec<Strin
             PIP_PYPROJECT => parse_pyproject_toml_content(content, &mut registry),
             SPIN_MANIFEST => parse_spin_toml_content(content, &mut registry),
             WRANGLER_MANIFEST => parse_wrangler_toml_content(content, &mut registry),
+            MAVEN_MANIFEST => parse_pom_xml_content(content, &mut registry),
+            GRADLE_MANIFEST | GRADLE_KTS_MANIFEST => parse_gradle_content(content, &mut registry),
+            GEMFILE_LOCK => parse_gemfile_lock_content(content, &mut registry),
             _ => {
-                if let Some("sh" | "bash") = path.extension().and_then(|e| e.to_str()) {
-                    parse_shell_script_content(content, &mut registry);
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                match ext {
+                    "sh" | "bash" => parse_shell_script_content(content, &mut registry),
+                    "csproj" | "fsproj" => parse_csproj_content(content, &mut registry),
+                    _ => {}
                 }
             }
         }
@@ -449,6 +466,34 @@ fn parse_wrangler_toml(path: &Path, registry: &mut DependencyRegistry) {
         return;
     };
     parse_wrangler_toml_content(&content, registry);
+}
+
+fn parse_pom_xml(path: &Path, registry: &mut DependencyRegistry) {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    parse_pom_xml_content(&content, registry);
+}
+
+fn parse_gradle(path: &Path, registry: &mut DependencyRegistry) {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    parse_gradle_content(&content, registry);
+}
+
+fn parse_csproj(path: &Path, registry: &mut DependencyRegistry) {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    parse_csproj_content(&content, registry);
+}
+
+fn parse_gemfile_lock(path: &Path, registry: &mut DependencyRegistry) {
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    parse_gemfile_lock_content(&content, registry);
 }
 
 // ---------------------------------------------------------------------------
@@ -816,6 +861,186 @@ fn extract_wrangler_bindings(
                     name: b.to_owned(),
                     version: "*".to_owned(),
                     ecosystem: DependencyEcosystem::CloudflareBinding,
+                    dev: false,
+                });
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Manifest parsers — Maven / Gradle / C# / Ruby (Sprint 171, Phase 2)
+// ---------------------------------------------------------------------------
+
+/// Parse `pom.xml` content — extracts `<groupId>:<artifactId>` pairs with version.
+///
+/// Zero-copy byte scan: no XML library required. Finds `<dependency>` blocks and
+/// extracts the first `<groupId>`, `<artifactId>`, and optional `<version>` within
+/// each block.
+fn parse_pom_xml_content(content: &str, registry: &mut DependencyRegistry) {
+    for block in content.split("<dependency>").skip(1) {
+        let end = block.find("</dependency>").unwrap_or(block.len());
+        let dep_block = &block[..end];
+        let group = extract_xml_text(dep_block, "groupId");
+        let artifact = extract_xml_text(dep_block, "artifactId");
+        if let (Some(g), Some(a)) = (group, artifact) {
+            let name = format!("{g}:{a}");
+            let version = extract_xml_text(dep_block, "version")
+                .unwrap_or("*")
+                .to_owned();
+            registry.insert(DependencyEntry {
+                name,
+                version,
+                ecosystem: DependencyEcosystem::Maven,
+                dev: false,
+            });
+        }
+    }
+}
+
+fn extract_xml_text<'a>(src: &'a str, tag: &str) -> Option<&'a str> {
+    let open = format!("<{tag}>");
+    let close = format!("</{tag}>");
+    let start = src.find(&open)? + open.len();
+    let end = src[start..].find(&close)?;
+    let value = src[start..start + end].trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+/// Parse `build.gradle` / `build.gradle.kts` — extracts `implementation`,
+/// `api`, `runtimeOnly`, and `testImplementation` declarations.
+///
+/// Zero-copy line scan for `"group:artifact:version"` and `"group:artifact"`
+/// quoted strings. Handles both Groovy and Kotlin DSL syntax.
+fn parse_gradle_content(content: &str, registry: &mut DependencyRegistry) {
+    const GRADLE_KEYWORDS: &[&str] = &[
+        "implementation",
+        "api(",
+        "runtimeOnly",
+        "compileOnly",
+        "testImplementation",
+        "testRuntimeOnly",
+        "annotationProcessor",
+        "kapt(",
+    ];
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let is_dep_line = GRADLE_KEYWORDS.iter().any(|kw| trimmed.starts_with(kw));
+        if !is_dep_line {
+            continue;
+        }
+        // Extract quoted "group:artifact:version" or 'group:artifact:version'
+        let quoted = extract_gradle_quoted(trimmed);
+        if let Some(coord) = quoted {
+            let parts: Vec<&str> = coord.splitn(3, ':').collect();
+            if parts.len() >= 2 {
+                let name = format!("{}:{}", parts[0], parts[1]);
+                let version = parts.get(2).copied().unwrap_or("*").to_owned();
+                let dev = trimmed.starts_with("test");
+                registry.insert(DependencyEntry {
+                    name,
+                    version,
+                    ecosystem: DependencyEcosystem::Maven,
+                    dev,
+                });
+            }
+        }
+    }
+}
+
+fn extract_gradle_quoted(line: &str) -> Option<&str> {
+    for delim in ['"', '\''] {
+        if let Some(start) = line.find(delim) {
+            let rest = &line[start + 1..];
+            if let Some(end) = rest.find(delim) {
+                let coord = &rest[..end];
+                if coord.contains(':') {
+                    return Some(coord);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Parse `.csproj` / `.fsproj` content — extracts `<PackageReference>` entries.
+///
+/// Zero-copy line scan for `Include="…"` and `Version="…"` attributes.
+fn parse_csproj_content(content: &str, registry: &mut DependencyRegistry) {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !trimmed.contains("PackageReference") {
+            continue;
+        }
+        let name = extract_xml_attr(trimmed, "Include");
+        let version = extract_xml_attr(trimmed, "Version")
+            .unwrap_or("*")
+            .to_owned();
+        if let Some(name) = name {
+            registry.insert(DependencyEntry {
+                name: name.to_owned(),
+                version,
+                ecosystem: DependencyEcosystem::NuGet,
+                dev: false,
+            });
+        }
+    }
+}
+
+fn extract_xml_attr<'a>(src: &'a str, attr: &str) -> Option<&'a str> {
+    let key = format!("{attr}=\"");
+    let start = src.find(&key)? + key.len();
+    let end = src[start..].find('"')?;
+    let value = &src[start..start + end];
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+/// Parse `Gemfile.lock` content — extracts gem name + version from the `specs:`
+/// block within the `GEM` section.
+///
+/// Line scan: enter the `GEM … specs:` block, parse `  gemname (version)` lines
+/// at indent-2, exit on blank line or next top-level section.
+fn parse_gemfile_lock_content(content: &str, registry: &mut DependencyRegistry) {
+    let mut in_specs = false;
+    for line in content.lines() {
+        if line == "GEM" || line.starts_with("GEM\r") {
+            in_specs = false;
+            continue;
+        }
+        if line.trim() == "specs:" {
+            in_specs = true;
+            continue;
+        }
+        if !in_specs {
+            continue;
+        }
+        // specs: entries are indented with exactly 4 spaces
+        if !line.starts_with("    ") || line.starts_with("     ") {
+            // blank or next section header — exit specs block
+            if line.is_empty() || line.starts_with('\r') || !line.starts_with(' ') {
+                in_specs = false;
+            }
+            continue;
+        }
+        let trimmed = line.trim();
+        // Format: "gemname (version)"
+        if let Some(paren) = trimmed.find(" (") {
+            let name = &trimmed[..paren];
+            let rest = &trimmed[paren + 2..];
+            let version = rest.trim_end_matches(')');
+            if !name.is_empty() {
+                registry.insert(DependencyEntry {
+                    name: name.to_owned(),
+                    version: version.to_owned(),
+                    ecosystem: DependencyEcosystem::RubyGems,
                     dev: false,
                 });
             }
@@ -2802,6 +3027,130 @@ my-crate = { git = "https://github.com/attacker/crate", branch = "main" }
                 .as_ref()
                 .map_or(false, |c| !c.is_empty()),
             "taint chain must be populated"
+        );
+    }
+
+    // ── Phase 2: Maven / Gradle / C# / Ruby manifest parsers ────────────────
+
+    #[test]
+    fn parse_pom_xml_content_extracts_group_artifact_version() {
+        let pom = r#"<?xml version="1.0"?>
+<project>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+      <version>3.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+      <version>0.11.5</version>
+    </dependency>
+  </dependencies>
+</project>"#;
+        let mut registry = DependencyRegistry::new();
+        parse_pom_xml_content(pom, &mut registry);
+        let names: Vec<_> = registry.entries.iter().map(|e| e.name.as_str()).collect();
+        assert!(
+            names.contains(&"org.springframework.boot:spring-boot-starter-security"),
+            "spring-boot-starter-security must be extracted"
+        );
+        assert!(
+            names.contains(&"io.jsonwebtoken:jjwt-api"),
+            "jjwt-api must be extracted"
+        );
+        assert_eq!(
+            registry
+                .entries
+                .iter()
+                .find(|e| e.name.ends_with("jjwt-api"))
+                .map(|e| e.version.as_str()),
+            Some("0.11.5")
+        );
+    }
+
+    #[test]
+    fn parse_gradle_content_extracts_implementation_coordinates() {
+        let gradle = r#"
+plugins { id 'java' }
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.2.0'
+    api("io.auth0:java-jwt:4.4.0")
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    compileOnly "org.projectlombok:lombok:1.18.30"
+}
+"#;
+        let mut registry = DependencyRegistry::new();
+        parse_gradle_content(gradle, &mut registry);
+        let names: Vec<_> = registry.entries.iter().map(|e| e.name.as_str()).collect();
+        assert!(
+            names.contains(&"org.springframework.boot:spring-boot-starter-web"),
+            "spring-boot-starter-web must be extracted"
+        );
+        assert!(
+            names.contains(&"io.auth0:java-jwt"),
+            "java-jwt must be extracted"
+        );
+    }
+
+    #[test]
+    fn parse_csproj_content_extracts_package_references() {
+        let csproj = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>"#;
+        let mut registry = DependencyRegistry::new();
+        parse_csproj_content(csproj, &mut registry);
+        let names: Vec<_> = registry.entries.iter().map(|e| e.name.as_str()).collect();
+        assert!(
+            names.contains(&"Microsoft.AspNetCore.Authentication.JwtBearer"),
+            "JwtBearer must be extracted"
+        );
+        assert!(
+            names.contains(&"Newtonsoft.Json"),
+            "Newtonsoft.Json must be extracted"
+        );
+        assert_eq!(
+            registry
+                .entries
+                .iter()
+                .find(|e| e.name == "Newtonsoft.Json")
+                .map(|e| e.version.as_str()),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
+    fn parse_gemfile_lock_content_extracts_gem_specs() {
+        let lockfile = r#"GEM
+  remote: https://rubygems.org/
+  specs:
+    devise (4.9.3)
+      bcrypt (~> 3.0)
+      orm_adapter (~> 0.1)
+    omniauth (2.1.1)
+      hashie (>= 3.4.6)
+    rails (7.1.0)
+
+BUNDLED WITH
+   2.4.22
+"#;
+        let mut registry = DependencyRegistry::new();
+        parse_gemfile_lock_content(lockfile, &mut registry);
+        let names: Vec<_> = registry.entries.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.contains(&"devise"), "devise must be extracted");
+        assert!(names.contains(&"omniauth"), "omniauth must be extracted");
+        assert!(names.contains(&"rails"), "rails must be extracted");
+        assert_eq!(
+            registry
+                .entries
+                .iter()
+                .find(|e| e.name == "devise")
+                .map(|e| e.version.as_str()),
+            Some("4.9.3")
         );
     }
 }
