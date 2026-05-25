@@ -3,6 +3,21 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-24 — Sprint 171: JWT Keyfunc Proof Gate + Manifest Parser (Maven/Gradle/C#/Ruby) + Workflow Fix + Hunt Sweep
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — added `classify_jwt_keyfunc_proof(has_valid_methods_guard, has_nil_nil_return, in_test_path) -> ProofClass` (pure predicate) and `classify_jwt_validation_bypass_proof(source, finding)` (source-reading wrapper). Priority order: `in_test_path ∨ has_valid_methods_guard → InvariantViolationProof`; `has_nil_nil_return → ReachabilityProof`; else `LatticeGapProposal`.
+* `crates/cli/src/hunt.rs` *(modified)* — `classify_one_proof` dispatch extended with `id.contains("jwt_validation_bypass") → po::classify_jwt_validation_bypass_proof`. Closes Grafana FP class: `WithValidMethods`/algorithm-assertion guarded calls now correctly suppressed.
+* `crates/forge/src/jwt_keyfunc_oracle.rs` *(modified)* — added 3 unit tests: `jwt_keyfunc_with_valid_methods_guard_yields_invariant_violation`, `jwt_keyfunc_nil_nil_return_yields_reachability`, `jwt_keyfunc_grafana_fp_class_yields_invariant_violation`.
+* `crates/forge/src/reflexive_assurance.rs` *(modified)* — added Kani harness `jwt_keyfunc_is_exact_conjunction` in `compliance_oracle_kani` module; proves priority-ordered predicate for all boolean inputs.
+* `crates/common/src/deps.rs` *(modified)* — added `DependencyEcosystem::Maven` (6), `DependencyEcosystem::NuGet` (7), `DependencyEcosystem::RubyGems` (8) variants with Display impl.
+* `crates/anatomist/src/manifest.rs` *(modified)* — added Maven `pom.xml`, Gradle `build.gradle`/`build.gradle.kts`, C# `.csproj`/`.fsproj`, Ruby `Gemfile.lock` parsers (zero-copy string scan, no new deps). All four manifest types wired into `scan_manifests` and `find_zombie_deps_in_blobs`. MANIFEST_NAMES updated. 4 unit tests added.
+* `.github/workflows/registry-watch.yml` *(modified)* — added `Install Janitor Binary` step (SHA-384 verified) before scan step; fixes `command not found` on every ubuntu-latest daily run.
+* **Dependabot enabled**: vulnerability alerts and automated security fixes enabled via GitHub API (`gh api --method PUT`).
+* **Hunt sweep**: querybook/oauth_missing_state_validation upgraded 65%→70% (state discard confirmed at `oauth_auth.py:66`). casdoor/react_xss_dangerous_html upgraded 40%→60% (write path confirmed via `UpdateApplication` org-admin check). keycloak/non_constant_time_comparison demoted 40%→LOW_YIELD (Argon2 KDF 100ms dominates String.equals() 100ns by 10⁶ factor — timing irrecoverable).
+* `.INNOVATION_LOG.md` *(modified)* — dependency-visibility gap text updated to reflect Maven/Gradle/C#/Ruby parser shipment.
+
+**Verification**: `just audit` exits 0; 11/11 JWT keyfunc tests pass; 47/47 anatomist manifest tests pass (includes 4 new parsers); `cargo kani --harness jwt_keyfunc_is_exact_conjunction` verified.
+
 ## 2026-05-22 — Sprint 164: MCP/FFI Proof Cures + Adversarial Robustness Docs + Hunt Sweep
 
 * `crates/forge/src/proof_obligation.rs` *(modified)* — added `mcp_confused_deputy_dispatch_is_reachable` / `classify_mcp_confused_deputy_dispatch_proof` and `ffi_memory_corruption_is_reachable` / `classify_ffi_memory_corruption_proof`; classifiers suppress tests, generated fixtures, local-dev transports, generated bindings, local shims, and explicit secret/capability/null/length/ownership guards, and emit `ReachabilityProof` only for production untrusted dispatch or FFI pointer/length sinks without guards.

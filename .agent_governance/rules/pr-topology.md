@@ -49,13 +49,51 @@ Pattern to enforce:
 The six-line `retain_mut` clone pattern triggers `logic_clones_found` in
 the Structural Firewall and will score 5 pts per clone (gate = 10).
 
-## CI Monitoring Cadence (after every `git push`)
+## Rebase Mandate (before every `gh pr create`)
+
+**Always rebase the feature branch onto `origin/main` before opening a PR.**
+
+```bash
+git fetch origin main
+git rebase origin/main
+```
+
+If git auto-skips commits (squash-merged ancestors), verify the diff is clean:
+
+```bash
+git diff origin/main...HEAD --stat
+```
+
+A branch with unresolved divergence from `main` will produce merge conflicts
+that suppress `pull_request` event delivery to GitHub Actions, causing
+the Governor `Janitor Integrity Check` to time out with no gate run recorded.
+
+## CI Monitoring Cadence (after every `git push` + PR creation)
 
 | Time | Action |
 |---|---|
-| 1 min | Check `gh pr checks <N>` — Structural Firewall must show pass/fail (not pending) |
+| 60 s | `gh pr checks <N>` — **`Janitor PR Gate` must appear** (queued/running/pass/fail). If absent → re-dispatch immediately (see below). |
 | 5 min | All GitHub Actions checks should be pass/fail |
-| 9+ min | Governor Janitor Integrity Check resolves; if fail, read log |
+| 9+ min | Governor `Janitor Integrity Check` resolves |
 
-A timeout on the Governor check means the `janitor bounce` binary took
->9 min on the PR diff — investigate binary size / diff size.
+### Governor `Janitor Integrity Check` timeout — diagnosis
+
+A `timed_out` conclusion on the Governor check means **the `Janitor PR Gate`
+GitHub Actions workflow did not deliver its bounce result to the Governor within
+9 minutes**. Two root causes:
+
+| Cause | Symptom | Fix |
+|---|---|---|
+| Workflow never triggered | `gh run list` shows NO Janitor PR Gate run for the PR head SHA | Re-dispatch (see below) |
+| Bounce exceeded 120 s timeout | Janitor PR Gate run exists but timed out | Investigate diff size / binary budget |
+
+### Re-dispatch command (workflow not triggered)
+
+```bash
+gh workflow run janitor-pr-gate.yml \
+  --repo janitor-security/the-janitor \
+  --ref <head-branch> \
+  -f pr_number=<N>
+```
+
+After dispatching, re-check within 90 s: `gh pr checks <N> --watch`.
