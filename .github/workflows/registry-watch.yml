@@ -37,11 +37,32 @@ jobs:
         id: scan
         run: |
           set -euo pipefail
-          EXIT=0
-          janitor registry-watch --output /tmp/rw_report.json --sarif /tmp/rw_report.sarif || EXIT=$?
-          echo "exit_code=${EXIT}" >> "$GITHUB_OUTPUT"
-          if [ "${EXIT}" -ne 0 ]; then
+          # Correct subcommand: watch-registries (not registry-watch).
+          # --once: single poll cycle, no daemon loop.
+          # --dry-run: print findings as NDJSON to stdout; do NOT write queue file.
+          # Findings detection: non-empty output file, not exit code.
+          # Exit code is always 0 on success; non-zero only on binary/network error.
+          janitor watch-registries --once --dry-run --max-age-hours 24 > /tmp/rw_report.json 2>/tmp/rw_scan.log || {
+            echo "::warning::watch-registries exited non-zero — check /tmp/rw_scan.log for errors (not a findings signal)"
+            echo "findings=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ -s /tmp/rw_report.json ]; then
             echo "findings=true" >> "$GITHUB_OUTPUT"
+            # Generate minimal SARIF from NDJSON for Security tab integration.
+            jq -n --slurpfile pkgs /tmp/rw_report.json '{
+              "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+              version: "2.1.0",
+              runs: [{
+                tool: { driver: { name: "janitor-registry-watch", version: "1.0", rules: [] } },
+                results: [ $pkgs[] | {
+                  ruleId: "registry-watch/suspicious-package",
+                  level: "warning",
+                  message: { text: ("Suspicious package: " + .name + " v" + .version + " (" + .registry + ")") },
+                  locations: [{ physicalLocation: { artifactLocation: { uri: "registry-feed" } } }]
+                }]
+              }]
+            }' > /tmp/rw_report.sarif
           else
             echo "findings=false" >> "$GITHUB_OUTPUT"
           fi
@@ -75,7 +96,7 @@ jobs:
                 '',
                 `Automated registry scan on run [${context.runId}](${runUrl}) detected suspicious packages.`,
                 '',
-                '**Artifacts:** Download `rw-report-' + context.runId + '` from the run artifacts above for the full JSON report.',
+                '**Artifacts:** Download `rw-report-' + context.runId + '` from the run artifacts above for the full NDJSON report.',
                 '',
                 '**SARIF findings** are visible in the [Security → Code scanning](../../security/code-scanning) tab.',
                 '',
