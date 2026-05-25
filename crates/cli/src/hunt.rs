@@ -3175,6 +3175,8 @@ fn classify_one_proof(dir: &Path, finding: &StructuredFinding) -> Option<ProofCl
         po::classify_react_xss_proof(&src(), finding)
     } else if id.contains("unauthenticated_debug_endpoint") {
         po::classify_debug_endpoint_proof(&src(), finding)
+    } else if id.contains("jwt_validation_bypass") {
+        po::classify_jwt_validation_bypass_proof(&src(), finding)
     } else {
         return None;
     })
