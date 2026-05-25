@@ -836,7 +836,7 @@ impl PRBouncer for PatchBouncer {
             let is_release_pr = self
                 .branch_name
                 .as_deref()
-                .map_or(false, |b| b.starts_with("release/v"))
+                .is_some_and(|b| b.starts_with("release/v"))
                 || (section_paths.iter().any(|p| p == "Cargo.toml")
                     && section_paths.iter().any(|p| p.ends_with("CHANGELOG.md")));
             for section in sections {
