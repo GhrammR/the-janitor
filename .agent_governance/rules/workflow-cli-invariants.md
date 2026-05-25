@@ -29,12 +29,20 @@ check for the presence and non-emptiness of the output file, not the exit code a
 
 **Required pattern:**
 ```bash
+<<<<<<< HEAD
 janitor <subcommand> ... > /tmp/report.json 2>/tmp/scan.log || {
+=======
+janitor <subcommand> ... > "${GITHUB_WORKSPACE}/report.json" 2>"${GITHUB_WORKSPACE}/scan.log" || {
+>>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
   echo "::warning::subcommand failed — not a findings signal"
   echo "findings=false" >> "$GITHUB_OUTPUT"
   exit 0
 }
+<<<<<<< HEAD
 if [ -s /tmp/report.json ]; then
+=======
+if [ -s "${GITHUB_WORKSPACE}/report.json" ]; then
+>>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
   echo "findings=true" >> "$GITHUB_OUTPUT"
 else
   echo "findings=false" >> "$GITHUB_OUTPUT"
@@ -66,3 +74,31 @@ content was produced (Law W-CLI-II above).
 grep -A 3 "File issue on detection" .github/workflows/*.yml | grep "findings == 'true'"
 # Must be present. findings=true must only be set when output file is non-empty.
 ```
+<<<<<<< HEAD
+=======
+
+## Law W-CLI-IV — Report Files Must Be Written to $GITHUB_WORKSPACE
+
+`hashFiles()` in GitHub Actions evaluates glob patterns **relative to `$GITHUB_WORKSPACE`**.
+Paths outside the workspace (e.g. `/tmp/report.json`) always return empty string — the
+`hashFiles` condition evaluates false, and dependent upload/SARIF steps are silently skipped
+even when findings exist.
+
+**Required:** All report files written by CI scan steps must use workspace-relative paths:
+```bash
+REPORT="${GITHUB_WORKSPACE}/rw_report.json"
+SARIF="${GITHUB_WORKSPACE}/rw_report.sarif"
+```
+
+And `hashFiles` / `upload-artifact` `path:` must use the bare filename (no leading `/`):
+```yaml
+if: always() && hashFiles('rw_report.json') != ''
+# ...
+path: rw_report.json   # workspace-relative, not /tmp/rw_report.json
+```
+
+**Root cause of incident (Sprint 173, issue #152):** Scan step wrote reports to `/tmp/`.
+`hashFiles('/tmp/rw_report.json')` always returned `''`. Upload steps were skipped even
+when genuine findings existed. Issue was filed but contained no downloadable artifact —
+triage was impossible.
+>>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
