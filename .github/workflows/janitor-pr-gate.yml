@@ -4,6 +4,15 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: >
+          PR number to gate (manual re-trigger when the pull_request.opened
+          event is dropped by GitHub Actions — e.g. after a Governor
+          Janitor Integrity Check timed_out with no gate run recorded).
+        required: true
+        type: number
 
 # Workflow-level: deny all by default.
 permissions:
@@ -72,6 +81,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           governor_url: ${{ secrets.JANITOR_GOVERNOR_URL }}
+          pr_number: ${{ inputs.pr_number || github.event.pull_request.number }}
 
       - name: Upload bounce log
         # Always upload so reviewers can inspect findings even on gate failure.

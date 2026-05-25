@@ -32,6 +32,15 @@ inputs:
       control plane.  Example: https://governor.your-org.internal
     required: false
     default: ''
+  pr_number:
+    description: >
+      PR number override.  Set when invoking via workflow_dispatch to
+      re-trigger the gate after a pull_request.opened event was dropped
+      by GitHub Actions (Governor Janitor Integrity Check timed_out with
+      no gate run recorded).  When omitted, resolved from
+      github.event.pull_request.number.
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -164,14 +173,16 @@ runs:
         chmod +x "${JANITOR_BIN}"
 
     # Step 4 — Extract the PR unified diff.
+    # Also runs on workflow_dispatch re-triggers (inputs.pr_number set).
     - name: Extract Patch
-      if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+      if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' || (github.event_name == 'workflow_dispatch' && inputs.pr_number != '') }}
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
-        gh pr diff "${{ github.event.pull_request.number }}" \
+        PR_NUM="${{ inputs.pr_number || github.event.pull_request.number }}"
+        gh pr diff "${PR_NUM}" \
           --repo "${{ github.repository }}" \
           > .janitor-pr.patch
 
@@ -188,14 +199,25 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        # Resolve HEAD_SHA: prefer PR event context; fall back to gh pr view
+        # for workflow_dispatch re-triggers where the event payload is absent.
         HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+        if [ -z "${HEAD_SHA}" ]; then
+          _PR_NUM="${{ inputs.pr_number }}"
+          if [ -n "${_PR_NUM}" ]; then
+            HEAD_SHA="$(gh pr view "${_PR_NUM}" \
+              --repo "${{ github.repository }}" \
+              --json headRefOid -q .headRefOid)"
+          fi
+        fi
         GOVERNOR="${{ inputs.governor_url }}"
         GOVERNOR_CURL_OPTS=(--fail --show-error --silent --connect-timeout 5 --max-time 30 --retry 0)
         JANITOR_TIMEOUT_SECONDS=120
+        _PR_NUM_RESOLVED="${{ inputs.pr_number || github.event.pull_request.number }}"
         BOUNCE_ARGS=(
           bounce .
           --patch .janitor-pr.patch
-          --pr-number "${{ github.event.pull_request.number }}"
+          --pr-number "${_PR_NUM_RESOLVED}"
           --head-sha "$HEAD_SHA"
         )
         if [ "${{ inputs.deep_scan }}" = "true" ]; then

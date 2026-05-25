@@ -20,6 +20,23 @@
      Auto-Merge Watch at immediate, +1 minute, +5 minutes, and final +9
      minutes.
 
+2a. **PR Gate Presence Check (60 s after `gh pr create`):**
+   ```bash
+   gh pr checks <N> 2>&1 | grep -q "Janitor PR Gate"
+   ```
+   If `Janitor PR Gate` is absent from the output after 60 seconds:
+   1. Immediately re-dispatch:
+      ```bash
+      gh workflow run janitor-pr-gate.yml \
+        --repo janitor-security/the-janitor \
+        --ref <head-branch> \
+        -f pr_number=<N>
+      ```
+   2. Wait 90 s, then verify `gh pr checks <N> --watch` shows Janitor PR Gate running.
+   3. Log the event: GitHub silently dropped the `pull_request.opened` event —
+      re-dispatch via `workflow_dispatch` is the recovery path.
+   **Never proceed to merge-readiness checks until Janitor PR Gate is confirmed queued.**
+
 3. **If signed commit creation fails because GPG is locked**:
    - Stop before any fallback commit attempt.
    - Prompt the operator exactly: `Run gpg-unlock, enter the passphrase in the terminal, then reply "continue".`

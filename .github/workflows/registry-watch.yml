@@ -16,6 +16,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install Janitor Binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="$(gh release view --repo janitor-security/the-janitor --json tagName -q .tagName)"
+          mkdir -p /tmp/janitor-bin
+          gh release download "${TAG}" \
+            --repo janitor-security/the-janitor \
+            --pattern "janitor" \
+            --pattern "janitor.sha384" \
+            --dir /tmp/janitor-bin \
+            --clobber
+          printf '%s  %s\n' "$(tr -d '\n' < /tmp/janitor-bin/janitor.sha384)" "/tmp/janitor-bin/janitor" | sha384sum -c -
+          chmod +x /tmp/janitor-bin/janitor
+          echo "/tmp/janitor-bin" >> "$GITHUB_PATH"
+
       - name: Run registry watch scan
         id: scan
         run: |
