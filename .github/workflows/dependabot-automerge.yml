@@ -6,7 +6,8 @@ on:
       - main
 
 # Minimal workflow surface: read by default; the dependabot job receives only
-# PR-write authority to approve and queue its PR.
+# PR-write + contents-write authority. contents:write is required by the
+# enablePullRequestAutoMerge GraphQL mutation invoked by `gh pr merge --auto`.
 permissions:
   contents: read
 
@@ -16,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: write
       pull-requests: write
     # Hard-guard: only act when the PR author is the Dependabot bot.
     # github.actor is set by GitHub and cannot be spoofed by PR content.
