@@ -6,8 +6,9 @@ on:
       - main
 
 # Minimal workflow surface: read by default; the dependabot job receives only
-# PR-write + contents-write authority. contents:write is required by the
-# enablePullRequestAutoMerge GraphQL mutation invoked by `gh pr merge --auto`.
+# PR-write + contents-write authority. contents:write is required by both
+# enablePullRequestAutoMerge (gh pr merge --auto) and updatePullRequestBranch
+# (gh pr update-branch) GraphQL mutations.
 permissions:
   contents: read
 
@@ -30,8 +31,20 @@ jobs:
           allowed-endpoints: >
             api.github.com:443
 
-      # Enable auto-merge first so the merge fires the moment required checks
-      # pass — even if the approve step below races with check completion.
+      # Update the branch so it is current with main before arming auto-merge.
+      # Branch protection has strict:true (require up-to-date), so a branch
+      # that is behind main will block the merge even when all checks pass.
+      - name: Update branch to base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh pr update-branch \
+            --repo "${{ github.repository }}" \
+            "${{ github.event.pull_request.number }}" || true
+
+      # Enable auto-merge. Fires the moment all required checks pass on the
+      # updated branch.
       - name: Enable auto-merge (squash)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -39,17 +52,4 @@ jobs:
           set -euo pipefail
           gh pr merge --auto --squash \
             --repo "${{ github.repository }}" \
-            "${{ github.event.pull_request.number }}"
-
-      # Approve so any "required review" branch-protection rule is satisfied.
-      # GITHUB_TOKEN is the Actions app identity — distinct from dependabot[bot]
-      # — so self-approval restrictions do not apply here.
-      - name: Approve PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh pr review --approve \
-            --repo "${{ github.repository }}" \
-            --body "Auto-approved: Dependabot dependency update. Squash-merge queued pending all 10 required checks (PR Resolution Audit, Janitor Integrity Check, Structural Firewall, MSRV, Dependency Review, CodeQL×4, Code Scanning Alert Audit)." \
             "${{ github.event.pull_request.number }}"
