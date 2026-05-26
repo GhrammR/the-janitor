@@ -97,3 +97,31 @@ gh workflow run janitor-pr-gate.yml \
 ```
 
 After dispatching, re-check within 90 s: `gh pr checks <N> --watch`.
+
+## Law PT-IV — Never Accumulate Multiple Fixes on a Branch Already Partially Merged via Squash
+
+When a PR is squash-merged, GitHub creates a new commit on `main` whose tree
+matches the PR tip but whose parents differ from the branch's commits. Any
+subsequent commits pushed to that same branch will **conflict** on the next
+PR against `main` because git cannot detect the squash relationship.
+
+**Required pattern:** one branch = one PR = one squash commit. After a PR merges:
+1. Immediately branch from fresh `origin/main` for follow-on work.
+2. Never push additional commits to a branch whose PR has already been squash-merged.
+
+**Recovery** when a conflict is detected (`mergeStateStatus: DIRTY`):
+```bash
+git fetch origin main
+git rebase origin/main   # git skips already-merged commits automatically
+git push --force-with-lease origin <branch>
+```
+
+The rebase will skip the squash-merged commit with `warning: skipped previously
+applied commit` — this is expected and correct. Only the new, unmerged commits
+remain.
+
+**Root cause (Sprint 173, 2026-05-26):** PR #163 squash-merged the first commit
+of `sprint173/fix-dependabot-automerge`. Two subsequent governance/workflow
+commits were pushed to the same branch, creating PR #164. GitHub reported
+`mergeable: CONFLICTING` / `mergeStateStatus: DIRTY`. Fixed by `git rebase
+origin/main` which auto-skipped the already-merged commit.
