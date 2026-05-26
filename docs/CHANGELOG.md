@@ -6969,3 +6969,74 @@ All three hunts → LOW_YIELD only. Tri-Ledger applied.
 * **apache/superset** (Sprint 170 targeted hunt of `views/` + `utils/`): `jwt_validation_bypass` in `oauth2.py` (admin-config-bound algorithm, not user-controlled); `oauth_missing_state_validation` in `users/api.py` (user profile API, not OAuth callback); `config_taint_*` mass batch (internal form data routing, not HTTP sourced). All → LOW_YIELD.
 
 **Verification**: `cargo test -p forge` 1,360+ passed, 0 failed. P17-3A bounded_overflow + ld_preload eradicated from INNOVATION_LOG. Java OAuth gate ships with 2 regression tests. Push protection enabled on GH repo. 7 new LOW_YIELD entries.
+
+## 2026-05-26 — Sprint 175: P17-3C Blockchain Proof Gates, Oracle Fix, java_deser FP Suppression, Hunt Sweep ×3
+
+### Phase 1: Branch Setup
+
+* `sprint175/code` created from `origin/main` (post PR #169/#170 merge).
+
+### Phase 2–3: P17-3A Batch 3 — is_lattice_gap_synthesizable_rule + 12 Tests
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — `is_lattice_gap_synthesizable_rule` extended from 14 to 20 entries: `oracle_price_manipulation`, `signature_replay`, `unprotected_authority_transition`, `flash_loan_callback_unvalidated_sender`, `reentrancy`, `unsafe_delegatecall`. Docstring updated.
+* 12 new deterministic tests (P17-3C block, 2 per rule): `_without_proof_gets_lattice_gap` + `_with_proof_preserved` pattern.
+
+### Phase 4: INNOVATION_LOG Hard-Deletion
+
+* `.INNOVATION_LOG.md` *(modified)* — 6 P17-3A blocks hard-deleted: oracle_price_manipulation, signature_replay, unprotected_authority_transition, flash_loan_callback_unvalidated_sender, reentrancy, unsafe_delegatecall. 7 P17-3A blocks remain (see NRA for Batch 4).
+
+### Phase 5: ClickHouse optimizer_phantom_authority Investigation
+
+* Full clone of ClickHouse, manual inspection of `src/Analyzer/Resolve/QueryAnalyzer.cpp:5089-5196` and `src/Interpreters/InterpreterSelectQuery.cpp:1065`. `checkAccess` confirmed at interpreter level (upstream of Analyzer). Row-level policy filter injected at `QueryAnalyzer.cpp:5180` correctly before optimizer operates. Finding DEMOTED to LOW_YIELD.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — `optimizer_phantom_authority` row deleted.
+* `tools/campaign/LOW_YIELD_LEDGER.md` *(modified)* — ClickHouse demotion entry added.
+
+### Phase 6: Oracle Fix — raw_added.clone() Eliminated
+
+* `crates/forge/src/slop_filter.rs` *(modified)* — `let added = raw_added.clone()` at line 1182 changed to `let added = raw_added` (move); call at line 1407 changed from `&raw_added` to `&added`. Eliminates one String clone per patch-bounce invocation. `package_context_for_patch` already accepts `&str` via deref coercion. `cargo check -p forge` exit 0.
+
+### Phase 7: just audit + Crucible
+
+* `just audit` exit 0. `cargo run -p crucible` → 181/181 SANCTUARY INTACT.
+
+### Phase 8: PR #171 Created, Auto-Merge Armed, Merged
+
+* PR #171 `feat(proof_obligation): P17-3C — LatticeGapProposal gate for 6 blockchain-class rules` created against main. Auto-merge armed. All checks passed. MERGED (squash).
+
+### Phase 9: Hunt Sweep ×3
+
+* **yearn-finance/yearn-vaults**: `unauthenticated_debug_endpoint` at `yarn.lock:531` → LOW_YIELD (lockfile FP).
+* **apache/kafka**: `unpinned_asset` at `gradle/resources/dependencycheck-suppressions.xml:18` → LOW_YIELD (Dependency Check CVE URL, not shell download). `java_deser_allowlist_bypass` ×multiple → LOW_YIELD (Kafka `Deserializer<T>` FP — engine fix applied).
+* **hashicorp/vault**: `ssrf_dynamic_url` at `builtin/credential/cert/backend.go:188` → CANDIDATE 25% (cert CRL CDP fetch, user-cert-controlled URL possible). Testing.go SSRF → LOW_YIELD. unpinned first-party git dep → LOW_YIELD. `protobuf_any_unguarded_decode` ×35 — covered by existing CANDIDATE entry at 50%.
+
+### Phase 10: java_deser_guard FP Suppression Engine Fix (PR #172)
+
+* `crates/forge/src/java_deser_guard.rs` *(modified)* — Added `OBJECT_DESER_CONTEXT_MARKERS` constant + file-level `has_object_deser_context` pre-check in `find_unguarded_deser_sinks`. Bare `deserialize(` now requires `ObjectInputStream`/`Serializable`/`ObjectDecoder`/`ObjectSerializationDecoder`/`readObject` to appear in the file before emitting. Eliminates Kafka `Deserializer<T>`, Jackson, and similar generic-interface FPs.
+* Updated `tp_deserialize_call_no_suppressor` test to include ObjectInputStream context; added `tn_kafka_style_deserializer_interface_suppressed` TN fixture.
+* PR #172 `fix(java_deser_guard): context gate to suppress Kafka Deserializer<T> FP` opened against main. Auto-merge armed. Checks pending (`WAIT_FOR_CHECKS`).
+
+**Verification**: `just audit` exit 0. `cargo run -p crucible` 181/181. PR #171 MERGED. PR #172 AUTO_MERGE_ARMED_WAITING_FOR_CHECKS. 7 P17-3A blocks remain in log. 5 new LOW_YIELD entries. 1 new CANDIDATE entry (Vault cert SSRF at 25%).
+
+---
+
+## Sprint 175 — P17-3A Batch 4 (2026-05-26)
+
+**Proof Obligation Cure — Final Batch**
+
+* `crates/forge/src/proof_obligation.rs` *(modified)* — Extended `is_lattice_gap_synthesizable_rule` from 20 → 27 entries with the final 7 P17-3A rule IDs: `code_execution`, `nonce_reuse`, `unsafe_transmute`, `curl_pipe_execution`, `cmake_execute_process_injection`, `open_cidr_exposure`, `xxe_external_entity`. P17-3A proof-obligation backlog is now empty (0 blocks remain in `.INNOVATION_LOG.md`).
+* Added 14 deterministic gate tests (2 per rule: LatticeGapProposal synthesis + proof-class preservation).
+
+**Architectural Oracle — nonce_reuse Path Suppressor**
+
+* `crates/forge/src/crypto_protocol.rs` *(modified)* — `detect_crypto_protocol_issues` gains `file_path: &str` parameter. `nonce_reuse` detector now skips files in `/node_modules/`, `/compiled/`, `/dist/`, `/vendor/` paths where hardcoded IV findings are structural FPs from bundled third-party code. Added `is_vendored_path` helper and 3 deterministic unit tests (suppressed in node_modules, suppressed in /compiled/, fires on first-party path).
+* `crates/forge/src/slop_hunter.rs`, `slop_filter.rs`, `crates/mcp/src/lib.rs`, `crates/cli/src/hunt.rs`, `crates/anatomist/src/chronovisor.rs`, `crates/crucible/src/main.rs` *(modified)* — All `find_slop` and `detect_crypto_protocol_issues` call sites updated to pass `file_path`. `find_slop_bytes` (test helper) updated to accept `file_path: &str` and thread to `find_slop`.
+
+**Hunt Sweep ×3**
+
+* `pinterest/querybook` — 844 PRs, 13 critical security findings. `security:rag_context_poisoning` (score 490), `security:embedding_trust_transposition` (score 115), `security:mutable_workflow_tag` batch. `oauth_auth.py` state discard not surfaced in PR-diff mode (base code unchanged in recent 1000 PRs). All routed LOW_YIELD.
+* `ethereum/go-ethereum` — 954 PRs, 16 critical findings ($2,400 bounty budget). `security:mutable_workflow_tag` (score 750), `security:ssrf_dynamic_url` (JS frontend), `security:command_injection_shell_exec` (Windows shim). No Bugcrowd/HackerOne bounty program. All routed LOW_YIELD.
+* `apache/flink` — 348 PRs, 28 critical security PRs ($0 bounty). 100% `security:mutable_workflow_tag`. No Apache Flink VDP. All routed LOW_YIELD. 3 new LOW_YIELD entries added.
+
+**PR**: `#173` `feat(proof_obligation): P17-3A Batch 4 — 7 mixed-surface rules + nonce_reuse path suppressor` — opened against main, auto-merge armed.
+
+**Verification**: `just audit` exit 0. `cargo run -p crucible` 181/181. P17-3A backlog = 0. 3 new LOW_YIELD entries appended. CANDIDATE_LEDGER unchanged.
