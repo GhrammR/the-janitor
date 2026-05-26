@@ -34,6 +34,17 @@ const DESER_SINKS: &[&str] = &[
     "deserialize(",
 ];
 
+// File-level context markers required before treating bare `deserialize(` as a
+// Java Object Deserialization sink. Without these, `deserialize(` matches any
+// generic `Deserializer<T>` interface (Kafka, Jackson, etc.) and produces FPs.
+const OBJECT_DESER_CONTEXT_MARKERS: &[&str] = &[
+    "ObjectInputStream",
+    "Serializable",
+    "ObjectDecoder",
+    "ObjectSerializationDecoder",
+    "readObject",
+];
+
 const ALLOWLIST_SUPPRESSORS: &[&str] = &[
     "setAllowClasses(",
     "ClassFilter",
@@ -71,11 +82,28 @@ fn find_unguarded_deser_sinks(source: &str, window: usize) -> Vec<u32> {
         .build(ALLOWLIST_SUPPRESSORS)
         .expect("static ALLOWLIST_SUPPRESSORS patterns are valid");
 
+    let context_ac = AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostFirst)
+        .build(OBJECT_DESER_CONTEXT_MARKERS)
+        .expect("static OBJECT_DESER_CONTEXT_MARKERS patterns are valid");
+
+    // Pre-compute: does this file contain Java Object Serialization context?
+    let has_object_deser_context = context_ac.find(source.as_bytes()).is_some();
+
     let lines: Vec<&str> = source.lines().collect();
     let mut hits: Vec<u32> = Vec::new();
 
     for (line_idx, line) in lines.iter().enumerate() {
         if sink_ac.find(line.as_bytes()).is_none() {
+            continue;
+        }
+        // Guard: bare `deserialize(` without Object Serialization context is a
+        // generic interface method (Kafka Deserializer<T>, Jackson, etc.) — skip.
+        if line.contains("deserialize(")
+            && !line.contains("ObjectInputStream")
+            && !line.contains("readObject")
+            && !has_object_deser_context
+        {
             continue;
         }
 
@@ -198,17 +226,38 @@ Object obj = vois.readObject();
         );
     }
 
-    // ── TP: deserialize( call with no suppressor ─────────────────────────────
+    // ── TP: deserialize( in Java Object Serialization context, no suppressor ────
 
     #[test]
     fn tp_deserialize_call_no_suppressor() {
         let src = r#"
+// Java Object Serialization context — ObjectInputStream present
+ObjectInputStream ois = new ObjectInputStream(inputStream);
 public Object fromBytes(byte[] data) {
     return serializer.deserialize(data);
 }
 "#;
         let findings = emit_java_deser_findings(src, "Codec.java");
-        assert!(!findings.is_empty(), "deserialize( without guard must fire");
+        assert!(
+            !findings.is_empty(),
+            "deserialize( in ObjectInputStream context without guard must fire"
+        );
+    }
+
+    // ── TN: generic Deserializer<T> without Object Serialization context ──────
+
+    #[test]
+    fn tn_kafka_style_deserializer_interface_suppressed() {
+        let src = r#"
+// Kafka custom binary-protocol interface, no Java-object-deser context
+key = keyBytes == null ? null : deserializers.keyDeserializer().deserialize(partition.topic(), headers, keyBytes);
+value = valueBytes == null ? null : deserializers.valueDeserializer().deserialize(partition.topic(), headers, valueBytes);
+"#;
+        let findings = emit_java_deser_findings(src, "CompletedFetch.java");
+        assert!(
+            findings.is_empty(),
+            "Kafka Deserializer<T> without ObjectInputStream context must not fire"
+        );
     }
 
     // ── TN: AllowList present near deserialize( ──────────────────────────────
