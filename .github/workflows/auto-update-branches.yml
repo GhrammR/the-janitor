@@ -1,0 +1,46 @@
+name: Auto-update branches
+
+# Whenever main advances, bring every open PR that has auto-merge enabled
+# up-to-date with the new base. This prevents the strict:true branch-protection
+# rule from blocking auto-merge on PRs whose CI passed while another commit
+# landed on main.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  update-branches:
+    name: Update BEHIND auto-merge PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+
+      - name: Update BEHIND auto-merge PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # List all open PRs with auto-merge enabled whose branch is behind main.
+          gh pr list \
+            --repo "${REPO}" \
+            --state open \
+            --json number,autoMergeRequest,mergeStateStatus \
+            --jq '.[] | select(.autoMergeRequest != null and .mergeStateStatus == "BEHIND") | .number' \
+          | while read -r pr; do
+            echo "Updating PR #${pr}"
+            gh pr update-branch "${pr}" --repo "${REPO}" || true
+          done
