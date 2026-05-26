@@ -32,8 +32,8 @@ jobs:
             api.github.com:443
 
       # Update the branch so it is current with main before arming auto-merge.
-      # Branch protection has strict:true (require up-to-date), so a branch
-      # that is behind main will block the merge even when all checks pass.
+      # Branch protection runs strict:false, so this is a hygiene step only;
+      # the merge is not blocked if the branch is slightly behind main.
       - name: Update branch to base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
