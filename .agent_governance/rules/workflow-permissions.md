@@ -173,3 +173,40 @@ took effect when new `pull_request` events were generated.
 human closes and reopens a dependabot PR, `github.actor` is the human's login,
 the job is SKIPPED, and auto-merge is never armed. Use `@dependabot recreate`
 to get a Dependabot-actor event instead.
+
+## Law W-VI — Dependabot Auto-merge Requires Branch-Update Before Arming; Approve Step Is Banned
+
+Two invariants for any `dependabot-automerge` workflow:
+
+**1. Update branch before arming auto-merge.**
+Branch protection has `strict: true` — branches behind `main` are blocked from
+merging even when all required checks pass. The workflow must call
+`gh pr update-branch` before `gh pr merge --auto` so the branch is current at
+arm time. If main advances again later, use `@dependabot rebase` to update.
+
+```yaml
+- name: Update branch to base
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    set -euo pipefail
+    gh pr update-branch --repo "${{ github.repository }}" \
+      "${{ github.event.pull_request.number }}" || true
+```
+
+The `|| true` is intentional: `gh pr update-branch` exits non-zero when the
+branch is already up-to-date. That is a success condition, not a failure.
+
+**2. Never include an Approve PR step.**
+The repo setting "Allow GitHub Actions to approve pull requests" is disabled.
+Any `gh pr review --approve` step using `GITHUB_TOKEN` will fail with
+`GitHub Actions is not permitted to approve pull requests (addPullRequestReview)`.
+Since `required_approving_review_count: 0`, an approval step provides no value
+and its failure marks the entire `dependabot-automerge` check as FAILURE, creating
+misleading noise on every dependabot PR.
+
+**Root cause (Sprint 173, 2026-05-25):** `dependabot-automerge` failing with
+`addPullRequestReview` error on all 4 remaining Cargo dependabot PRs. Branches
+were also `BEHIND` main (strict:true blocks merge). Both caused by the workflow
+not including an update-branch step and including an approve step that the repo
+setting forbids.
