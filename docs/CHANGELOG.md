@@ -3,6 +3,14 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-26 — Sprint 175 Post-Batch: health-signal hardening + Law W-CLI-V
+
+* `.github/workflows/health-signal.yml` *(modified)* — **root cause of issue #174 fixed**: `gh run list --workflow=<path>` exits non-zero for GitHub-hosted dynamic paths (e.g. `dynamic/github-code-scanning/codeql`); under `set -euo pipefail` this trapped before the null-guard, converting every CodeQL `workflow_run` success trigger into a health-signal exit 1 and a false consecutive-failure count. Fix: `|| echo '[]'` fallback on `RUNS_JSON` and `pr_json` assignments; `|| echo ''` fallback on `ISSUE_NUM`; `continue-on-error: true` on step 2 (operational queue is informational — must never cascade into job failure).
+* `.agent_governance/rules/workflow-cli-invariants.md` *(modified)* — resolved stale merge conflict markers from ead2367; added **Law W-CLI-V**: all `gh` API calls whose output is assigned under `set -euo pipefail` must carry `|| echo '<default>'` fallbacks; informational-only steps must carry `continue-on-error: true`.
+* Issue #174 closed with root cause explanation.
+
+**Verification**: commits c8d25fc + 031ad42 pushed to sprint175/code; PR #173 Janitor Integrity Check re-triggered against new SHA.
+
 ## v10.2.7 — 2026-05-25 — Release: Sprint 171 Sprint Batch
 
 * `action.yml` *(modified)* — added `pr_number` input + `workflow_dispatch` re-trigger path; HEAD_SHA resolution from `gh pr view` for manual dispatches; `_PR_NUM_RESOLVED` unification.
