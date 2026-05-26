@@ -174,29 +174,9 @@ human closes and reopens a dependabot PR, `github.actor` is the human's login,
 the job is SKIPPED, and auto-merge is never armed. Use `@dependabot recreate`
 to get a Dependabot-actor event instead.
 
-## Law W-VI — strict:true Requires Branch-Update; Approve Step Is Banned; BEHIND Is the Universal Blocker
+## Law W-VI — Approve Step Is Banned; strict:false Is Required for Reliable Auto-merge
 
-### Invariant 1 — Update branch before arming auto-merge (workflows)
-
-Branch protection has `strict: true` — branches behind `main` are blocked from
-merging even when all required checks pass and auto-merge is armed. The
-`dependabot-automerge` workflow must call `gh pr update-branch` before
-`gh pr merge --auto` so the branch is current at arm time.
-
-```yaml
-- name: Update branch to base
-  env:
-    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  run: |
-    set -euo pipefail
-    gh pr update-branch --repo "${{ github.repository }}" \
-      "${{ github.event.pull_request.number }}" || true
-```
-
-The `|| true` is intentional: `gh pr update-branch` exits non-zero when the
-branch is already up-to-date. That is a success condition, not a failure.
-
-### Invariant 2 — Never include an Approve PR step
+### Invariant 1 — Never include an Approve PR step
 
 The repo setting "Allow GitHub Actions to approve pull requests" is disabled.
 Any `gh pr review --approve` step using `GITHUB_TOKEN` will fail with
@@ -204,35 +184,49 @@ Any `gh pr review --approve` step using `GITHUB_TOKEN` will fail with
 Since `required_approving_review_count: 0`, an approval step provides no value
 and its failure marks the entire check as FAILURE.
 
-### Invariant 3 — Recovery when auto-merge is armed but PR stays open after all checks pass
+### Invariant 2 — Branch protection must have strict:false
 
-When a PR has auto-merge armed and all required checks pass but the PR does not
-merge, the universal diagnosis is `mergeStateStatus: BEHIND`. Main advanced while
-CI was running, leaving the branch stale.
+`strict: true` requires branches to be up-to-date with main before merging. With
+concurrent PRs (especially dependabot batches), every merge to main invalidates
+all other open PR branches simultaneously. Auto-merge re-arms but blocks again
+the instant the next PR lands — creating an irresolvable deadlock that requires
+indefinite manual intervention.
 
-**Diagnosis:**
+**This repo runs `strict: false`.** Required checks must still pass; the suite
+catches regressions without requiring branch currency. The `auto-update-branches`
+workflow (`.github/workflows/auto-update-branches.yml`) keeps branches reasonably
+fresh as a hygiene measure, but correctness does not depend on it.
+
+**Verification:**
+```bash
+gh api repos/janitor-security/the-janitor/branches/main/protection \
+  --jq '.required_status_checks.strict'
+# Must return: false
+```
+
+**If ever re-enabled by mistake:**
+```bash
+gh api --method PATCH \
+  repos/janitor-security/the-janitor/branches/main/protection/required_status_checks \
+  --field strict=false
+```
+
+### Invariant 3 — Diagnosis when auto-merge is armed but PR stays open
+
 ```bash
 gh pr view <N> --json mergeable,mergeStateStatus \
   --jq '{mergeable:.mergeable, state:.mergeStateStatus}'
-# BEHIND → branch needs updating
-# DIRTY  → merge conflict → rebase (see Law PT-IV)
 ```
 
-**Recovery (any PR — human or bot):**
-```bash
-gh pr update-branch <N> --repo janitor-security/the-janitor
-# CI re-runs on the updated branch; auto-merge fires when checks pass
-```
+| `mergeStateStatus` | Meaning | Fix |
+|---|---|---|
+| `BEHIND` | Branch behind main + strict:true still set | Disable strict (Invariant 2 above) |
+| `DIRTY` | Merge conflict | Rebase (Law PT-IV) |
+| `BLOCKED` | Required check pending or failing | Wait or inspect failing check |
+| `UNKNOWN` | GitHub still computing | Wait 15s and re-check |
 
-**Recovery (dependabot PRs specifically):**
-```bash
-gh pr comment <N> --body "@dependabot rebase"
-```
-
-The repo has `allow_update_branch: true` (set 2026-05-26), which causes GitHub
-to show an "Update branch" button on all PRs with auto-merge enabled — but this
-button requires a human click and does not auto-update.
-
-**Root cause (Sprint 173, 2026-05-26):** PR #164 passed all required checks with
-auto-merge armed but stayed open. `mergeStateStatus: BEHIND` — another PR had
-merged to main while CI ran. Fixed by `gh pr update-branch 164`.
+**Root cause (Sprint 173, 2026-05-26):** `strict: true` was set. Dependabot PRs
+merging in sequence (8 in batch) kept advancing main faster than CI could
+complete. PRs #164 and #165 each fell BEHIND 3+ times, each requiring manual
+`gh pr update-branch`. Disabled `strict: true` (set `strict: false`); both PRs
+auto-merged immediately as their armed auto-merge fired.
