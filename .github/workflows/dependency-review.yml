@@ -16,8 +16,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write # required-by-design: action comments the dependency summary on the PR
-    # External OpenSSF API timeouts must not block PR merges.
-    # The Janitor slop-gate (janitor-pr-gate.yml) is the primary blocking check.
+    # Non-blocking by design: transient GitHub Dependency Graph API fetch failures
+    # must not block Dependabot auto-merge. "Dependency Review" is intentionally
+    # absent from branch-protection required_status_checks (Law W-VI). The Janitor
+    # slop-gate (janitor-pr-gate.yml) is the sole blocking integrity check.
     continue-on-error: true
     steps:
       - name: Harden runner
