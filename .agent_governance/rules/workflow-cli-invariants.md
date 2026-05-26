@@ -29,20 +29,12 @@ check for the presence and non-emptiness of the output file, not the exit code a
 
 **Required pattern:**
 ```bash
-<<<<<<< HEAD
-janitor <subcommand> ... > /tmp/report.json 2>/tmp/scan.log || {
-=======
 janitor <subcommand> ... > "${GITHUB_WORKSPACE}/report.json" 2>"${GITHUB_WORKSPACE}/scan.log" || {
->>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
   echo "::warning::subcommand failed — not a findings signal"
   echo "findings=false" >> "$GITHUB_OUTPUT"
   exit 0
 }
-<<<<<<< HEAD
-if [ -s /tmp/report.json ]; then
-=======
 if [ -s "${GITHUB_WORKSPACE}/report.json" ]; then
->>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
   echo "findings=true" >> "$GITHUB_OUTPUT"
 else
   echo "findings=false" >> "$GITHUB_OUTPUT"
@@ -74,8 +66,6 @@ content was produced (Law W-CLI-II above).
 grep -A 3 "File issue on detection" .github/workflows/*.yml | grep "findings == 'true'"
 # Must be present. findings=true must only be set when output file is non-empty.
 ```
-<<<<<<< HEAD
-=======
 
 ## Law W-CLI-IV — Report Files Must Be Written to $GITHUB_WORKSPACE
 
@@ -101,4 +91,37 @@ path: rw_report.json   # workspace-relative, not /tmp/rw_report.json
 `hashFiles('/tmp/rw_report.json')` always returned `''`. Upload steps were skipped even
 when genuine findings existed. Issue was filed but contained no downloadable artifact —
 triage was impossible.
->>>>>>> ead2367 (fix: write registry-watch reports to GITHUB_WORKSPACE; add Law W-CLI-IV)
+
+## Law W-CLI-V — gh API Calls Under set -euo pipefail Must Have Fallback Defaults
+
+Any `gh` CLI call whose output is assigned to a variable under `set -euo pipefail` **must**
+have a `|| echo '<default>'` fallback. `gh run list`, `gh issue list`, and `gh pr list` all
+return non-zero when the target resource does not exist, is rate-limited, or the workflow
+path is a GitHub-hosted dynamic path (e.g. `dynamic/github-code-scanning/codeql`).
+
+**Required pattern:**
+```bash
+RUNS_JSON=$(gh run list --workflow="${WORKFLOW_PATH}" ... 2>/dev/null || echo '[]')
+ISSUE_NUM=$(gh issue list --label "${LABEL}" ... 2>/dev/null || echo '')
+pr_json=$(gh pr list ... 2>/dev/null || echo '[]')
+```
+
+**Forbidden pattern:**
+```bash
+# WRONG — gh run list exits 1 for dynamic/github-hosted workflow paths;
+# set -euo pipefail traps before any null-guard can fire.
+RUNS_JSON=$(gh run list --workflow="${WORKFLOW_PATH}" ...)
+if [ -z "${RUNS_JSON}" ]; then exit 0; fi   # never reached on gh failure
+```
+
+**Informational-only steps must also carry `continue-on-error: true`:**
+```yaml
+- name: Build ranked operational issue queue
+  continue-on-error: true   # failure here is never a hard signal
+```
+
+**Root cause of incident (Sprint 175, issue #174):** `health-signal.yml` step 1
+called `gh run list --workflow="dynamic/github-code-scanning/codeql"` (a GitHub-hosted
+path). `gh` exited 1; `set -euo pipefail` propagated before the `RUNS_JSON` null-guard.
+Every `workflow_run` CodeQL success trigger caused health-signal to exit 1, which cascaded
+into a false consecutive-failure count and spurious issue creation.
