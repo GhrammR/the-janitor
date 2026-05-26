@@ -95,6 +95,14 @@ fn is_lattice_gap_synthesizable_rule(id: &str) -> bool {
         "flash_loan_callback_unvalidated_sender",
         "reentrancy",
         "unsafe_delegatecall",
+        // P17-3A: Batch 4 — mixed-surface rules
+        "code_execution",
+        "nonce_reuse",
+        "unsafe_transmute",
+        "curl_pipe_execution",
+        "cmake_execute_process_injection",
+        "open_cidr_exposure",
+        "xxe_external_entity",
     ]
     .iter()
     .any(|needle| id.contains(needle))
@@ -5286,6 +5294,106 @@ mod tests {
     #[test]
     fn unsafe_delegatecall_with_proof_preserved() {
         let mut finding = critical_finding("security:unsafe_delegatecall");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    // --- P17-3A gate: Batch 4 mixed-surface rules ---
+
+    #[test]
+    fn code_execution_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:code_execution");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn code_execution_with_proof_preserved() {
+        let mut finding = critical_finding("security:code_execution");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn nonce_reuse_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:nonce_reuse");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn nonce_reuse_with_proof_preserved() {
+        let mut finding = critical_finding("security:nonce_reuse");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn unsafe_transmute_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:unsafe_transmute");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn unsafe_transmute_with_proof_preserved() {
+        let mut finding = critical_finding("security:unsafe_transmute");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn curl_pipe_execution_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:curl_pipe_execution");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn curl_pipe_execution_with_proof_preserved() {
+        let mut finding = critical_finding("security:curl_pipe_execution");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn cmake_execute_process_injection_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:cmake_execute_process_injection");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn cmake_execute_process_injection_with_proof_preserved() {
+        let mut finding = critical_finding("security:cmake_execute_process_injection");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn open_cidr_exposure_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:open_cidr_exposure");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn open_cidr_exposure_with_proof_preserved() {
+        let mut finding = critical_finding("security:open_cidr_exposure");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn xxe_external_entity_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:xxe_external_entity");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+    #[test]
+    fn xxe_external_entity_with_proof_preserved() {
+        let mut finding = critical_finding("security:xxe_external_entity");
         finding.proof_class = Some(ProofClass::ReachabilityProof);
         let result = super::seal_with_lattice_gap_proof(finding);
         assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));

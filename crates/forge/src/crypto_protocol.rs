@@ -152,11 +152,27 @@ fn pqc_hybrid_ac() -> &'static AhoCorasick {
 /// Returns findings for:
 /// - Hardcoded IV/nonce adjacent to AEAD cipher calls → `security:nonce_reuse`
 /// - Legacy asymmetric key generation without PQC hybrid layer → `security:pqc_hybrid_downgrade`
-pub fn detect_crypto_protocol_issues(source: &[u8]) -> Vec<SlopFinding> {
+///
+/// `file_path` is used to suppress `nonce_reuse` in vendored/compiled paths
+/// (node_modules, /compiled/, /dist/, /vendor/) where the finding is structurally
+/// unreachable from the application's own key-management code.
+pub fn detect_crypto_protocol_issues(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
     let mut out = Vec::new();
-    detect_nonce_reuse(source, &mut out);
+    if !is_vendored_path(file_path) {
+        detect_nonce_reuse(source, &mut out);
+    }
     detect_pqc_downgrade(source, &mut out);
     out
+}
+
+/// Returns `true` for paths that are vendored, compiled, or otherwise third-party
+/// artefacts where `nonce_reuse` findings are structural FPs.
+fn is_vendored_path(path: &str) -> bool {
+    let p = path.replace('\\', "/");
+    p.contains("/node_modules/")
+        || p.contains("/compiled/")
+        || p.contains("/dist/")
+        || p.contains("/vendor/")
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +296,7 @@ mod tests {
 const iv = \"000000000000000000000000\";
 const cipher = crypto.createCipheriv('aes-gcm', key, iv);
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let nonce = findings
             .iter()
             .find(|f| f.description.contains("nonce_reuse"));
@@ -297,7 +313,7 @@ const cipher = crypto.createCipheriv('aes-gcm', key, iv);
 const iv = crypto.randomBytes(12);
 const cipher = crypto.createCipheriv('aes-gcm', key, iv);
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let nonce = findings
             .iter()
             .find(|f| f.description.contains("nonce_reuse"));
@@ -311,7 +327,7 @@ const { privateKey, publicKey } = crypto.generateKeyPair('rsa', {
   modulusLength: 4096,
 });
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let pqc = findings
             .iter()
             .find(|f| f.description.contains("pqc_hybrid_downgrade"));
@@ -326,7 +342,7 @@ const { privateKey, publicKey } = crypto.generateKeyPair('rsa', {
 let rsa_key = rsa.generate_private_key(65537, 2048, &mut rng);
 let kem = ml_kem::MlKem768::encapsulate(&pk);
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let pqc = findings
             .iter()
             .find(|f| f.description.contains("pqc_hybrid_downgrade"));
@@ -342,7 +358,7 @@ let kem = ml_kem::MlKem768::encapsulate(&pk);
 from cryptography.hazmat.primitives.asymmetric.ec import generate_key
 private_key = ec.generateKeyPair(SECP256R1())
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let pqc = findings
             .iter()
             .find(|f| f.description.contains("pqc_hybrid_downgrade"));
@@ -356,13 +372,53 @@ nonce = bytes.fromhex(\"000000000000000000000000\")
 cipher = ChaCha20Poly1305(key)
 ct = cipher.encrypt(nonce, plaintext, aad)
 ";
-        let findings = detect_crypto_protocol_issues(src);
+        let findings = detect_crypto_protocol_issues(src, "");
         let nonce = findings
             .iter()
             .find(|f| f.description.contains("nonce_reuse"));
         assert!(
             nonce.is_some(),
             "hardcoded nonce adjacent to ChaCha20 must fire"
+        );
+    }
+
+    // --- nonce_reuse path suppressor ---
+
+    #[test]
+    fn nonce_reuse_suppressed_in_node_modules() {
+        let src = b"iv = \"000000000000000000000000\"\ncreateCipheriv('aes-256-gcm', key, iv)\n";
+        let findings =
+            detect_crypto_protocol_issues(src, "repo/node_modules/webpack/lib/crypto.js");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("nonce_reuse")),
+            "nonce_reuse must be suppressed in node_modules paths"
+        );
+    }
+
+    #[test]
+    fn nonce_reuse_suppressed_in_compiled_path() {
+        let src = b"nonce = b\"\\x00\\x00\\x00\\x00\"\nAES-GCM.new(key, nonce)\n";
+        let findings =
+            detect_crypto_protocol_issues(src, "packages/next/src/compiled/conf/index.js");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("nonce_reuse")),
+            "nonce_reuse must be suppressed in /compiled/ paths"
+        );
+    }
+
+    #[test]
+    fn nonce_reuse_fires_on_first_party_path() {
+        let src = b"iv = b\"\\x00\\x00\\x00\"\nAES-GCM.new(key, iv)\n";
+        let findings = detect_crypto_protocol_issues(src, "src/crypto/session.py");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("nonce_reuse")),
+            "nonce_reuse must fire on first-party paths"
         );
     }
 }
