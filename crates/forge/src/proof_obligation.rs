@@ -67,7 +67,7 @@ fn upgrade_implicit_reachability_proof(finding: &StructuredFinding) -> Option<St
     Some(upgraded)
 }
 
-/// Returns `true` for the 8 rules whose classify_* functions exist but are not
+/// Returns `true` for rules whose classify_* functions exist but are not
 /// yet wired at the detector emission site. The gate synthesizes a deterministic
 /// `LatticeGapProposal` so findings pass ledger routing instead of being
 /// suppressed with an INNOVATION_LOG entry.
@@ -88,6 +88,13 @@ fn is_lattice_gap_synthesizable_rule(id: &str) -> bool {
         "ffi_unsafe_deref_unguarded",
         "bounded_overflow_witness",
         "ld_preload_injection",
+        // P17-3C: blockchain-class rules (Batch 3)
+        "oracle_price_manipulation",
+        "signature_replay",
+        "unprotected_authority_transition",
+        "flash_loan_callback_unvalidated_sender",
+        "reentrancy",
+        "unsafe_delegatecall",
     ]
     .iter()
     .any(|needle| id.contains(needle))
@@ -5187,6 +5194,98 @@ mod tests {
     #[test]
     fn ld_preload_injection_with_proof_preserved() {
         let mut finding = critical_finding("security:ld_preload_injection");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    // --- P17-3C gate: Batch 3 blockchain-class rules ---
+
+    #[test]
+    fn oracle_price_manipulation_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:oracle_price_manipulation");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn oracle_price_manipulation_with_proof_preserved() {
+        let mut finding = critical_finding("security:oracle_price_manipulation");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn signature_replay_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:signature_replay");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn signature_replay_with_proof_preserved() {
+        let mut finding = critical_finding("security:signature_replay");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn unprotected_authority_transition_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:unprotected_authority_transition");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn unprotected_authority_transition_with_proof_preserved() {
+        let mut finding = critical_finding("security:unprotected_authority_transition");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn flash_loan_callback_unvalidated_sender_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:flash_loan_callback_unvalidated_sender");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn flash_loan_callback_unvalidated_sender_with_proof_preserved() {
+        let mut finding = critical_finding("security:flash_loan_callback_unvalidated_sender");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn reentrancy_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:reentrancy");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn reentrancy_with_proof_preserved() {
+        let mut finding = critical_finding("security:reentrancy");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn unsafe_delegatecall_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:unsafe_delegatecall");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn unsafe_delegatecall_with_proof_preserved() {
+        let mut finding = critical_finding("security:unsafe_delegatecall");
         finding.proof_class = Some(ProofClass::ReachabilityProof);
         let result = super::seal_with_lattice_gap_proof(finding);
         assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));

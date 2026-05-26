@@ -1179,7 +1179,7 @@ impl PRBouncer for PatchBouncer {
         };
 
         // Reconstruct added source from `+` diff lines.
-        let added = raw_added.clone();
+        let added = raw_added;
 
         if added.trim().is_empty() {
             return Ok(SlopScore::default());
@@ -1404,7 +1404,7 @@ impl PRBouncer for PatchBouncer {
             })
             .collect();
         let package_context =
-            package_context_for_patch(&file_path, &raw_added, self.repo_root.as_deref());
+            package_context_for_patch(&file_path, &added, self.repo_root.as_deref());
         for semantic_root in &semantic_roots {
             let subtree_bytes = &source[semantic_root.start_byte()..semantic_root.end_byte()];
             let subtree_unit = crate::slop_hunter::ParsedUnit::unparsed(subtree_bytes);
