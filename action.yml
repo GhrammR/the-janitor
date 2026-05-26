@@ -277,9 +277,13 @@ runs:
             fi
         fi
 
+        # _PR_NUM_RESOLVED is set above from inputs.pr_number || github.event.pull_request.number.
+        # Do NOT use ${{ github.event.pull_request.number }} here — it is empty on
+        # workflow_dispatch, which causes jq --argjson to receive an empty string
+        # and exit 2 (invalid JSON), blocking every manual re-trigger.
         TOKEN_PAYLOAD=$(jq -n \
           --arg  repo "${{ github.repository }}" \
-          --argjson pr  ${{ github.event.pull_request.number }} \
+          --argjson pr  "${_PR_NUM_RESOLVED}" \
           --arg  sha  "$HEAD_SHA" \
           --arg  id   "${INSTALL_ID:-0}" \
           '{repo: $repo, pr: $pr, head_sha: $sha, installation_id: (if $id == "" then 0 else ($id | tonumber) end)}')
