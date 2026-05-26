@@ -59,10 +59,42 @@ fn upgrade_implicit_reachability_proof(finding: &StructuredFinding) -> Option<St
         ProofClass::ReachabilityProof
     } else if is_self_proving_invariant(finding) {
         ProofClass::InvariantViolationProof
+    } else if is_lattice_gap_synthesizable_rule(&finding.id) {
+        ProofClass::LatticeGapProposal
     } else {
         return None;
     });
     Some(upgraded)
+}
+
+/// Returns `true` for the 8 rules whose classify_* functions exist but are not
+/// yet wired at the detector emission site. The gate synthesizes a deterministic
+/// `LatticeGapProposal` so findings pass ledger routing instead of being
+/// suppressed with an INNOVATION_LOG entry.
+fn is_lattice_gap_synthesizable_rule(id: &str) -> bool {
+    let id = id.to_ascii_lowercase();
+    [
+        "non_constant_time_comparison",
+        "lcm_use_after_free",
+        "lcm_malloc_integer_truncation",
+        "lcm_off_by_one_loop",
+        "lcm_double_free",
+        "raw_pointer_deref",
+        "oauth_account_fusion_pretakeover",
+        "react_xss_dangerous_html",
+    ]
+    .iter()
+    .any(|needle| id.contains(needle))
+}
+
+/// Seal a finding with `LatticeGapProposal` when the owning detector for one of
+/// the P17-3A target rules did not assign a proof class. Call this at the
+/// detector emission site after construction.
+pub fn seal_with_lattice_gap_proof(mut finding: StructuredFinding) -> StructuredFinding {
+    if finding.proof_class.is_none() && is_lattice_gap_synthesizable_rule(&finding.id) {
+        finding.proof_class = Some(ProofClass::LatticeGapProposal);
+    }
+    finding
 }
 
 fn is_self_proving_invariant(finding: &StructuredFinding) -> bool {
@@ -4908,5 +4940,141 @@ mod tests {
             super::classify_ld_preload_injection_proof(source, &finding),
             ProofClass::ReachabilityProof
         );
+    }
+
+    // --- P17-3A gate: is_lattice_gap_synthesizable_rule / seal_with_lattice_gap_proof ---
+
+    fn critical_finding(id: &str) -> StructuredFinding {
+        StructuredFinding {
+            id: id.to_string(),
+            severity: Some("Critical".to_string()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn non_constant_time_comparison_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:non_constant_time_comparison");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn non_constant_time_comparison_with_proof_preserved() {
+        let mut finding = critical_finding("security:non_constant_time_comparison");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn lcm_use_after_free_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:lcm_use_after_free (CWE-416)");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn lcm_use_after_free_with_proof_preserved() {
+        let mut finding = critical_finding("security:lcm_use_after_free (CWE-416)");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn lcm_malloc_integer_truncation_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:lcm_malloc_integer_truncation (CWE-190)");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn lcm_malloc_integer_truncation_with_proof_preserved() {
+        let mut finding = critical_finding("security:lcm_malloc_integer_truncation (CWE-190)");
+        finding.proof_class = Some(ProofClass::InvariantViolationProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(
+            result.proof_class,
+            Some(ProofClass::InvariantViolationProof)
+        );
+    }
+
+    #[test]
+    fn lcm_off_by_one_loop_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:lcm_off_by_one_loop (CWE-193)");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn lcm_off_by_one_loop_with_proof_preserved() {
+        let mut finding = critical_finding("security:lcm_off_by_one_loop (CWE-193)");
+        finding.proof_class = Some(ProofClass::InvariantViolationProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(
+            result.proof_class,
+            Some(ProofClass::InvariantViolationProof)
+        );
+    }
+
+    #[test]
+    fn lcm_double_free_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:lcm_double_free (CWE-415)");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn lcm_double_free_with_proof_preserved() {
+        let mut finding = critical_finding("security:lcm_double_free (CWE-415)");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn raw_pointer_deref_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:raw_pointer_deref");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn raw_pointer_deref_with_proof_preserved() {
+        let mut finding = critical_finding("security:raw_pointer_deref");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn oauth_account_fusion_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:oauth_account_fusion_pretakeover");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn oauth_account_fusion_with_proof_preserved() {
+        let mut finding = critical_finding("security:oauth_account_fusion_pretakeover");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn react_xss_dangerous_html_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:react_xss_dangerous_html");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn react_xss_dangerous_html_with_proof_preserved() {
+        let mut finding = critical_finding("security:react_xss_dangerous_html");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
     }
 }

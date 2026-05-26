@@ -52,6 +52,8 @@ use common::policy::Suppression;
 use common::registry::SymbolRegistry;
 use common::surface::SurfaceKind;
 
+use crate::proof_obligation::seal_with_lattice_gap_proof;
+
 // ---------------------------------------------------------------------------
 // SlopScore
 // ---------------------------------------------------------------------------
@@ -546,24 +548,23 @@ fn push_manifest_structured_findings(
 ) {
     for finding in findings {
         let line = byte_offset_to_line(source, finding.start_byte);
-        score
-            .structured_findings
-            .push(common::slop::StructuredFinding {
-                id: finding.description.clone(),
-                file: Some(file_path.to_string()),
-                line: Some(line),
-                fingerprint: finding_fingerprint(
-                    extract_rule_id(&finding.description),
-                    file_path,
-                    finding_fingerprint_span(source, finding.start_byte, finding.end_byte),
-                ),
-                severity: Some(format!("{:?}", finding.severity)),
-                remediation: None,
-                docs_url: None,
-                exploit_witness: None,
-                upstream_validation_absent: false,
-                ..Default::default()
-            });
+        let structured = seal_with_lattice_gap_proof(common::slop::StructuredFinding {
+            id: finding.description.clone(),
+            file: Some(file_path.to_string()),
+            line: Some(line),
+            fingerprint: finding_fingerprint(
+                extract_rule_id(&finding.description),
+                file_path,
+                finding_fingerprint_span(source, finding.start_byte, finding.end_byte),
+            ),
+            severity: Some(format!("{:?}", finding.severity)),
+            remediation: None,
+            docs_url: None,
+            exploit_witness: None,
+            upstream_validation_absent: false,
+            ..Default::default()
+        });
+        score.structured_findings.push(structured);
     }
 }
 
