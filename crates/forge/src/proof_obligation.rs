@@ -82,6 +82,12 @@ fn is_lattice_gap_synthesizable_rule(id: &str) -> bool {
         "raw_pointer_deref",
         "oauth_account_fusion_pretakeover",
         "react_xss_dangerous_html",
+        "intent_divergence",
+        "mcp_confused_deputy_dispatch",
+        "ffi_memory_corruption",
+        "ffi_unsafe_deref_unguarded",
+        "bounded_overflow_witness",
+        "ld_preload_injection",
     ]
     .iter()
     .any(|needle| id.contains(needle))
@@ -3265,13 +3271,29 @@ mod tests {
     #[test]
     fn suppresses_kev_critical_finding_without_any_proof_class() {
         let findings = vec![StructuredFinding {
-            id: "security:ffi_unsafe_deref_unguarded".to_string(),
+            id: "security:unknown_rule_with_no_synthesizer".to_string(),
             severity: Some("KevCritical".to_string()),
             ..Default::default()
         }];
 
         let filtered = enforce_false_positive_proof_obligation(&findings);
         assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn ffi_unsafe_deref_unguarded_kev_critical_gets_lattice_gap_proposal() {
+        let findings = vec![StructuredFinding {
+            id: "security:ffi_unsafe_deref_unguarded".to_string(),
+            severity: Some("KevCritical".to_string()),
+            ..Default::default()
+        }];
+
+        let filtered = enforce_false_positive_proof_obligation(&findings);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(
+            filtered[0].proof_class,
+            Some(ProofClass::LatticeGapProposal)
+        );
     }
 
     #[test]
@@ -5073,6 +5095,98 @@ mod tests {
     #[test]
     fn react_xss_dangerous_html_with_proof_preserved() {
         let mut finding = critical_finding("security:react_xss_dangerous_html");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    // --- P17-3B gate: Batch 2 rules ---
+
+    #[test]
+    fn intent_divergence_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:intent_divergence");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn intent_divergence_with_proof_preserved() {
+        let mut finding = critical_finding("security:intent_divergence");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn mcp_confused_deputy_dispatch_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:mcp_confused_deputy_dispatch");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn mcp_confused_deputy_dispatch_with_proof_preserved() {
+        let mut finding = critical_finding("security:mcp_confused_deputy_dispatch");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn ffi_memory_corruption_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:ffi_memory_corruption");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn ffi_memory_corruption_with_proof_preserved() {
+        let mut finding = critical_finding("security:ffi_memory_corruption");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn ffi_unsafe_deref_unguarded_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:ffi_unsafe_deref_unguarded");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn ffi_unsafe_deref_unguarded_with_proof_preserved() {
+        let mut finding = critical_finding("security:ffi_unsafe_deref_unguarded");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn bounded_overflow_witness_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:bounded_overflow_witness");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn bounded_overflow_witness_with_proof_preserved() {
+        let mut finding = critical_finding("security:bounded_overflow_witness");
+        finding.proof_class = Some(ProofClass::ReachabilityProof);
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
+    }
+
+    #[test]
+    fn ld_preload_injection_without_proof_gets_lattice_gap() {
+        let finding = critical_finding("security:ld_preload_injection");
+        let result = super::seal_with_lattice_gap_proof(finding);
+        assert_eq!(result.proof_class, Some(ProofClass::LatticeGapProposal));
+    }
+
+    #[test]
+    fn ld_preload_injection_with_proof_preserved() {
+        let mut finding = critical_finding("security:ld_preload_injection");
         finding.proof_class = Some(ProofClass::ReachabilityProof);
         let result = super::seal_with_lattice_gap_proof(finding);
         assert_eq!(result.proof_class, Some(ProofClass::ReachabilityProof));
