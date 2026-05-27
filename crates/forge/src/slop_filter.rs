@@ -1091,7 +1091,7 @@ impl PRBouncer for PatchBouncer {
                         self.repo_root.as_deref(),
                     );
                     let mut raw_findings = manifest_findings;
-                    raw_findings.extend(crate::slop_hunter::find_slop(ext, &parsed));
+                    raw_findings.extend(crate::slop_hunter::find_slop(ext, &parsed, &file_path));
                     raw_findings.extend(crate::slop_hunter::find_generative_build_execution(
                         &file_path, ext, source,
                     ));
@@ -1408,7 +1408,11 @@ impl PRBouncer for PatchBouncer {
         for semantic_root in &semantic_roots {
             let subtree_bytes = &source[semantic_root.start_byte()..semantic_root.end_byte()];
             let subtree_unit = crate::slop_hunter::ParsedUnit::unparsed(subtree_bytes);
-            raw_findings.extend(crate::slop_hunter::find_slop(ext, &subtree_unit));
+            raw_findings.extend(crate::slop_hunter::find_slop(
+                ext,
+                &subtree_unit,
+                &file_path,
+            ));
         }
         raw_findings.extend(crate::slop_hunter::find_generative_build_execution(
             &file_path, ext, source,

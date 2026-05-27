@@ -80,13 +80,16 @@ jobs:
           # `--repo` is mandatory: this job does not check out source, so gh has
           # no git context to auto-detect the repository from.
           LIMIT=$((THRESHOLD + 2))
+          # Guard: gh run list returns exit 1 for GitHub-hosted or dynamic
+          # workflow paths (e.g. "dynamic/github-code-scanning/codeql").
+          # Fall back to "[]" so the null-guard below fires cleanly.
           RUNS_JSON=$(gh run list \
             --repo "${REPO}" \
             --workflow="${WORKFLOW_PATH}" \
             --status=completed \
             --limit="${LIMIT}" \
             --json conclusion,databaseId,createdAt \
-            --jq '.')
+            --jq '.' 2>/dev/null || echo '[]')
           if [ -z "${RUNS_JSON}" ] || [ "${RUNS_JSON}" = "[]" ]; then
             echo "[health-signal] no completed runs visible — exiting cleanly"
             exit 0
@@ -98,7 +101,7 @@ jobs:
             --label "${LABEL}" \
             --state open \
             --json number \
-            --jq '.[0].number // empty')"
+            --jq '.[0].number // empty' 2>/dev/null || echo '')"
 
           MOST_RECENT_CONCLUSION="$(printf '%s' "${RUNS_JSON}" | jq -r '.[0].conclusion // empty')"
 
@@ -154,6 +157,7 @@ jobs:
           fi
 
       - name: Build ranked operational issue queue
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -174,8 +178,9 @@ jobs:
           stuck_cutoff=$((now_epoch - STUCK_MINUTES * 60))
           stale_cutoff=$((now_epoch - STALE_DAYS * 86400))
 
+          # Guard: API call may fail on rate-limit or transient network error.
           pr_json="$(gh pr list --repo "${REPO}" --state open --limit 50 \
-            --json number,title,updatedAt,statusCheckRollup,url)"
+            --json number,title,updatedAt,statusCheckRollup,url 2>/dev/null || echo '[]')"
 
           # shellcheck disable=SC2016 # jq variables are intentionally evaluated by jq, not Bash.
           printf '%s' "${pr_json}" \

@@ -1530,7 +1530,7 @@ pub fn run_gallery() -> bool {
 
     for entry in GALLERY {
         let parsed = ParsedUnit::unparsed(entry.source);
-        let findings = find_slop(entry.lang, &parsed);
+        let findings = find_slop(entry.lang, &parsed, "");
         let intercepted = !findings.is_empty();
 
         let ok = if entry.must_intercept {
@@ -2637,7 +2637,7 @@ index 1111111..2222222 100644
                 // exercising the timeout path.  find_slop must not panic regardless
                 // of input content.
                 let parsed = forge::slop_hunter::ParsedUnit::unparsed(&bytes);
-                let _ = find_slop(lang, &parsed);
+                let _ = find_slop(lang, &parsed, "");
                 let elapsed = start.elapsed();
 
                 assert!(

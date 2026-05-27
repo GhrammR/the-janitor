@@ -1044,7 +1044,7 @@ fn run_lint_file(file_path: &str, contents: &str) -> Result<serde_json::Value> {
 
     let source = contents.as_bytes();
     let unit = forge::slop_hunter::ParsedUnit::unparsed(source);
-    let raw_findings = forge::slop_hunter::find_slop(lang, &unit);
+    let raw_findings = forge::slop_hunter::find_slop(lang, &unit, file_path);
 
     // Convert SlopFinding (byte offsets) → StructuredFinding (line numbers).
     let findings: Vec<common::slop::StructuredFinding> = raw_findings

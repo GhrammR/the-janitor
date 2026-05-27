@@ -140,7 +140,7 @@ impl<'a> Detector<'a> {
             return true;
         }
         let parsed = ParsedUnit::unparsed(source);
-        find_slop(&self.ext, &parsed)
+        find_slop(&self.ext, &parsed, "")
             .into_iter()
             .any(|finding| extract_rule_id(&finding.description) == self.finding_id)
     }
