@@ -23,6 +23,8 @@ the root cause.  If none exists, create one.
 - Bug from missing proof gate? → `rules/evolution.md`
 - Bug from gate bootstrap dependency (new gate feature can't self-validate)? → `rules/release-discipline.md`
 - Bug from wrong `just release` invocation (version with `v` prefix)? → `rules/release-discipline.md`
+- Bug from untriaged registry-watch SARIF alerts? → `rules/workflow-cli-invariants.md` (Law W-CLI-VII)
+- Bug from hunt output misrouted or FP prose suppression? → `rules/hunt-discipline.md`
 
 ### 2. Does a skill auto-enforce the rule?
 

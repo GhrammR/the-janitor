@@ -396,135 +396,24 @@ summaries and must remain terminal-only.
 - The `[OPERATOR INTELLIGENCE]` section is mandatory for final directive
 summaries and must be addressed directly to the human operator.
 
-## Bounty Extraction Law (mandatory for all hunt/scan output review)
 
-When reviewing `janitor hunt` output, route every finding through the
-Tri-Ledger Funnel. A finding is weaponized ONLY if it possesses a concrete
-reproduction payload, `repro_cmd`, or generated HTML harness — NOT `Pending`.
+## Hunt / Scan Output Laws
 
-For every finding you MUST:
-A. Cross-reference the finding against its parent program's rules in
-   `tools/campaign/targets/<program>_targets.md`.
-B. Verify the target is strictly IN SCOPE.
-C. Extract the estimated payout for the finding's severity.
-D. Route the row to exactly one ledger:
-   - `tools/campaign/BOUNTY_LEDGER.md` when `Approval % >= 85` and the finding
-     carries a concrete autonomous payload. This ledger is submission-ready only
-     and MUST use the final column `Exploitation Strategy`.
-   - `tools/campaign/CANDIDATE_LEDGER.md` when `Approval % >= 10 && < 85`.
-     These rows MUST use the final column `R&D Follow-Up` and record the exact
-     proof gap, manual verification step, or structural engine cure that
-     prevented an 85% rating.
-   - `tools/campaign/LOW_YIELD_LEDGER.md` when `Approval % < 10`.
-E. Preserve the canonical schema fields:
-   `[Date]`, `[Target URL/Repo]`, `[Vulnerability Class]`, `[Severity]`,
-   `[Expected Payout]`, `[Estimated Approval %]`, `[Exact Repro Command]`, and
-   either `[Exploitation Strategy]` for the Bounty Ledger or `[R&D Follow-Up]`
-   for the Candidate Ledger.
+When reviewing `janitor hunt` or `janitor scan` output, read
+`.agent_governance/rules/hunt-discipline.md` in full before routing any
+findings. That file is the authoritative source for:
+- Bounty Extraction Law (Tri-Ledger Funnel, Dual-Ledger Mandate, Ledger Hydration)
+- Threat Model Pre-Filter (Taint Source Origin, Actor Privilege Level)
+- Structural Eradication Law (no prose suppression — AST guards only)
+- Mathematical Certainty Law (Kani harness mandate for security logic)
+- Delivery Guarantee Law (WAF-safe ExploitWitness rendering)
+- Ledger Synchronization Law (delete disproven bounty rows)
 
-If a finding requires a `[lattice-gap: P-XX]` annotation because the IFDS solver
-cannot trace a specific framework, protocol, or memory bound, you MUST
-simultaneously create a detailed architectural proposal for that `P-XX` item in
-`.INNOVATION_LOG.md`. The bounty ledger is the symptom; the innovation log is
-the cure. The proposal must name the missing lattice element, the Rust module to
-extend, the deterministic proof strategy, and the true-positive / true-negative
-fixture pair required to close the gap.
+## Git Sync Law
 
-### Mathematical Certainty Law (Sprint Batch 97)
-
-When authoring core security logic — taint scoring, HMAC/signature generation,
-cryptographic serialization boundaries — unit tests alone are **insufficient**.
-You MUST author a `#[kani::proof]` harness (gated under `#[cfg(kani)]`) that
-injects symbolic inputs via `kani::any::<T>()` and proves the absence of panics,
-integer overflows, and undefined behaviour across all possible input states up
-to a defined bound. The harness lives in `crates/forge/src/reflexive_assurance.rs`.
-Shipping a new security-critical function without this harness is a governance
-violation.
-
-### Delivery Guarantee Law (Sprint Batch 98)
-
-Web ExploitWitness rendering MUST assume a WAF is present. Z3-backed witness
-generation must assert negative constraints for common XSS and SQL injection
-signatures before model extraction, and must render only verifier-safe canaries.
-Raw bypass payloads, guaranteed bypass claims, live exploit command synthesis,
-and "100% bypass probability" language are not valid final output.
-
-### Dual-Ledger Mandate (Sprint Batch 96)
-
-Whenever a finding is logged with `Approval % < 85%` due to a **missing engine
-capability**, you MUST author BOTH: (1) a manual Exploitation Strategy in the
-Candidate Ledger AND (2) a corresponding P-tier architectural proposal in
-`.INNOVATION_LOG.md` that automates that strategy. Logging a capability gap in
-the candidate ledger without a corresponding innovation log entry is a governance
-violation. The bounty ledger records the failure; the innovation log records the
-cure. Both entries are mandatory and must be authored in the same session.
-
-Any new architectural feature added to `.INNOVATION_LOG.md` MUST be assigned a
-strict, sequential P-tier ID (for example `P1-15` or `P3-9`). Non-sequential,
-alphabetic, or section-only identifiers are governance-invalid.
-
-### Ledger Hydration Law (Sprint Batch 119)
-
-During EVERY sprint, you MUST read the `R&D Follow-Up` columns in
-`tools/campaign/CANDIDATE_LEDGER.md` and `tools/campaign/LOW_YIELD_LEDGER.md`.
-If an R&D task is listed but does not already have a corresponding strict
-P-tier entry in `.INNOVATION_LOG.md`, you MUST elevate it into a formal
-strict P-tier item immediately, and that item MUST append explicit instructions
-to re-hunt the affected targets once the feature is built.
-
-### Git Sync Law (Sprint Batch 124)
-
-You must execute `git push origin main` after every successful local commit in a
-sprint, UNLESS explicitly instructed otherwise by the operator. The local and
-remote state must remain synchronized to trigger CI/CD pipelines.
-
-### Threat Model Awareness (mandatory threat model pre-filter)
-
-You MUST evaluate the **Taint Source Origin** and **Actor Privilege Level** BEFORE
-logging any finding to the Bounty Ledger or including it in a hunt report.
-
-- A finding that requires **local config modification**, **env var control**, or
-  **Admin privileges** is NOT remotely exploitable. `Approval % < 10%`.
-- A finding in **client-side TypeScript/JavaScript** where the sink is a
-  `fetch()` / `XMLHttpRequest` / `axios` call is NOT server-side SSRF. Client-side
-  HTTP calls are blocked by SOP/CORS. Requires proof of a **server-side execution
-  path** (SSR, Next.js API route, Node.js backend). Without it: `Approval % < 10%`.
-- **Self-XSS** (victim must trigger the payload themselves without any third-party
-  attack vector): `Approval % < 10%`.
-
-For every entry with `Approval % < 10%`, route the row to
-`tools/campaign/LOW_YIELD_LEDGER.md` instead of deleting it. Preserve the target,
-finding class, approval estimate, reason routed, and R&D follow-up so Omni-Audits
-can mine it for future AEG templates or AST suppressions.
-`tools/campaign/BOUNTY_LEDGER.md` remains reserved for findings with
-`Approval % >= 85%`; `tools/campaign/CANDIDATE_LEDGER.md` owns the `10%..84%`
-band.
-
-## Structural Eradication Law (mandatory for all hunt/scan output review)
-
-You are mathematically forbidden from appending Markdown notes or prose to explain
-away a False Positive in a hunt report.  Suppress a Commercial False Positive ONLY
-by writing a deterministic Rust AST/path guard in `crates/cli/src/hunt.rs` or
-`crates/forge/src/slop_hunter.rs` that eradicates the finding from the output.
-The report must be completely devoid of the suppressed finding — no footnotes, no
-`---` suppression blocks, no explanatory prose.
-
-Required action on a Commercial False Positive:
-1. Write an `is_excluded_hunt_entry` path guard or a detector-level context filter
-   in `slop_hunter.rs` that prevents the finding from being emitted.
-2. Re-run `janitor hunt` and confirm the finding is absent.
-3. Never append a suppression explanation to the report.
-
-The exception: `security:credential_leak` in any directory is always billable — a
-secret in a repo is a secret in a repo.
-
-## Ledger Synchronization Law
-
-Whenever a structural AST guard suppresses a vulnerability class that already
-exists in `tools/campaign/BOUNTY_LEDGER.md`, you MUST proactively open the
-ledger and physically DELETE the disproven rows in the same session. A false
-positive may not survive as historical noise once the engine has mathematically
-eradicated it.
+After every successful local commit in a sprint, push the branch to origin to
+keep state synchronized and trigger CI/CD pipelines. Exception: when the
+operator explicitly instructs otherwise.
 
 ## Anti-Recency-Bias Law (mandatory for `[NEXT RECOMMENDED ACTION]`)
 
