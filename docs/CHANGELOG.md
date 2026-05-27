@@ -3,6 +3,17 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-27 — Sprint 176: Governance Cleanup, Law W-CLI-VII, Hunt Discipline
+
+* `11 SARIF alerts dismissed` — registry-watch findings (#66–#76) dismissed as "won't fix" via code-scanning API; issue #177 closed with triage notes.
+* `.agent_governance/rules/hunt-discipline.md` *(created)* — extracted Bounty Extraction Law, Dual-Ledger Mandate, Ledger Hydration, Threat Model Pre-Filter, Structural Eradication Law, Mathematical Certainty Law, and Delivery Guarantee Law from `response-format.md` into a focused hunt-session reference. Reduces mandatory per-response context load by ~170 lines.
+* `.agent_governance/rules/response-format.md` *(modified)* — replaced verbatim hunt/bounty laws with a single "Hunt / Scan Output Laws" reference block pointing to `hunt-discipline.md`; retained Anti-Recency-Bias Law, Cash-Flow Priority Override, Absolute Eradication Pre-Flight, and Git Sync Law. Net: 570 → 459 lines.
+* `.agent_governance/rules/workflow-cli-invariants.md` *(modified)* — **Law W-CLI-VII** added: registry-watch SARIF triage protocol with dismissal command, triage decision table, 3-business-day cadence, and root cause note (Sprint 176).
+* `.agent_governance/skills/governance-sync/SKILL.md` *(modified)* — two new routing hints: untriaged registry-watch alerts → Law W-CLI-VII; hunt FP prose suppression → hunt-discipline.md.
+* `CLAUDE.md` *(modified)* — governance table updated: workflow-cli-invariants entry updated to include Laws W-CLI-IV–VII; hunt-discipline.md added as new row.
+
+**Issues closed**: #177 (registry-watch SARIF alert backlog).
+
 ## 2026-05-27 — Sprint 175: CI Hardening, Governor Resilience, Law W-CLI-V/VI
 
 * `.github/workflows/health-signal.yml` *(modified)* — hardened against dynamic GitHub-hosted workflow paths (`dynamic/github-code-scanning/codeql`); `gh run list` now uses `2>/dev/null || echo '[]'` fallback; `gh issue list` uses `|| echo ''`; `pr_json` uses `|| echo '[]'`; step 2 "Build ranked operational issue queue" carries `continue-on-error: true`. Root cause: `gh` exits non-zero for dynamic paths; `set -euo pipefail` trapped before null-guard, cascading into false consecutive-failure count and spurious issue creation (issue #174/#175).

@@ -159,3 +159,41 @@ gives 30 s of back-off, sufficient for burst rate-limit windows.
 aborted before the `analysis-token` call. All subsequent retries hit the same limit.
 The fix: remove `--fail` from `resolve-id` (it is best-effort; installation_id=0 is
 a valid fallback), and add `--retry 3 --retry-delay 10` to `analysis-token`.
+
+## Law W-CLI-VII — Registry Watch SARIF Triage Protocol
+
+`registry-watch.yml` uploads SARIF findings to GitHub Security on every daily
+run. Open alerts on `main` are surfaced as `CODE_SCANNING_BASELINE_OPEN` notices
+by the `Code Scanning Alert Audit` workflow — they do NOT block unrelated PRs.
+However, they accumulate and should be triaged periodically.
+
+**Triage cadence:** Dismiss open alerts within 3 business days of the issue
+being filed. Close the auto-generated issue after dismissal.
+
+**Dismissal command (batch):**
+```bash
+for alert_number in <N1> <N2> ...; do
+  gh api "repos/${REPO}/code-scanning/alerts/${alert_number}" \
+    -X PATCH \
+    -f state=dismissed \
+    -f dismissed_reason="won't fix" \
+    -f dismissed_comment="Registry-watch output: external package flagged in the wild. Not a vulnerability in this repository. Triaged $(date +%Y-%m-%d)."
+done
+```
+
+**Triage decision table:**
+
+| Pattern | Verdict | Reason |
+|---------|---------|--------|
+| Timestamped name or version (e.g. `pkg-27052026_140843`) | True positive | Likely malware probe; dismiss "won't fix" |
+| Namespace squatting on hot brand/protocol (e.g. `mcp-*`, `openai-*`) | True positive | Supply-chain risk; dismiss "won't fix" |
+| Unknown crate family with v0.x versions, no prior history | Suspicious — flag | Dismiss "won't fix" after manual crates.io check |
+| Known maintained project with verifiable upstream (e.g. Google JAX packages) | False positive | Dismiss "false positive" |
+
+**After dismissal**, close the auto-filed issue with a triage comment summarising
+the package list and decision rationale.
+
+**Root cause of incident (Sprint 176):** 11 SARIF alerts accumulated on `main`
+with no documented triage procedure. The `Code Scanning Alert Audit` workflow
+reported them as baseline notices on every PR inspection, creating noise.
+Fix: dismiss via API + close the filed issue within 3 business days.
