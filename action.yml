@@ -267,11 +267,14 @@ runs:
         # Governor's App token — eliminates the "Wrong ID" support overhead.
         INSTALL_ID="${{ inputs.installation_id || github.event.installation.id || '0' }}"
         if [ "${INSTALL_ID}" = "0" ] || [ -z "${INSTALL_ID}" ]; then
-            RESOLVED=$(curl "${GOVERNOR_CURL_OPTS[@]}" -X POST \
-                "${GOVERNOR}/v1/resolve-id" \
+            # resolve-id is best-effort — a 429 or network blip must never abort
+            # the gate.  Omit --fail so curl exits 0 on HTTP errors; fall back
+            # to '{}' so jq always gets valid JSON.
+            _RESOLVE_BODY=$(curl --show-error --silent --connect-timeout 5 --max-time 30 \
+                -X POST "${GOVERNOR}/v1/resolve-id" \
                 -H "Content-Type: application/json" \
-                -d "{\"repo_slug\":\"${{ github.repository }}\"}" \
-                | jq -r '.installation_id // 0')
+                -d "{\"repo_slug\":\"${{ github.repository }}\"}" 2>/dev/null || echo '{}')
+            RESOLVED=$(printf '%s\n' "${_RESOLVE_BODY}" | jq -r '.installation_id // 0' 2>/dev/null || echo '0')
             if [ "${RESOLVED:-0}" != "0" ]; then
                 INSTALL_ID="${RESOLVED}"
             fi
@@ -288,7 +291,7 @@ runs:
           --arg  id   "${INSTALL_ID:-0}" \
           '{repo: $repo, pr: $pr, head_sha: $sha, installation_id: (if $id == "" then 0 else ($id | tonumber) end)}')
 
-        ANALYSIS_TOKEN=$(curl "${GOVERNOR_CURL_OPTS[@]}" -X POST \
+        ANALYSIS_TOKEN=$(curl "${GOVERNOR_CURL_OPTS[@]}" --retry 3 --retry-delay 10 -X POST \
           "${GOVERNOR}/v1/analysis-token" \
           -H "Content-Type: application/json" \
           -d "$TOKEN_PAYLOAD" | jq -er '.token')
