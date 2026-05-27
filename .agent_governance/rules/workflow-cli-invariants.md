@@ -125,3 +125,37 @@ called `gh run list --workflow="dynamic/github-code-scanning/codeql"` (a GitHub-
 path). `gh` exited 1; `set -euo pipefail` propagated before the `RUNS_JSON` null-guard.
 Every `workflow_run` CodeQL success trigger caused health-signal to exit 1, which cascaded
 into a false consecutive-failure count and spurious issue creation.
+
+## Law W-CLI-VI — Governor Curl Calls Must Be Resilient to 429 Rate Limits
+
+Any `curl` call to the Governor (`/v1/resolve-id`, `/v1/analysis-token`) under
+`set -euo pipefail` **must** handle HTTP 429 without aborting the gate.
+
+**Required pattern for optional endpoints (resolve-id):**
+```bash
+# Omit --fail so curl exits 0 on HTTP errors; fall back to '{}' for valid JSON.
+_RESOLVE_BODY=$(curl --show-error --silent --connect-timeout 5 --max-time 30 \
+    -X POST "${GOVERNOR}/v1/resolve-id" \
+    -H "Content-Type: application/json" \
+    -d "{\"repo_slug\":\"${REPO}\"}" 2>/dev/null || echo '{}')
+RESOLVED=$(printf '%s\n' "${_RESOLVE_BODY}" | jq -r '.installation_id // 0' 2>/dev/null || echo '0')
+```
+
+**Required pattern for mandatory endpoints (analysis-token):**
+```bash
+ANALYSIS_TOKEN=$(curl "${GOVERNOR_CURL_OPTS[@]}" --retry 3 --retry-delay 10 -X POST \
+  "${GOVERNOR}/v1/analysis-token" \
+  -H "Content-Type: application/json" \
+  -d "$TOKEN_PAYLOAD" | jq -er '.token')
+```
+
+**Why `--retry` works for 429:** curl (≥7.77) treats HTTP 429 as a transient error
+and retries it automatically when `--retry N` is set. `--retry 3 --retry-delay 10`
+gives 30 s of back-off, sufficient for burst rate-limit windows.
+
+**Root cause of incident (Sprint 175):** Rapid `workflow_dispatch` retriggers
+(8+ calls within 30 min) exhausted the Governor's per-installation rate limit.
+`resolve-id` returned 429; `RESOLVED=$(curl --fail ...)` exited 22; `set -euo pipefail`
+aborted before the `analysis-token` call. All subsequent retries hit the same limit.
+The fix: remove `--fail` from `resolve-id` (it is best-effort; installation_id=0 is
+a valid fallback), and add `--retry 3 --retry-delay 10` to `analysis-token`.
