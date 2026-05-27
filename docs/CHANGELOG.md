@@ -3,6 +3,17 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-27 — Sprint 175: CI Hardening, Governor Resilience, Law W-CLI-V/VI
+
+* `.github/workflows/health-signal.yml` *(modified)* — hardened against dynamic GitHub-hosted workflow paths (`dynamic/github-code-scanning/codeql`); `gh run list` now uses `2>/dev/null || echo '[]'` fallback; `gh issue list` uses `|| echo ''`; `pr_json` uses `|| echo '[]'`; step 2 "Build ranked operational issue queue" carries `continue-on-error: true`. Root cause: `gh` exits non-zero for dynamic paths; `set -euo pipefail` trapped before null-guard, cascading into false consecutive-failure count and spurious issue creation (issue #174/#175).
+* `action.yml` *(modified)* — `TOKEN_PAYLOAD` construction switched from `${{ github.event.pull_request.number }}` to `${_PR_NUM_RESOLVED}` to fix `jq --argjson` exit 2 on `workflow_dispatch` (empty string is invalid JSON). Governor `JANITOR_GOVERNOR_URL` secret wired. `resolve-id` curl made non-fatal (removed `--fail`, added `|| echo '{}'` fallback). `analysis-token` curl gains `--retry 3 --retry-delay 10` for 429 resilience. Root cause of rate-limit cascade: 8+ rapid `workflow_dispatch` retriggers with `installation_id=0` exhausted Governor rate limits.
+* `.agent_governance/rules/workflow-cli-invariants.md` *(modified)* — merge conflict markers resolved; **Law W-CLI-V** codified (gh API calls under pipefail must have `|| echo '<default>'` fallbacks; informational steps carry `continue-on-error: true`); **Law W-CLI-VI** added (Governor curl calls — `resolve-id` must be non-fatal, `analysis-token` must use `--retry 3 --retry-delay 10`).
+* `JANITOR_GOVERNOR_URL` secret set to `https://the-governor.fly.dev` — gate now routes through Governor; verdict published as named GitHub Check Run instead of anonymous commit status.
+
+**Issues closed**: #174 (health-signal false failures), #175 (4-consecutive-run health degradation signal).
+
+**Verification**: PR #173 merged; health-signal shows 3 consecutive successes post-merge; Janitor Integrity Check routes through Governor and completes within 8-minute window on warm sccache.
+
 ## v10.2.7 — 2026-05-25 — Release: Sprint 171 Sprint Batch
 
 * `action.yml` *(modified)* — added `pr_number` input + `workflow_dispatch` re-trigger path; HEAD_SHA resolution from `gh pr view` for manual dispatches; `_PR_NUM_RESOLVED` unification.
