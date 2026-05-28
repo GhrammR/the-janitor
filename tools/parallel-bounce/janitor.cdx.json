@@ -2,8 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
+  "serialNumber": "urn:uuid:f3ac1430-37fa-4bef-879d-f7add2632f3a",
   "metadata": {
-    "timestamp": "1980-01-01T00:00:00.000000000Z",
+    "timestamp": "2026-05-28T07:34:18.161173380Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -13,16 +14,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.8",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.9",
       "name": "parallel-bounce",
-      "version": "10.2.8",
+      "version": "10.2.9",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/parallel-bounce@10.2.8?download_url=file://.",
+      "purl": "pkg:cargo/parallel-bounce@10.2.9?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -32,10 +33,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.8 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.9 bin-target-0",
           "name": "parallel-bounce",
-          "version": "10.2.8",
-          "purl": "pkg:cargo/parallel-bounce@10.2.8?download_url=file://.#src/main.rs"
+          "version": "10.2.9",
+          "purl": "pkg:cargo/parallel-bounce@10.2.9?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -608,16 +609,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "author": "Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>",
       "name": "serde_json",
-      "version": "1.0.149",
+      "version": "1.0.150",
       "description": "A JSON serialization file format",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+          "content": "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
         }
       ],
       "licenses": [
@@ -625,7 +626,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/serde_json@1.0.149",
+      "purl": "pkg:cargo/serde_json@1.0.150",
       "externalReferences": [
         {
           "type": "documentation",
@@ -733,12 +734,12 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.8",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/parallel-bounce#10.2.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#rayon@1.12.0",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149"
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150"
       ]
     },
     {
@@ -834,7 +835,7 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#indexmap@2.14.0",
         "registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18",
