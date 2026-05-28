@@ -63,6 +63,12 @@ Entry structure:
 
 * Do not limit scope — include both incremental improvements and radical ideas.
 * You MUST NEVER use the `CT-` prefix.
+* **Sprint-ready proposals** (fully specified, no hardware blockers, concrete
+  module + pattern + test count defined) MUST be written as an `IQ-N` entry
+  in the `## Implementation Queue — Sprint-Ready` section at the top of
+  `.INNOVATION_LOG.md`, NOT appended to the bottom of the phase sections.
+  A proposal is sprint-ready when it names the target module, the AhoCorasick
+  or AST pattern, the emit rule ID, and a minimum test count.
 * When you identify a gap, inefficiency, or missing test, you must IMMEDIATELY
 classify it as `P0`, `P1`, or `P2` and append it directly to that section in
 `.INNOVATION\_LOG.md`.

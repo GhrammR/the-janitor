@@ -7,6 +7,18 @@
 After any task that resolves a bug, implements a feature, or closes a
 P-tier item, run this checklist before closing the directive.
 
+## Implementation Queue Check (Pre-Sprint)
+
+**Before starting any code sprint**, read the `## Implementation Queue —
+Sprint-Ready` section at the top of `.INNOVATION_LOG.md`. That section lists
+fully specified, buildable items in priority order.
+
+- If the sprint directive matches an IQ item, work it from the queue.
+- When an IQ item is completed, mark it `[DONE vX.Y.Z]` inline and delete
+  the entry from the queue in the same commit as the feature.
+- If a new finding is sprint-ready (fully specified, no blockers), add it to
+  the queue rather than appending it to the bottom of the log.
+
 ## Checklist
 
 For each issue fixed or feature implemented, answer all four questions:
