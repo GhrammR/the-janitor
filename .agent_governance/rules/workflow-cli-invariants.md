@@ -201,10 +201,18 @@ Fix: dismiss via API + close the filed issue within 3 business days.
 ## Law W-CLI-VIII — Dependency Review `fetch failed` Is Expected and Non-Blocking
 
 `dependency-review.yml` sets `continue-on-error: true` at the job level. The
-`fetch failed` error it emits is a transient GitHub Dependency Graph API failure
-that occurs when the PR merge-ref (`refs/remotes/pull/<N>/merge`) has not yet been
-computed by GitHub after PR creation, or when the Dependency Graph API is temporarily
-unavailable.
+`fetch failed` error it emits occurs when `dependency-review-action` cannot resolve
+the PR merge-ref (`refs/pull/<N>/merge`) — GitHub's pre-computed merge commit.
+
+**Structural fix (required in `dependency-review.yml`):**
+```yaml
+- name: Checkout
+  uses: actions/checkout@...
+  with:
+    fetch-depth: 0  # shallow clone cannot resolve refs/pull/N/merge pack object
+```
+Without `fetch-depth: 0`, `git fetch --depth=1` cannot resolve the merge commit SHA
+as a pack object and fails with `fetch failed` on every single run.
 
 **This is NOT a blocker.** `Dependency Review` is intentionally absent from
 branch-protection `required_status_checks`.  The Structural Firewall
@@ -216,7 +224,7 @@ branch-protection `required_status_checks`.  The Structural Firewall
 |---------|--------|
 | `fetch failed` only | Non-blocking. `continue-on-error: true` absorbs it. No action needed. |
 | License violation or high-severity CVE | Blocker. Remediate before merge. |
-| `fetch failed` on EVERY run (not transient) | Investigate GitHub Dependency Graph API availability or PR merge-ref state. |
+| `fetch failed` on EVERY run after structural fix applied | Investigate GitHub Dependency Graph API availability. |
 
 **Do not re-run** `Dependency Review` to clear the failure — `gh run rerun` on a
 `continue-on-error: true` job changes nothing about merge-readiness.  Only the
@@ -224,6 +232,7 @@ Structural Firewall and Janitor Integrity Check results determine whether auto-m
 can proceed.
 
 **Root cause of incident (Sprint 179, 2026-05-28):** Dependency Review `fetch failed`
-on three consecutive runs of PR #185.  Wasted re-run cycles because the job was
-incorrectly treated as a blocker.  It is not.  `continue-on-error: true` was already
-correct; the missing piece was documented triage guidance.
+on 6+ consecutive runs of PR #185.  Root cause: checkout used default `fetch-depth: 1`
+(shallow clone).  `dependency-review-action` internally fetches `refs/pull/N/merge`;
+the shallow clone cannot resolve the merge-ref pack object.  Fix: `fetch-depth: 0` in
+`dependency-review.yml` checkout (structural fix, not just tolerated failure).
