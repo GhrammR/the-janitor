@@ -47,6 +47,7 @@ pub mod unix {
     use tokio::net::{UnixListener, UnixStream};
     use tokio::sync::Semaphore;
 
+    use common::immunity::AffinityMaturator;
     use common::physarum::{global_pulse, start_background_heart, Pulse};
     use common::registry::{MappedRegistry, SymbolRegistry};
     use forge::pr_collider::LshIndex;
@@ -232,6 +233,9 @@ pub mod unix {
         /// Any gap exceeding 30 000 ms is reported as a `daemon:heartbeat_timeout`
         /// warning via `check_heartbeat_timeout()`.
         pub last_heartbeat_ms: std::sync::atomic::AtomicU64,
+        /// P9-1 Physarum Immune Memory — accumulates confirmed vuln-pattern
+        /// signatures across all bounce requests served by this daemon instance.
+        pub immune_memory: std::sync::Mutex<AffinityMaturator>,
     }
 
     impl DaemonState {
@@ -368,6 +372,7 @@ pub mod unix {
             constrict_semaphore: Arc::new(Semaphore::new(CONSTRICT_CONCURRENCY)),
             siem_webhook_url,
             last_heartbeat_ms: std::sync::atomic::AtomicU64::new(0),
+            immune_memory: std::sync::Mutex::new(AffinityMaturator::new()),
         });
 
         // Remove a stale socket file from a previous run.
@@ -524,9 +529,17 @@ pub mod unix {
                         let antipatterns_count = score.antipatterns_found;
                         let zombie_symbols_added = score.zombie_symbols_added;
                         // P3-4 Phase A: emit SIEM events for every security finding.
+                        // P9-1 Phase A: ingest each security finding into immune memory
+                        //   so the AffinityMaturator accumulates cross-request pattern
+                        //   exposure counts for downstream maturation and anomaly gating.
                         for detail in &score.antipattern_details {
                             if detail.starts_with("security:") {
                                 state.emit_siem_event(detail);
+                                if let Ok(mut mem) = state.immune_memory.lock() {
+                                    mem.ingest_pattern(common::immunity::hash_pattern(
+                                        detail.as_bytes(),
+                                    ));
+                                }
                             }
                         }
                         // fields are None.  Best-effort: I/O errors are silently dropped.

@@ -1001,6 +1001,7 @@ dependencies = [
  "bloom",
  "bytecheck",
  "ed25519-dalek",
+ "ena",
  "fips204",
  "fips205",
  "memmap2",

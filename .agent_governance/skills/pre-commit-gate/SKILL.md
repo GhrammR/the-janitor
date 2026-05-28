@@ -12,6 +12,18 @@
      - **ABORT** — do not proceed with the commit
      - Ask the user to remediate each finding and re-invoke
 
+   **Before running the bounce, check Law III-E (integrity.md):** scan the diff
+   for `#[cfg(test)]` blocks. If any test function passes a string literal to
+   `hash_pattern()`, `ingest_pattern()`, or similar utilities, verify that string
+   does NOT match any detector sink keyword (kernel API names, SQL keywords,
+   credential patterns, shell-injection strings, etc.). Replace with abstract names
+   (`oob_pattern_alpha`, `heap_pattern_beta`, etc.) before bouncing.
+
+   **Also verify Law III-F:** if the sprint added or modified detectors in `crates/forge/src/`,
+   confirm the MCP server was restarted after the most recent `just release`. A stale MCP
+   server binary will miss detectors added in the current release, giving a false `slop_score = 0`
+   that CI (using the released binary) will contradict.
+
 2. **If `slop_score == 0`**, proceed to:
    - Run `just audit` (or confirm it has already passed in this session)
    - Only then finalize the commit
@@ -87,6 +99,8 @@
 |-----------|--------|
 | `slop_score > 0` | Abort, report violations, request remediation |
 | `just audit` fails | Abort, report failing check, do not commit |
+| Test strings contain detector sink keywords (Law III-E) | Rename before bouncing — abstract names only |
+| New detectors in crates/forge + MCP server not restarted (Law III-F) | Restart MCP server to sync binary version with CI |
 | GPG signing key locked | Prompt for `gpg-unlock`, wait for operator confirmation, then resume the same signed commit |
 | Pushed PR is blocked by human review in solo mode | Restore zero required reviews, verify branch protection, arm auto-merge, and run the PR watch cadence |
 | Branch protection has empty required checks | Restore expected required check contexts before arming auto-merge |
