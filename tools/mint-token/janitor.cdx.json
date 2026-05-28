@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:131424b7-6a14-49d4-985e-ed0484049b47",
+  "serialNumber": "urn:uuid:5705af4e-911a-4765-b333-527057367df5",
   "metadata": {
-    "timestamp": "2026-05-28T07:34:18.151818214Z",
+    "timestamp": "2026-05-28T09:11:53.924550264Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.10",
       "name": "mint-token",
-      "version": "10.2.9",
+      "version": "10.2.10",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/mint-token@10.2.9?download_url=file://.",
+      "purl": "pkg:cargo/mint-token@10.2.10?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.10 bin-target-0",
           "name": "mint-token",
-          "version": "10.2.9",
-          "purl": "pkg:cargo/mint-token@10.2.9?download_url=file://.#src/main.rs"
+          "version": "10.2.10",
+          "purl": "pkg:cargo/mint-token@10.2.10?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -1750,7 +1750,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.10",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
