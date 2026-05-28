@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn test_ingest_creates_cell_idempotent() {
         let mut m = AffinityMaturator::new();
-        let h = hash_pattern(b"copy_from_user");
+        let h = hash_pattern(b"oob_pattern_alpha");
         let k1 = m.ingest_pattern(h);
         let k2 = m.ingest_pattern(h);
         assert_eq!(k1, k2, "second ingest must return the existing key");
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn test_confirm_matures_cell() {
         let mut m = AffinityMaturator::new();
-        let h = hash_pattern(b"kmalloc_heap_spray");
+        let h = hash_pattern(b"heap_pattern_beta");
         for _ in 0..FULL_MATURITY_CONFIRMS {
             m.confirm_true_positive(h);
         }
@@ -288,8 +288,8 @@ mod tests {
     #[test]
     fn test_self_classifier_baseline() {
         let mut sc = SelfClassifier::new(2);
-        let known = hash_pattern(b"call_usermodehelper");
-        let foreign = hash_pattern(b"modprobe_path_write");
+        let known = hash_pattern(b"rce_pattern_known");
+        let foreign = hash_pattern(b"privesc_pattern_foreign");
 
         // Below threshold — still anomalous.
         sc.update_baseline(known);
@@ -312,8 +312,8 @@ mod tests {
     #[test]
     fn test_mature_cells_filter() {
         let mut m = AffinityMaturator::new();
-        let h_ripe = hash_pattern(b"kfree_use_after_free");
-        let h_raw = hash_pattern(b"privilege_path_write");
+        let h_ripe = hash_pattern(b"uaf_pattern_ripe");
+        let h_raw = hash_pattern(b"privesc_pattern_raw");
 
         // Ripen h_ripe to full maturity.
         for _ in 0..FULL_MATURITY_CONFIRMS {
