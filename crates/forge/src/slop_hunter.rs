@@ -1388,6 +1388,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
                 source, file_path,
             ));
             f.extend(crate::sidechannel::find_secret_dependent_branches(source));
+            f.extend(find_python_disabled_auth(source, file_path));
             f
         }
         "js" | "jsx" | "ts" | "tsx" => {
@@ -1461,6 +1462,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
                 source, file_path,
             ));
             f.extend(crate::sidechannel::find_secret_dependent_branches(source));
+            f.extend(find_go_noop_verify(eng, parsed, file_path));
             f
         }
         "rb" => {
@@ -1506,7 +1508,11 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
     }
     // Language-agnostic: supply-chain integrity scan runs on every source file.
     // Catches external script loading without SRI and GitHub Pages URL embedding.
-    findings.extend(find_supply_chain_slop_with_context(language, parsed));
+    // CycloneDX SBOM files (.cdx.json) legitimately reference third-party crate
+    // documentation on github.io — suppress supply-chain scan to avoid false positives.
+    if !file_path.ends_with(".cdx.json") {
+        findings.extend(find_supply_chain_slop_with_context(language, parsed));
+    }
     filter_standard_sast_suppressions(source, findings)
 }
 
@@ -5731,6 +5737,90 @@ fn walk_python_slopsquat_imports(node: Node<'_>, source: &[u8], findings: &mut V
 }
 
 // ---------------------------------------------------------------------------
+// IQ-9: Python AI-agent framework disabled-auth config detector
+// ---------------------------------------------------------------------------
+
+/// Scan Python source files (non-test) for hardcoded disabled-authentication
+/// configuration identifiers used by Python AI agent frameworks such as
+/// PraisonAI, LangServe, and CrewAI.
+///
+/// Fires when an identifier containing any of the key-name prefixes
+/// (`AUTH_ENABLED`, `AUTH_TOKEN`, `auth_required`, `DISABLE_AUTH`) appears
+/// on the same line as the corresponding disabled value (`= False`, `= None`,
+/// `= ""`, or `= True` for `DISABLE_AUTH`).
+///
+/// Gate: file must end in `.py` and must not be a test file.
+fn find_python_disabled_auth(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
+    if !file_path.ends_with(".py") || file_path.contains("test") || file_path.contains("spec") {
+        return Vec::new();
+    }
+
+    // (key-name bytes, disabled-value bytes, description)
+    type AuthEntry = (&'static [u8], &'static [&'static [u8]], &'static str);
+    const DISABLED_AUTH_ENTRIES: &[AuthEntry] = &[
+        (
+            b"AUTH_ENABLED",
+            &[b"= False"],
+            "security:ai_agent_disabled_auth — `AUTH_ENABLED` assigned `False` disables \
+             authentication in a Python AI agent framework config; every endpoint served \
+             by this process accepts unauthenticated requests — CVE-2026-44338 class \
+             (PraisonAI auth bypass)",
+        ),
+        (
+            b"AUTH_TOKEN",
+            &[b"= None", b"= \"\"", b"= ''"],
+            "security:ai_agent_disabled_auth — `AUTH_TOKEN` set to empty/None disables \
+             token-based authentication in a Python AI agent framework config; endpoints \
+             accept requests without a valid bearer token — CVE-2026-44338 class",
+        ),
+        (
+            b"auth_required",
+            &[b"= False"],
+            "security:ai_agent_disabled_auth — `auth_required` assigned `False` disables \
+             authentication enforcement; matches PraisonAI/LangServe/CrewAI disabled-auth \
+             pattern — CVE-2026-44338 class",
+        ),
+        (
+            b"DISABLE_AUTH",
+            &[b"= True"],
+            "security:ai_agent_disabled_auth — `DISABLE_AUTH` assigned `True` explicitly \
+             disables authentication; any endpoint served by this process is \
+             unauthenticated — CVE-2026-44338 class",
+        ),
+    ];
+
+    let mut findings = Vec::new();
+    let mut line_start = 0usize;
+
+    for line in source.split(|&b| b == b'\n') {
+        let line_end = line_start + line.len();
+
+        'entry: for (key, values, description) in DISABLED_AUTH_ENTRIES {
+            // Scan for the key-name prefix on this line.
+            if line.windows(key.len()).any(|w| w == *key) {
+                // Confirm the disabled value also appears on this line.
+                for val in *values {
+                    if line.windows(val.len()).any(|w| w == *val) {
+                        findings.push(SlopFinding {
+                            start_byte: line_start,
+                            end_byte: line_end,
+                            description: description.to_string(),
+                            domain: DOMAIN_FIRST_PARTY,
+                            severity: Severity::High,
+                        });
+                        break 'entry;
+                    }
+                }
+            }
+        }
+
+        line_start = line_end + 1;
+    }
+
+    findings
+}
+
+// ---------------------------------------------------------------------------
 // Phase 2 R&D: Java deserialization / JNDI AST walk (Tier 1)
 // ---------------------------------------------------------------------------
 
@@ -7538,6 +7628,109 @@ fn go_composite_literal_has_field(
         }
     }
     false
+}
+
+// ---------------------------------------------------------------------------
+// IQ-11: Go no-op verification function detector
+// ---------------------------------------------------------------------------
+
+/// Inspect a Go function body `block` node and return `true` if it is a
+/// no-op: either an empty block `{}` or a single `return nil` / `return true`
+/// statement with no conditional logic.
+///
+/// Uses source-text comparison on the block's raw bytes to avoid fragile
+/// tree-sitter AST child-count assumptions across grammar versions.
+fn is_go_noop_body(block: Node<'_>, source: &[u8]) -> bool {
+    let body_text = match block.utf8_text(source) {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+    // Strip outer braces and normalise internal whitespace.
+    let inner = body_text
+        .trim()
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+        .unwrap_or("")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    matches!(inner.as_str(), "" | "return nil" | "return true")
+}
+
+fn find_go_noop_verify_nodes(node: Node<'_>, source: &[u8], findings: &mut Vec<SlopFinding>) {
+    if node.kind() == "function_declaration" {
+        let name = node
+            .child_by_field_name("name")
+            .and_then(|n| n.utf8_text(source).ok())
+            .unwrap_or("");
+        if name.starts_with("Verify")
+            || name.starts_with("Validate")
+            || name.starts_with("Check")
+            || name.starts_with("Assert")
+        {
+            if let Some(body) = node.child_by_field_name("body") {
+                if is_go_noop_body(body, source) {
+                    findings.push(SlopFinding {
+                        start_byte: node.start_byte(),
+                        end_byte: node.end_byte(),
+                        description: format!(
+                            "security:noop_verification_function — Go no-op verification \
+                             function detected: `{name}` returns nil/true without any \
+                             conditional logic — signature bypass pattern \
+                             (CVE-2026-42248 class)"
+                        ),
+                        domain: DOMAIN_FIRST_PARTY,
+                        severity: Severity::KevCritical,
+                    });
+                    return;
+                }
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        find_go_noop_verify_nodes(child, source, findings);
+    }
+}
+
+/// Scan Go source for functions whose name starts with
+/// `Verify`, `Validate`, `Check`, or `Assert` and whose entire body is
+/// `return nil`, `return true`, or empty — the canonical signature-bypass
+/// pattern (CVE-2026-42248: Ollama Windows auto-updater).
+///
+/// Gate: non-test file paths only (`_test.go`, `test/`, `mock/`, `testdata/`
+/// are suppressed).
+fn find_go_noop_verify(
+    eng: &QueryEngine,
+    parsed: &ParsedUnit<'_>,
+    file_path: &str,
+) -> Vec<SlopFinding> {
+    if file_path.contains("_test.go")
+        || file_path.contains("/test/")
+        || file_path.contains("/mock/")
+        || file_path.contains("/testdata/")
+    {
+        return Vec::new();
+    }
+
+    let source = parsed.source;
+    const NOOP_PREFIXES: &[&[u8]] = &[b"Verify", b"Validate", b"Check", b"Assert"];
+    if !NOOP_PREFIXES
+        .iter()
+        .any(|p| source.windows(p.len()).any(|w| w == *p))
+    {
+        return Vec::new();
+    }
+
+    let tree = match parsed.ensure_tree(eng.go_lang.clone(), "go") {
+        Ok(Some(tree)) => tree,
+        Ok(None) => return Vec::new(),
+        Err(finding) => return vec![finding],
+    };
+
+    let mut findings = Vec::new();
+    find_go_noop_verify_nodes(tree.root_node(), source, &mut findings);
+    findings
 }
 
 // ---------------------------------------------------------------------------
@@ -12274,6 +12467,91 @@ mod phase4_rd_tests {
                 .iter()
                 .any(|f| f.description.contains("tls_verification_bypass")),
             "find_slop(go) must dispatch to Phase 4 Go AST walk"
+        );
+    }
+
+    // ── Go-4: no-op verification function (IQ-11) ───────────────────────────
+
+    #[test]
+    fn test_noop_verify_fires_on_bare_return() {
+        // Abstract name: VerifyAlpha (not the real CVE-2026-42248 symbol).
+        // Body is a single `return nil` — no conditional logic.
+        let src = b"func VerifyAlpha() error { return nil }\n";
+        let findings = find_go_noop_verify(eng(), &ParsedUnit::unparsed(src), "updater.go");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("noop_verification_function")),
+            "func VerifyAlpha() {{ return nil }} must fire noop_verification_function"
+        );
+    }
+
+    #[test]
+    fn test_noop_verify_no_fire_with_logic() {
+        // ValidateBeta has actual conditional logic — must NOT fire.
+        let src =
+            b"func ValidateBeta(data []byte) error {\n    if len(data) == 0 { return ErrEmpty }\n    return nil\n}\n";
+        let findings = find_go_noop_verify(eng(), &ParsedUnit::unparsed(src), "validator.go");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("noop_verification_function")),
+            "func ValidateBeta with conditional must not fire noop_verification_function"
+        );
+    }
+
+    #[test]
+    fn test_noop_verify_no_fire_in_test_file() {
+        // Same no-op body, but path matches _test.go — must be suppressed.
+        let src = b"func VerifyAlpha() error { return nil }\n";
+        let findings =
+            find_go_noop_verify(eng(), &ParsedUnit::unparsed(src), "verify_alpha_test.go");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("noop_verification_function")),
+            "_test.go path must suppress noop_verification_function"
+        );
+    }
+
+    // ── Python-disabled-auth (IQ-9) ──────────────────────────────────────────
+
+    #[test]
+    fn test_disabled_auth_fires() {
+        // Abstract name AUTH_ENABLED_ALPHA (Law III-E) — contains AUTH_ENABLED prefix.
+        let src = b"AUTH_ENABLED_ALPHA = False\n";
+        let findings = find_python_disabled_auth(src, "config.py");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("ai_agent_disabled_auth")),
+            "AUTH_ENABLED... = False in .py must fire ai_agent_disabled_auth"
+        );
+    }
+
+    #[test]
+    fn test_disabled_auth_no_fire_test_file() {
+        // Same pattern but path is a test file.
+        let src = b"AUTH_ENABLED_ALPHA = False\n";
+        let findings = find_python_disabled_auth(src, "test_config.py");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("ai_agent_disabled_auth")),
+            "test_config.py path must suppress ai_agent_disabled_auth"
+        );
+    }
+
+    #[test]
+    fn test_disabled_auth_no_fire_enabled() {
+        // auth_beta_required does NOT contain auth_required as substring — no fire.
+        let src = b"auth_beta_required = True\n";
+        let findings = find_python_disabled_auth(src, "config.py");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("ai_agent_disabled_auth")),
+            "auth_beta_required = True must not fire ai_agent_disabled_auth"
         );
     }
 

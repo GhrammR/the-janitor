@@ -1002,19 +1002,18 @@ impl PRBouncer for PatchBouncer {
         // crate documentation URLs hosted on github.io in their externalReferences
         // sections. These are metadata links, not production asset loads. Skip
         // binary_hunter scan for SBOM files to prevent false positives on release diffs.
-        let pre_lang_payload_findings: Vec<String> = if raw_added.trim().is_empty()
-            || file_path.ends_with(".cdx.json")
-        {
-            vec![]
-        } else {
-            advanced_threats::binary_hunter::scan(raw_added.as_bytes())
-                .into_iter()
-                .map(|t| {
-                    let line = byte_offset_to_line(raw_added.as_bytes(), t.byte_offset);
-                    format!("{} (line={line})", t.description)
-                })
-                .collect()
-        };
+        let pre_lang_payload_findings: Vec<String> =
+            if raw_added.trim().is_empty() || file_path.ends_with(".cdx.json") {
+                vec![]
+            } else {
+                advanced_threats::binary_hunter::scan(raw_added.as_bytes())
+                    .into_iter()
+                    .map(|t| {
+                        let line = byte_offset_to_line(raw_added.as_bytes(), t.byte_offset);
+                        format!("{} (line={line})", t.description)
+                    })
+                    .collect()
+            };
         let mut metadata_findings = crate::metadata::package_json_lifecycle_audit(patch);
         if matches!(ext, "md" | "markdown") {
             metadata_findings.extend(crate::metadata::detect_ai_prompt_injection(&raw_added));
