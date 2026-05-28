@@ -1005,6 +1005,8 @@ dependencies = [
  "fips204",
  "fips205",
  "memmap2",
+ "rand 0.9.4",
+ "rand_chacha 0.9.0",
  "rkyv",
  "semver 1.0.28",
  "serde",
