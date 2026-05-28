@@ -90,11 +90,26 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            // Law W-CLI-IX: deduplicate — skip if an open triage issue already exists.
+            // Daily runs produce findings every day; without this gate a new issue is
+            // filed unconditionally even when yesterday's alerts are already dismissed.
+            const TRIAGE_TITLE = 'Registry Watch: suspicious package detected';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 20,
+            }).catch(() => ({ data: [] }));
+            const alreadyOpen = existing.data.some(i => i.title === TRIAGE_TITLE);
+            if (alreadyOpen) {
+              core.info('Open triage issue already exists — skipping duplicate creation (Law W-CLI-IX).');
+              return;
+            }
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: 'Registry Watch: suspicious package detected',
+              title: TRIAGE_TITLE,
               body: [
                 '## Registry Watch Alert',
                 '',
