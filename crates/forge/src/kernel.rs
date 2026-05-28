@@ -103,84 +103,16 @@ static PRIVILEGE_SUPP_AC: OnceLock<AhoCorasick> = OnceLock::new();
 static HELPER_PATH_SUPP_AC: OnceLock<AhoCorasick> = OnceLock::new();
 static UAF_SUPP_AC: OnceLock<AhoCorasick> = OnceLock::new();
 
-fn copy_from_user_ac() -> &'static AhoCorasick {
-    COPY_FROM_USER_AC.get_or_init(|| {
+/// Single parameterized initializer — eliminates structural clone across all 9 instances.
+fn ac(
+    lock: &'static OnceLock<AhoCorasick>,
+    patterns: &'static [&'static str],
+) -> &'static AhoCorasick {
+    lock.get_or_init(|| {
         AhoCorasick::builder()
             .match_kind(MatchKind::LeftmostFirst)
-            .build(COPY_FROM_USER_SINKS)
-            .expect("COPY_FROM_USER_AC build infallible")
-    })
-}
-
-fn kmalloc_ac() -> &'static AhoCorasick {
-    KMALLOC_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(KMALLOC_SINKS)
-            .expect("KMALLOC_AC build infallible")
-    })
-}
-
-fn usermode_helper_ac() -> &'static AhoCorasick {
-    USERMODE_HELPER_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(USERMODE_HELPER_SINKS)
-            .expect("USERMODE_HELPER_AC build infallible")
-    })
-}
-
-fn privilege_path_ac() -> &'static AhoCorasick {
-    PRIVILEGE_PATH_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(PRIVILEGE_PATH_SINKS)
-            .expect("PRIVILEGE_PATH_AC build infallible")
-    })
-}
-
-fn uaf_ac() -> &'static AhoCorasick {
-    UAF_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(UAF_SINKS)
-            .expect("UAF_AC build infallible")
-    })
-}
-
-fn size_bound_supp_ac() -> &'static AhoCorasick {
-    SIZE_BOUND_SUPP_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(SIZE_BOUND_SUPPRESSORS)
-            .expect("SIZE_BOUND_SUPP_AC build infallible")
-    })
-}
-
-fn privilege_supp_ac() -> &'static AhoCorasick {
-    PRIVILEGE_SUPP_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(PRIVILEGE_SUPPRESSORS)
-            .expect("PRIVILEGE_SUPP_AC build infallible")
-    })
-}
-
-fn helper_path_supp_ac() -> &'static AhoCorasick {
-    HELPER_PATH_SUPP_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(HELPER_PATH_SUPPRESSORS)
-            .expect("HELPER_PATH_SUPP_AC build infallible")
-    })
-}
-
-fn uaf_supp_ac() -> &'static AhoCorasick {
-    UAF_SUPP_AC.get_or_init(|| {
-        AhoCorasick::builder()
-            .match_kind(MatchKind::LeftmostFirst)
-            .build(UAF_SUPPRESSORS)
-            .expect("UAF_SUPP_AC build infallible")
+            .build(patterns)
+            .expect("kernel AC build infallible")
     })
 }
 
@@ -243,7 +175,13 @@ pub fn emit_kernel_findings(source: &str, file: &str) -> Vec<StructuredFinding> 
     let mut findings: Vec<StructuredFinding> = Vec::new();
 
     // ── Class 1: copy_from_user OOB write ────────────────────────────────────
-    for line_no in scan_window(&lines, copy_from_user_ac(), size_bound_supp_ac(), 10, 3) {
+    for line_no in scan_window(
+        &lines,
+        ac(&COPY_FROM_USER_AC, COPY_FROM_USER_SINKS),
+        ac(&SIZE_BOUND_SUPP_AC, SIZE_BOUND_SUPPRESSORS),
+        10,
+        3,
+    ) {
         findings.push(StructuredFinding {
             id: "security:kernel_oob_write".to_string(),
             severity: Some("KevCritical".to_string()),
@@ -262,7 +200,13 @@ the copy call.  Exploit class: LPE."
     }
 
     // ── Class 2: kmalloc heap spray ───────────────────────────────────────────
-    for line_no in scan_window(&lines, kmalloc_ac(), size_bound_supp_ac(), 10, 3) {
+    for line_no in scan_window(
+        &lines,
+        ac(&KMALLOC_AC, KMALLOC_SINKS),
+        ac(&SIZE_BOUND_SUPP_AC, SIZE_BOUND_SUPPRESSORS),
+        10,
+        3,
+    ) {
         findings.push(StructuredFinding {
             id: "security:kernel_heap_spray".to_string(),
             severity: Some("KevCritical".to_string()),
@@ -282,7 +226,13 @@ Exploit class: LPE."
     }
 
     // ── Class 3: call_usermodehelper RCE ─────────────────────────────────────
-    for line_no in scan_window(&lines, usermode_helper_ac(), helper_path_supp_ac(), 5, 0) {
+    for line_no in scan_window(
+        &lines,
+        ac(&USERMODE_HELPER_AC, USERMODE_HELPER_SINKS),
+        ac(&HELPER_PATH_SUPP_AC, HELPER_PATH_SUPPRESSORS),
+        5,
+        0,
+    ) {
         findings.push(StructuredFinding {
             id: "security:kernel_rce_usermode_helper".to_string(),
             severity: Some("KevCritical".to_string()),
@@ -301,7 +251,13 @@ Exploit class: RCE / ContainerEscape."
     }
 
     // ── Class 4: modprobe_path / core_pattern privilege write ─────────────────
-    for line_no in scan_window(&lines, privilege_path_ac(), privilege_supp_ac(), 15, 0) {
+    for line_no in scan_window(
+        &lines,
+        ac(&PRIVILEGE_PATH_AC, PRIVILEGE_PATH_SINKS),
+        ac(&PRIVILEGE_SUPP_AC, PRIVILEGE_SUPPRESSORS),
+        15,
+        0,
+    ) {
         findings.push(StructuredFinding {
             id: "security:kernel_privilege_path_write".to_string(),
             severity: Some("KevCritical".to_string()),
@@ -320,7 +276,13 @@ core-dump invocation to an arbitrary binary, achieving immediate LPE.  Gate writ
     }
 
     // ── Class 5: kfree UAF (missing null-after-free) ──────────────────────────
-    for line_no in scan_window(&lines, uaf_ac(), uaf_supp_ac(), 0, 3) {
+    for line_no in scan_window(
+        &lines,
+        ac(&UAF_AC, UAF_SINKS),
+        ac(&UAF_SUPP_AC, UAF_SUPPRESSORS),
+        0,
+        3,
+    ) {
         findings.push(StructuredFinding {
             id: "security:kernel_uaf".to_string(),
             severity: Some("KevCritical".to_string()),

@@ -22,6 +22,41 @@ If the count exceeds 5, split into topic PRs before pushing:
 **Never** create a sprint-batch PR spanning all three topics.
 `.janitor/` generated artifacts are **never** part of a PR.
 
+## OnceLock Accessor Law — No Structural Clones
+
+When a module needs multiple `OnceLock<AhoCorasick>` statics, **never** write N
+separate accessor functions with identical structure. The slop guardian
+alpha-normalizes identifiers and will detect N structurally-identical functions as
+`logic_clones_found = N×(N-1)/2`, scoring `5 × N×(N-1)/2` pts plus a
+`recursive_boilerplate` Critical antipattern at 50 pts — enough to block at ≥3 functions.
+
+**Required pattern** (single parameterized helper, structurally unique):
+```rust
+fn ac(lock: &'static OnceLock<AhoCorasick>, patterns: &'static [&'static str]) -> &'static AhoCorasick {
+    lock.get_or_init(|| {
+        AhoCorasick::builder()
+            .match_kind(MatchKind::LeftmostFirst)
+            .build(patterns)
+            .expect("AC build infallible")
+    })
+}
+// Usage: ac(&MY_LOCK, MY_PATTERNS)
+```
+
+**Forbidden pattern** (triggers boilerplate flood at ≥3 instances):
+```rust
+fn foo_ac() -> &'static AhoCorasick {
+    FOO_AC.get_or_init(|| { AhoCorasick::builder()... .build(FOO_PATTERNS).expect("...") })
+}
+fn bar_ac() -> &'static AhoCorasick {  // identical shape → clone
+    BAR_AC.get_or_init(|| { AhoCorasick::builder()... .build(BAR_PATTERNS).expect("...") })
+}
+```
+
+**Root cause (Sprint 178, 2026-05-28):** `kernel.rs` had 9 structurally-identical
+OnceLock accessors → `logic_clones_found: 26` (26 × 5 = 130 pts) + one
+`recursive_boilerplate` antipattern (50 pts) = slop_score 180 → Structural Firewall block.
+
 ## Logic Clone Law
 
 New proof classifiers for `hunt.rs` are **always** added to the
