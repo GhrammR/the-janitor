@@ -1446,6 +1446,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
         }
         "go" => {
             let mut f = find_go_ssrf_slop(source);
+            f.extend(find_go_filepath_traversal(source));
             f.extend(detect_embedding_trust_transposition(source));
             f.extend(detect_vector_store_poisoning(source));
             f.extend(detect_model_weight_backdoor(source));
@@ -6868,6 +6869,66 @@ fn find_go_ssrf_slop(source: &[u8]) -> Vec<SlopFinding> {
                 }
             }
         }
+    }
+    findings
+}
+
+/// IQ-7: Detect Go `filepath.Join` calls using user-controlled input without a
+/// preceding `filepath.Clean` or `path.Clean` call within ±3 lines.
+/// Triggered by Ollama CVE-2026-42248/42249 (CVSS 8.6).
+fn find_go_filepath_traversal(source: &[u8]) -> Vec<SlopFinding> {
+    const JOIN_NEEDLE: &[u8] = b"filepath.Join(";
+    const CLEAN_NEEDLES: &[&[u8]] = &[b"filepath.Clean(", b"path.Clean(", b"filepath.Base("];
+
+    let mut findings = Vec::new();
+    let lines: Vec<&[u8]> = source.split(|&b| b == b'\n').collect();
+
+    for (line_idx, line) in lines.iter().enumerate() {
+        if !line.windows(JOIN_NEEDLE.len()).any(|w| w == JOIN_NEEDLE) {
+            continue;
+        }
+        // Require at least one argument that looks like a variable (not a string literal).
+        // Heuristic: JOIN_NEEDLE is followed by content that contains no leading `"`.
+        let after = match line
+            .windows(JOIN_NEEDLE.len())
+            .position(|w| w == JOIN_NEEDLE)
+        {
+            Some(pos) => &line[pos + JOIN_NEEDLE.len()..],
+            None => continue,
+        };
+        let first_char = after.iter().find(|&&b| b != b' ');
+        if first_char == Some(&b'"') {
+            // All-literal call — not a traversal risk.
+            continue;
+        }
+
+        // Check ±3 lines for a Clean call.
+        let lo = line_idx.saturating_sub(3);
+        let hi = (line_idx + 4).min(lines.len());
+        let window: Vec<u8> = lines[lo..hi].join(&b'\n');
+        if CLEAN_NEEDLES
+            .iter()
+            .any(|n| window.windows(n.len()).any(|w| w == *n))
+        {
+            continue;
+        }
+
+        let byte_offset = lines[..line_idx].iter().map(|l| l.len() + 1).sum::<usize>();
+        findings.push(SlopFinding {
+            start_byte: byte_offset,
+            end_byte: byte_offset + line.len(),
+            description: format!(
+                "security:path_traversal — `filepath.Join` at line {} receives \
+                 user-controlled input without a preceding `filepath.Clean` call; \
+                 `..` sequences in the input traverse outside the intended directory \
+                 (Ollama CVE-2026-42248/CVE-2026-42249, CVSS 8.6). \
+                 Wrap with `filepath.Clean(filepath.Join(...))` or validate the \
+                 resolved path is within the expected root using `strings.HasPrefix`.",
+                line_idx + 1
+            ),
+            domain: crate::metadata::DOMAIN_FIRST_PARTY,
+            severity: Severity::High,
+        });
     }
     findings
 }

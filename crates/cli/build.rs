@@ -58,6 +58,39 @@ fn main() {
         "rustdecimal".into(),
         "deser-hjson".into(),
         "bikeshed".into(),
+        // RubyGems — permutations covering the 500+ mass-upload campaign (2026-05)
+        // Strategy: hyphen↔underscore swap, vowel-doubling, digit substitution,
+        // common suffix injection — mirrors npm slopsquat permutation patterns.
+        "rails".into(),
+        "raiils".into(),     // vowel-double
+        "r4ils".into(),      // digit substitution
+        "rails-core".into(), // suffix injection
+        "rack".into(),
+        "r4ck".into(),
+        "rackk".into(),
+        "rack-core".into(),
+        "devise".into(),
+        "devisse".into(),
+        "d3vise".into(),
+        "activerecord".into(),
+        "active_record".into(), // underscore variant
+        "active-record".into(), // hyphen variant
+        "activesupport".into(),
+        "active_support".into(),
+        "nokogiri".into(),
+        "n0kogiri".into(),
+        "bundler".into(),
+        "bundlerr".into(),
+        "b4ndler".into(),
+        "rspec".into(),
+        "rspecc".into(),
+        "r_spec".into(),
+        "puma".into(),
+        "pumaa".into(),
+        "p4ma".into(),
+        "sidekiq".into(),
+        "s1dekiq".into(),
+        "sidekiiq".into(),
     ];
 
     let seed_corpus = common::wisdom::SlopsquatCorpus {

@@ -14,7 +14,20 @@ scan_buffer; introduce Implementation Queue governance.
 - `.agent_governance/skills/evolution-tracker/SKILL.md` *(modified)* — sprint-ready proposals route to IQ-N entries
 - `crates/forge/src/slop_filter.rs` *(modified)* — `emit_debug_endpoint_findings` and `emit_oidc_scope_findings` wired into `scan_buffer` alongside authz/idor/toctou; findings scored KevCritical
 
-**Commit:** `17ce6be` (governance), next commit for slop_filter wiring
+**Commit:** `17ce6be` (governance), `f3379c9` (IQ-1/IQ-2 wiring), next commit for IQ-3..IQ-8
+
+## 2026-05-27 — Sprint 177 cont: IQ-3 through IQ-8
+
+**Directive:** Complete all remaining Implementation Queue items.
+
+**Files modified:**
+- `crates/forge/src/slop_filter.rs` *(modified)* — wired `linker_hijack`, `oauth_state`, `pkce_downgrade` into scan_buffer
+- `crates/forge/src/oauth_account_fusion.rs` *(modified)* — `detect_pkce_downgrade` + 4 tests (IQ-6); `MatchKind` import added
+- `crates/forge/src/slop_hunter.rs` *(modified)* — `find_go_filepath_traversal` + Go dispatch wiring (IQ-7)
+- `crates/cli/build.rs` *(modified)* — 28 Ruby gem permutations added to slopsquat seed corpus (IQ-8)
+- `.INNOVATION_LOG.md` *(modified)* — IQ-3..IQ-8 marked `[DONE v10.2.9]`
+
+**Notes:** IQ-4 (S3 public-read ACL) was already implemented in `find_hcl_s3_public_acl`. IQ-3/IQ-5 existed in hunt.rs only — now wired into scan_buffer. IQ-6/IQ-7/IQ-8 built from scratch.
 
 ## 2026-05-27 — Sprint 176: Governance Cleanup, Law W-CLI-VII, Hunt Discipline
 
