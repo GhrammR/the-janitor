@@ -236,3 +236,40 @@ on 6+ consecutive runs of PR #185.  Root cause: checkout used default `fetch-dep
 (shallow clone).  `dependency-review-action` internally fetches `refs/pull/N/merge`;
 the shallow clone cannot resolve the merge-ref pack object.  Fix: `fetch-depth: 0` in
 `dependency-review.yml` checkout (structural fix, not just tolerated failure).
+
+## Law W-CLI-IX — Registry Watch Issue Filing Must Deduplicate Against Open Triage Issues
+
+The `File issue on detection` step in `registry-watch.yml` **must** check for an
+existing open triage issue before creating a new one.  Without this gate, daily runs
+unconditionally file a new issue even when all SARIF alerts from yesterday's run are
+already dismissed — producing one new issue per day as long as the registry has any
+churn.
+
+**Required pattern (in `actions/github-script`):**
+```javascript
+const TRIAGE_TITLE = 'Registry Watch: suspicious package detected';
+const existing = await github.rest.issues.listForRepo({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  state: 'open',
+  per_page: 20,
+}).catch(() => ({ data: [] }));
+const alreadyOpen = existing.data.some(i => i.title === TRIAGE_TITLE);
+if (alreadyOpen) {
+  core.info('Open triage issue already exists — skipping duplicate creation (Law W-CLI-IX).');
+  return;
+}
+// ... proceed with issue creation
+```
+
+**Forbidden pattern:**
+```javascript
+// WRONG — no deduplication check; fires unconditionally every day
+github.rest.issues.create({ title: '...', body: '...' })
+```
+
+**Root cause of incident (Sprint 175, issue #184):** `registry-watch.yml` filed a new
+triage issue (issue #184) the day after the previous triage issue (#177) was closed and
+all 11 SARIF alerts were already dismissed.  The issue-filing step had no check for an
+existing open issue, so every day with any registry churn produces a new issue regardless
+of triage state.
