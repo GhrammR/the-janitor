@@ -3,6 +3,45 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-28 — Sprint 180: P9-1 Phase B + Node.js 24 + Law W-CLI-X
+
+**Directive:** Node.js 24 action pin upgrade (registry-watch); P9-1 Phase B
+AffinityMaturation mutation-select cycle; ARTICLE_REVIEW batch 2.
+
+**Files modified:**
+- `.github/workflows/registry-watch.yml` *(modified)* — `actions/checkout`
+  v4→v6.0.2 (Node 24 SHA `de0fac2e`); `actions/upload-artifact` v4→v7.0.1
+  (Node 24 SHA `043fb46d`). Deadline: GitHub forces Node 24 on 2026-06-02.
+- `crates/common/src/immunity.rs` *(modified)* — P9-1 Phase B: mutation-select
+  refinement cycle on `AffinityMaturator`; new fields `suppressed_patterns`,
+  `ingest_count`, `MemoryCell::is_pruned`; new methods `mature_cells()` (sweep),
+  `list_mature_cells()` (filter), `with_suppressed()` (constructor),
+  `ingest_pattern_raw()` (internal); 3 new deterministic tests; rand/rand_chacha
+  0.9 deps added.
+- `crates/common/Cargo.toml` *(modified)* — `rand = "0.9"`, `rand_chacha = "0.9"`
+- `.INNOVATION_LOG.md` *(modified)* — P9-1 block hard-deleted (both phases shipped)
+
+**PR:** sprint180/nodejs24-p9-1-phase-b
+
+## 2026-05-28 — Sprint 179: P9-1 Phase A — Physarum Immune Memory
+
+**Directive:** Implement P9-1 Phase A: Physarum Immune Memory with
+MemoryCell records, AffinityMaturator (ena union-find), and SelfClassifier
+(tenant baseline + anomaly gate).
+
+**Files added/modified:**
+- `crates/common/src/immunity.rs` *(new)* — `MemoryCell`, `CellKey`,
+  `AffinityMaturator` (pool + ena `InPlaceUnificationTable<CellKey>`),
+  `SelfClassifier` (XOR-baseline + anomaly threshold), `hash_pattern`;
+  5 deterministic unit tests
+- `crates/common/src/lib.rs` *(modified)* — `pub mod immunity;` added
+- `crates/common/Cargo.toml` *(modified)* — `ena = "0.14"` dependency
+- `crates/cli/src/daemon.rs` *(modified)* — `DaemonState.immune_memory:
+  Mutex<AffinityMaturator>` field; `process_request` ingests each
+  `security:` finding into immune_memory for cross-request accumulation
+
+**PR:** #185 (`sprint179/p9-1-immune-memory`)
+
 ## 2026-05-27 — Sprint 177: IQ-1/IQ-2 scan_buffer wiring + Implementation Queue
 
 **Directive:** Wire IQ-1 (debug_endpoint_guard) and IQ-2 (oidc_scope_guard) into
