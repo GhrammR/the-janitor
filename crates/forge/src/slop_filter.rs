@@ -1291,6 +1291,7 @@ impl PRBouncer for PatchBouncer {
             crate::oidc_scope_guard::emit_oidc_scope_findings(source_utf8, &file_path);
         let linker_hijack_findings =
             crate::linker_hijack::emit_linker_hijack_findings(source_utf8, &file_path);
+        let kernel_findings = crate::kernel::emit_kernel_findings(source_utf8, &file_path);
         let oauth_state_findings =
             crate::oauth_account_fusion::detect_missing_state_validation(source, &file_path);
         let pkce_downgrade_findings =
@@ -1628,7 +1629,8 @@ impl PRBouncer for PatchBouncer {
                 + toctou_findings.len()
                 + debug_endpoint_findings.len()
                 + oidc_scope_findings.len()
-                + linker_hijack_findings.len(),
+                + linker_hijack_findings.len()
+                + kernel_findings.len(),
         );
         for f in accepted {
             let line = byte_offset_to_line(source, f.start_byte);
@@ -1812,6 +1814,15 @@ impl PRBouncer for PatchBouncer {
             structured_findings.push(finding);
         }
         for finding in linker_hijack_findings {
+            antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
+            antipattern_details.push(format!(
+                "{} (line={})",
+                finding.id,
+                finding.line.unwrap_or_default()
+            ));
+            structured_findings.push(finding);
+        }
+        for finding in kernel_findings {
             antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
             antipattern_details.push(format!(
                 "{} (line={})",

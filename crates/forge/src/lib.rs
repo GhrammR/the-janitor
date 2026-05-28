@@ -60,6 +60,7 @@ pub mod intent_divergence;
 pub mod invisible_payload;
 pub mod java_deser_guard;
 pub mod jwt_keyfunc_oracle;
+pub mod kernel;
 pub mod labyrinth;
 pub mod lcm;
 pub mod legacy_c_mining;

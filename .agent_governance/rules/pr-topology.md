@@ -22,6 +22,41 @@ If the count exceeds 5, split into topic PRs before pushing:
 **Never** create a sprint-batch PR spanning all three topics.
 `.janitor/` generated artifacts are **never** part of a PR.
 
+## OnceLock Accessor Law — No Structural Clones
+
+When a module needs multiple `OnceLock<AhoCorasick>` statics, **never** write N
+separate accessor functions with identical structure. The slop guardian
+alpha-normalizes identifiers and will detect N structurally-identical functions as
+`logic_clones_found = N×(N-1)/2`, scoring `5 × N×(N-1)/2` pts plus a
+`recursive_boilerplate` Critical antipattern at 50 pts — enough to block at ≥3 functions.
+
+**Required pattern** (single parameterized helper, structurally unique):
+```rust
+fn ac(lock: &'static OnceLock<AhoCorasick>, patterns: &'static [&'static str]) -> &'static AhoCorasick {
+    lock.get_or_init(|| {
+        AhoCorasick::builder()
+            .match_kind(MatchKind::LeftmostFirst)
+            .build(patterns)
+            .expect("AC build infallible")
+    })
+}
+// Usage: ac(&MY_LOCK, MY_PATTERNS)
+```
+
+**Forbidden pattern** (triggers boilerplate flood at ≥3 instances):
+```rust
+fn foo_ac() -> &'static AhoCorasick {
+    FOO_AC.get_or_init(|| { AhoCorasick::builder()... .build(FOO_PATTERNS).expect("...") })
+}
+fn bar_ac() -> &'static AhoCorasick {  // identical shape → clone
+    BAR_AC.get_or_init(|| { AhoCorasick::builder()... .build(BAR_PATTERNS).expect("...") })
+}
+```
+
+**Root cause (Sprint 178, 2026-05-28):** `kernel.rs` had 9 structurally-identical
+OnceLock accessors → `logic_clones_found: 26` (26 × 5 = 130 pts) + one
+`recursive_boilerplate` antipattern (50 pts) = slop_score 180 → Structural Firewall block.
+
 ## Logic Clone Law
 
 New proof classifiers for `hunt.rs` are **always** added to the
@@ -48,6 +83,40 @@ Pattern to enforce:
 
 The six-line `retain_mut` clone pattern triggers `logic_clones_found` in
 the Structural Firewall and will score 5 pts per clone (gate = 10).
+
+## Branch Source Mandate (before every `git checkout -b`)
+
+**Always branch new feature/sprint work from `origin/main`, never from a `release/vX.Y.Z` branch.**
+
+Release branches contain version-bump artifacts that are NOT in the PR that created them
+(SBOM `janitor.cdx.json` files per crate, `Cargo.toml`/`Cargo.lock` version pin,
+`docs/index.md`, `README.md`). If you branch from a release branch and that release
+PR squash-merges, your new branch base diverges from `main`'s squash commit — every
+subsequent PR will drag in all those release artifacts, immediately blowing the
+blast-radius gate.
+
+**Correct pattern:**
+```bash
+git fetch origin
+git checkout -b sprint<N>/feature origin/main
+```
+
+**Recovery** when you discover you branched from a release branch:
+```bash
+git fetch origin
+git rebase origin/main   # skips already-merged release commit automatically
+git push --force-with-lease origin <branch>
+```
+
+Then verify the diff is clean:
+```bash
+git diff --name-only origin/main...HEAD | sed 's|/.*||' | sort -u
+```
+
+**Root cause (Sprint 178, 2026-05-28):** `sprint178/p8-4-kernel-primitives` was cut from
+`release/v10.2.9` while still checked out. After PR #181 squash-merged the release branch,
+the PR #182 diff included all release artifacts (14 `janitor.cdx.json` files, `Cargo.toml`,
+`docs/index.md`, `README.md`) — blowing blast-radius and triggering the docs-isolation gate.
 
 ## Rebase Mandate (before every `gh pr create`)
 
