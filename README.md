@@ -1,6 +1,6 @@
 # The Janitor
 
-**v10.2.10 — Rust static-analysis research across 23 grammars. IFDS + Z3 SMT + Kani proof obligations. Dual-PQC attestation. Zero-upload. On-device.**
+**vv10.2.11 — Rust static-analysis research across 23 grammars. IFDS + Z3 SMT + Kani proof obligations. Dual-PQC attestation. Zero-upload. On-device.**
 
 > *82% of open Godot Engine pull requests contain no issue link. 20% introduce language antipatterns. Zero comment scanners caught it. The Janitor did — across 50 live PRs, in under 90 seconds.*
 

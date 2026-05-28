@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:ae9012e1-e0a0-4edc-ab88-4c79232324ab",
+  "serialNumber": "urn:uuid:7d376d55-5dfd-4db7-a4d3-da4b7b8e7141",
   "metadata": {
-    "timestamp": "2026-05-28T09:11:53.774553169Z",
+    "timestamp": "2026-05-28T18:14:39.300694621Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.10",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.11",
       "name": "polyglot",
-      "version": "10.2.10",
+      "version": "10.2.11",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/polyglot@10.2.10?download_url=file://.",
+      "purl": "pkg:cargo/polyglot@10.2.11?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.10 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.11 bin-target-0",
           "name": "polyglot",
-          "version": "10.2.10",
-          "purl": "pkg:cargo/polyglot@10.2.10?download_url=file://.#src/lib.rs"
+          "version": "10.2.11",
+          "purl": "pkg:cargo/polyglot@10.2.11?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -1337,7 +1337,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.10",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/polyglot#10.2.11",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.9",
         "registry+https://github.com/rust-lang/crates.io-index#tree-sitter-bash@0.25.1",
