@@ -1289,6 +1289,12 @@ impl PRBouncer for PatchBouncer {
             crate::debug_endpoint_guard::emit_debug_endpoint_findings(source_utf8, &file_path);
         let oidc_scope_findings =
             crate::oidc_scope_guard::emit_oidc_scope_findings(source_utf8, &file_path);
+        let linker_hijack_findings =
+            crate::linker_hijack::emit_linker_hijack_findings(source_utf8, &file_path);
+        let oauth_state_findings =
+            crate::oauth_account_fusion::detect_missing_state_validation(source, &file_path);
+        let pkce_downgrade_findings =
+            crate::oauth_account_fusion::detect_pkce_downgrade(source, &file_path);
 
         // Domain routing: classify this file's context so memory-safety rules are
         // not applied to vendored or test code.  Supply-chain rules (DOMAIN_ALL)
@@ -1425,6 +1431,8 @@ impl PRBouncer for PatchBouncer {
         raw_findings.extend(crate::slop_hunter::find_untrusted_ide_extensions(
             &file_path, source,
         ));
+        raw_findings.extend(oauth_state_findings);
+        raw_findings.extend(pkce_downgrade_findings);
         raw_findings.retain(|finding| {
             !should_suppress_contextual_finding(finding, package_context.as_deref())
         });
@@ -1619,7 +1627,8 @@ impl PRBouncer for PatchBouncer {
                 + idor_findings.len()
                 + toctou_findings.len()
                 + debug_endpoint_findings.len()
-                + oidc_scope_findings.len(),
+                + oidc_scope_findings.len()
+                + linker_hijack_findings.len(),
         );
         for f in accepted {
             let line = byte_offset_to_line(source, f.start_byte);
@@ -1794,6 +1803,15 @@ impl PRBouncer for PatchBouncer {
             structured_findings.push(finding);
         }
         for finding in oidc_scope_findings {
+            antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
+            antipattern_details.push(format!(
+                "{} (line={})",
+                finding.id,
+                finding.line.unwrap_or_default()
+            ));
+            structured_findings.push(finding);
+        }
+        for finding in linker_hijack_findings {
             antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
             antipattern_details.push(format!(
                 "{} (line={})",

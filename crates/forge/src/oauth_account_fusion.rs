@@ -17,7 +17,7 @@
 
 use std::sync::OnceLock;
 
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, MatchKind};
 
 use crate::metadata::DOMAIN_FIRST_PARTY;
 use crate::slop_hunter::{Severity, SlopFinding};
@@ -401,6 +401,129 @@ function validateState(req) {
         assert!(
             findings.is_empty(),
             "state= without code-extract must not fire"
+        );
+    }
+}
+
+// ── IQ-6: PKCE Downgrade Detector ────────────────────────────────────────────
+
+/// AhoCorasick patterns indicating an OAuth/OIDC server advertises PKCE-only
+/// (`code_challenge_method=S256`) but also accepts implicit flow.
+const PKCE_ADVERTISED: &[&[u8]] = &[
+    b"code_challenge_method",
+    b"code_challenge_method=S256",
+    b"code_challenge_method = ",
+    b"require_pkce",
+    b"pkce_required",
+];
+
+const IMPLICIT_FLOW_SINKS: &[&[u8]] = &[
+    b"response_type=token",
+    b"response_type: token",
+    b"response_type: \"token\"",
+    b"response_type='token'",
+    b"responseType: 'token'",
+    b"responseType: \"token\"",
+    b"response_type=id_token",
+    b"response_type: id_token",
+];
+
+/// Returns `true` when a PKCE-advertised endpoint also accepts implicit flow —
+/// the core PKCE downgrade invariant.
+pub fn pkce_downgrade_possible(pkce_advertised: bool, implicit_accepted: bool) -> bool {
+    pkce_advertised && implicit_accepted
+}
+
+/// Scan `source` for authorization endpoints that advertise PKCE
+/// (`code_challenge_method=S256`) while also accepting `response_type=token`
+/// (implicit flow). Emits `security:oauth_pkce_downgrade` at High.
+pub fn detect_pkce_downgrade(source: &[u8], label: &str) -> Vec<SlopFinding> {
+    let pkce_ac = AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostFirst)
+        .build(PKCE_ADVERTISED)
+        .expect("static PKCE_ADVERTISED patterns are valid");
+
+    let implicit_ac = AhoCorasick::builder()
+        .match_kind(MatchKind::LeftmostFirst)
+        .build(IMPLICIT_FLOW_SINKS)
+        .expect("static IMPLICIT_FLOW_SINKS patterns are valid");
+
+    let pkce_present = pkce_ac.find(source).is_some();
+    let implicit_present = implicit_ac.find(source).is_some();
+
+    if !pkce_downgrade_possible(pkce_present, implicit_present) {
+        return Vec::new();
+    }
+
+    // Report at the byte offset of the first implicit-flow sink.
+    let hit_byte = implicit_ac.find(source).map(|m| m.start()).unwrap_or(0);
+
+    vec![SlopFinding {
+        start_byte: hit_byte,
+        end_byte: hit_byte,
+        description: format!(
+            "security:oauth_pkce_downgrade — `{label}` advertises \
+             `code_challenge_method=S256` (PKCE-only) but also accepts \
+             `response_type=token` (implicit flow). An attacker can downgrade \
+             the flow to obtain access tokens without a code verifier, bypassing \
+             PKCE entirely. Remove implicit-flow handling or enforce \
+             `response_type=code` exclusively (RFC 9700 §4.1)."
+        ),
+        domain: crate::metadata::DOMAIN_FIRST_PARTY,
+        severity: crate::slop_hunter::Severity::High,
+    }]
+}
+
+#[cfg(test)]
+mod pkce_tests {
+    use super::*;
+
+    #[test]
+    fn predicate_exact_conjunction() {
+        assert!(pkce_downgrade_possible(true, true));
+        assert!(!pkce_downgrade_possible(true, false));
+        assert!(!pkce_downgrade_possible(false, true));
+        assert!(!pkce_downgrade_possible(false, false));
+    }
+
+    #[test]
+    fn tp_pkce_advertised_with_implicit_accepted() {
+        let src = br#"
+# Authorization server config
+code_challenge_method = "S256"
+require_pkce = true
+# Legacy clients may request implicit flow
+response_type=token
+"#;
+        let findings = detect_pkce_downgrade(src, "auth_server.py");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("oauth_pkce_downgrade")),
+            "PKCE + implicit must fire"
+        );
+    }
+
+    #[test]
+    fn tn_pkce_only_no_implicit() {
+        let src = br#"
+code_challenge_method = "S256"
+allowed_response_types = ["code"]
+"#;
+        let findings = detect_pkce_downgrade(src, "auth_server.py");
+        assert!(findings.is_empty(), "PKCE-only must not fire");
+    }
+
+    #[test]
+    fn tn_implicit_without_pkce_advertised() {
+        let src = br#"
+// Plain OAuth2 server, no PKCE
+response_type=token
+"#;
+        let findings = detect_pkce_downgrade(src, "old_auth.py");
+        assert!(
+            findings.is_empty(),
+            "implicit without PKCE advertisement must not fire"
         );
     }
 }
