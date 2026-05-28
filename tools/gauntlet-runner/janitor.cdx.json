@@ -2,8 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
+  "serialNumber": "urn:uuid:7436b97e-aa52-48f4-b26c-3fc8be15d37b",
   "metadata": {
-    "timestamp": "1980-01-01T00:00:00.000000000Z",
+    "timestamp": "2026-05-28T07:34:18.170651397Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -13,16 +14,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.8",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.9",
       "name": "gauntlet-runner",
-      "version": "10.2.8",
+      "version": "10.2.9",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/gauntlet-runner@10.2.8?download_url=file://.",
+      "purl": "pkg:cargo/gauntlet-runner@10.2.9?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -32,10 +33,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.8 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.9 bin-target-0",
           "name": "gauntlet-runner",
-          "version": "10.2.8",
-          "purl": "pkg:cargo/gauntlet-runner@10.2.8?download_url=file://.#src/main.rs"
+          "version": "10.2.9",
+          "purl": "pkg:cargo/gauntlet-runner@10.2.9?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -49,16 +50,16 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.8",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.9",
       "name": "common",
-      "version": "10.2.8",
+      "version": "10.2.9",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/common@10.2.8?download_url=file://../../crates/common",
+      "purl": "pkg:cargo/common@10.2.9?download_url=file://../../crates/common",
       "externalReferences": [
         {
           "type": "vcs",
@@ -3401,16 +3402,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "author": "Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>",
       "name": "serde_json",
-      "version": "1.0.149",
+      "version": "1.0.150",
       "description": "A JSON serialization file format",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+          "content": "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
         }
       ],
       "licenses": [
@@ -3418,7 +3419,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/serde_json@1.0.149",
+      "purl": "pkg:cargo/serde_json@1.0.150",
       "externalReferences": [
         {
           "type": "documentation",
@@ -4927,7 +4928,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.8",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",
@@ -4942,7 +4943,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#rkyv@0.8.16",
         "registry+https://github.com/rust-lang/crates.io-index#semver@1.0.28",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
         "registry+https://github.com/rust-lang/crates.io-index#sha2@0.11.0",
         "registry+https://github.com/rust-lang/crates.io-index#sysinfo@0.38.4",
         "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18",
@@ -4952,13 +4953,13 @@
       ]
     },
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.8",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/gauntlet-runner#10.2.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
-        "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.8",
+        "path+file:///home/ghrammr/dev/the-janitor/crates/common#10.2.9",
         "registry+https://github.com/rust-lang/crates.io-index#rayon@1.12.0",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149"
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150"
       ]
     },
     {
@@ -5089,7 +5090,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#log@0.4.29",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
         "registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.228",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
         "registry+https://github.com/rust-lang/crates.io-index#time@0.3.47",
         "registry+https://github.com/rust-lang/crates.io-index#url@2.5.8"
       ]
@@ -5624,7 +5625,7 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#indexmap@2.14.0",
         "registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18",
@@ -5829,7 +5830,7 @@
         "registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.40",
         "registry+https://github.com/rust-lang/crates.io-index#rustls-pki-types@1.14.1",
         "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
         "registry+https://github.com/rust-lang/crates.io-index#ureq-proto@0.6.0",
         "registry+https://github.com/rust-lang/crates.io-index#utf8-zero@0.8.1",
         "registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.7"

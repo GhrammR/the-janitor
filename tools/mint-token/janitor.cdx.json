@@ -2,8 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
+  "serialNumber": "urn:uuid:131424b7-6a14-49d4-985e-ed0484049b47",
   "metadata": {
-    "timestamp": "1980-01-01T00:00:00.000000000Z",
+    "timestamp": "2026-05-28T07:34:18.151818214Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -13,16 +14,16 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.8",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9",
       "name": "mint-token",
-      "version": "10.2.8",
+      "version": "10.2.9",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/mint-token@10.2.8?download_url=file://.",
+      "purl": "pkg:cargo/mint-token@10.2.9?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -32,10 +33,10 @@
       "components": [
         {
           "type": "application",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.8 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9 bin-target-0",
           "name": "mint-token",
-          "version": "10.2.8",
-          "purl": "pkg:cargo/mint-token@10.2.8?download_url=file://.#src/main.rs"
+          "version": "10.2.9",
+          "purl": "pkg:cargo/mint-token@10.2.9?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -1749,7 +1750,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.8",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/tools/mint-token#10.2.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1",

@@ -2,8 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
+  "serialNumber": "urn:uuid:5512ade9-57fa-4282-a1fc-73bbb08f3b87",
   "metadata": {
-    "timestamp": "1980-01-01T00:00:00.000000000Z",
+    "timestamp": "2026-05-28T07:34:17.886918305Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -13,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.8",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.9",
       "name": "backlog_pruner",
-      "version": "10.2.8",
+      "version": "10.2.9",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/backlog_pruner@10.2.8?download_url=file://.",
+      "purl": "pkg:cargo/backlog_pruner@10.2.9?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -32,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.8 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.9 bin-target-0",
           "name": "backlog_pruner",
-          "version": "10.2.8",
-          "purl": "pkg:cargo/backlog_pruner@10.2.8?download_url=file://.#src/lib.rs"
+          "version": "10.2.9",
+          "purl": "pkg:cargo/backlog_pruner@10.2.9?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -1333,16 +1334,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "author": "Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>",
       "name": "serde_json",
-      "version": "1.0.149",
+      "version": "1.0.150",
       "description": "A JSON serialization file format",
       "scope": "excluded",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+          "content": "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
         }
       ],
       "licenses": [
@@ -1350,7 +1351,7 @@
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:cargo/serde_json@1.0.149",
+      "purl": "pkg:cargo/serde_json@1.0.150",
       "externalReferences": [
         {
           "type": "documentation",
@@ -1585,16 +1586,16 @@
     },
     {
       "type": "library",
-      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.8",
+      "bom-ref": "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.9",
       "author": "Max Brunsfeld <maxbrunsfeld@gmail.com>, Amaan Qureshi <amaanq12@gmail.com>",
       "name": "tree-sitter",
-      "version": "0.26.8",
+      "version": "0.26.9",
       "description": "Rust bindings to the Tree-sitter parsing library",
       "scope": "required",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "887bd495d0582c5e3e0d8ece2233666169fa56a9644d172fc22ad179ab2d0538"
+          "content": "4dab76d0b724ba557954125188cf0633a1ca43199ced82d95c7b9c32cc3de1f3"
         }
       ],
       "licenses": [
@@ -1602,7 +1603,7 @@
           "expression": "MIT"
         }
       ],
-      "purl": "pkg:cargo/tree-sitter@0.26.8",
+      "purl": "pkg:cargo/tree-sitter@0.26.9",
       "externalReferences": [
         {
           "type": "documentation",
@@ -1807,13 +1808,13 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.8",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/experimental/backlog_pruner#10.2.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#blake3@1.8.5",
         "registry+https://github.com/rust-lang/crates.io-index#fips204@0.4.6",
         "registry+https://github.com/rust-lang/crates.io-index#petgraph@0.8.3",
-        "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.8"
+        "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.9"
       ]
     },
     {
@@ -2036,7 +2037,7 @@
       ]
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#indexmap@2.14.0",
         "registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18",
@@ -2081,12 +2082,12 @@
       "ref": "registry+https://github.com/rust-lang/crates.io-index#tree-sitter-language@0.1.7"
     },
     {
-      "ref": "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.8",
+      "ref": "registry+https://github.com/rust-lang/crates.io-index#tree-sitter@0.26.9",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#cc@1.2.61",
         "registry+https://github.com/rust-lang/crates.io-index#regex@1.12.3",
         "registry+https://github.com/rust-lang/crates.io-index#regex-syntax@0.8.10",
-        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.149",
+        "registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.150",
         "registry+https://github.com/rust-lang/crates.io-index#streaming-iterator@0.1.9",
         "registry+https://github.com/rust-lang/crates.io-index#tree-sitter-language@0.1.7"
       ]
