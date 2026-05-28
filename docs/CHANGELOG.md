@@ -3,6 +3,19 @@
 Append-only log of every major directive received and the specific changes
 implemented as a result.
 
+## 2026-05-27 — Sprint 177: IQ-1/IQ-2 scan_buffer wiring + Implementation Queue
+
+**Directive:** Wire IQ-1 (debug_endpoint_guard) and IQ-2 (oidc_scope_guard) into
+scan_buffer; introduce Implementation Queue governance.
+
+**Files modified:**
+- `.INNOVATION_LOG.md` *(modified)* — added `## Implementation Queue — Sprint-Ready` (IQ-1..IQ-8); IQ-1 and IQ-2 marked `[DONE v10.2.9]`
+- `.agent_governance/skills/governance-sync/SKILL.md` *(modified)* — pre-sprint Implementation Queue check mandate
+- `.agent_governance/skills/evolution-tracker/SKILL.md` *(modified)* — sprint-ready proposals route to IQ-N entries
+- `crates/forge/src/slop_filter.rs` *(modified)* — `emit_debug_endpoint_findings` and `emit_oidc_scope_findings` wired into `scan_buffer` alongside authz/idor/toctou; findings scored KevCritical
+
+**Commit:** `17ce6be` (governance), next commit for slop_filter wiring
+
 ## 2026-05-27 — Sprint 176: Governance Cleanup, Law W-CLI-VII, Hunt Discipline
 
 * `11 SARIF alerts dismissed` — registry-watch findings (#66–#76) dismissed as "won't fix" via code-scanning API; issue #177 closed with triage notes.

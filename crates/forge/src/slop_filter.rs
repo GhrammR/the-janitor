@@ -1284,6 +1284,11 @@ impl PRBouncer for PatchBouncer {
         let authz_consistency_findings = crate::authz::check_authz_consistency(&endpoint_surfaces);
         let idor_findings = crate::idor::scan_tree(&tree, ext, source, &file_path);
         let toctou_findings = crate::toctou::detect_race_conditions(ext, source, &file_path);
+        let source_utf8 = std::str::from_utf8(source).unwrap_or("");
+        let debug_endpoint_findings =
+            crate::debug_endpoint_guard::emit_debug_endpoint_findings(source_utf8, &file_path);
+        let oidc_scope_findings =
+            crate::oidc_scope_guard::emit_oidc_scope_findings(source_utf8, &file_path);
 
         // Domain routing: classify this file's context so memory-safety rules are
         // not applied to vendored or test code.  Supply-chain rules (DOMAIN_ALL)
@@ -1612,7 +1617,9 @@ impl PRBouncer for PatchBouncer {
             accepted.len()
                 + authz_consistency_findings.len()
                 + idor_findings.len()
-                + toctou_findings.len(),
+                + toctou_findings.len()
+                + debug_endpoint_findings.len()
+                + oidc_scope_findings.len(),
         );
         for f in accepted {
             let line = byte_offset_to_line(source, f.start_byte);
@@ -1770,6 +1777,24 @@ impl PRBouncer for PatchBouncer {
         }
         for finding in governance_findings {
             antipattern_score += crate::slop_hunter::Severity::Critical.points();
+            antipattern_details.push(format!(
+                "{} (line={})",
+                finding.id,
+                finding.line.unwrap_or_default()
+            ));
+            structured_findings.push(finding);
+        }
+        for finding in debug_endpoint_findings {
+            antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
+            antipattern_details.push(format!(
+                "{} (line={})",
+                finding.id,
+                finding.line.unwrap_or_default()
+            ));
+            structured_findings.push(finding);
+        }
+        for finding in oidc_scope_findings {
+            antipattern_score += crate::slop_hunter::Severity::KevCritical.points();
             antipattern_details.push(format!(
                 "{} (line={})",
                 finding.id,
