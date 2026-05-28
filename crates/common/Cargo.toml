@@ -44,5 +44,9 @@ sysinfo.workspace = true
 # Union-find for AffinityMaturator vulnerability-family grouping (P9-1)
 ena = "0.14"
 
+# Deterministic PRNG for AffinityMaturator mutation-select cycle (P9-1 Phase B)
+rand = { version = "0.9", default-features = false, features = ["std"] }
+rand_chacha = "0.9"
+
 [dev-dependencies]
 tempfile = "3"
