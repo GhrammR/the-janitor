@@ -78,6 +78,17 @@ After every commit/push/PR-create flow, and after every push to an existing PR:
 4. **Final +9 minute check**: repeat both commands after the Governor/Janitor
    Integrity window. Expected terminal duration is approximately `9m2s`.
    Include code-scanning alert state in the final check.
+   **If `Janitor Integrity Check` shows `timed_out`**: the Governor created a
+   check run but the analysis never reported back. Immediately re-dispatch:
+   ```bash
+   gh workflow run janitor-pr-gate.yml \
+     --repo janitor-security/the-janitor \
+     --ref <head-branch> \
+     -f pr_number=<N>
+   ```
+   Then repeat the 9-minute check window. Do NOT close the PR or push new
+   commits — re-dispatch is always the correct first response to `timed_out`.
+   Report as `GOVERNOR_CHECK_TIMED_OUT` until the re-dispatched run resolves.
 5. If all required checks are green and auto-merge is not armed, run
    `gh pr merge <pr> --auto --squash --delete-branch`.
 6. If the PR merged, verify with `gh pr view <pr> --json state,mergedAt`.
@@ -95,6 +106,7 @@ Report each PR as one of:
 - `CODE_SCANNING_NEW_ALERTS`
 - `CODE_SCANNING_API_UNAVAILABLE`
 - `WAIT_FOR_CHECKS`
+- `GOVERNOR_CHECK_TIMED_OUT`
 - `REBASE_OR_RECREATE`
 - `CLOSE_SUPERSEDED`
 - `LEAVE_OPEN`

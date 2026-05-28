@@ -37,6 +37,20 @@
       re-dispatch via `workflow_dispatch` is the recovery path.
    **Never proceed to merge-readiness checks until Janitor PR Gate is confirmed queued.**
 
+2b. **Before pushing follow-on work — check if current branch PR was squash-merged:**
+   ```bash
+   gh pr list --head $(git branch --show-current) --state merged --json mergeCommit --jq '.[0].mergeCommit.oid'
+   ```
+   If a merge commit SHA is returned, the branch was already squash-merged into main.
+   **Do NOT push additional commits to this branch.** Instead:
+   1. `git fetch origin main && git checkout main && git pull`
+   2. `git checkout -b <new-sprint-branch>`
+   3. Cherry-pick or recommit the new work onto the fresh branch
+   4. Open a new PR against main
+   Violating this creates a PR whose Governor analysis spans the full squash + new
+   diff, inflating the analysis surface and triggering `timed_out` on large diffs.
+   This is Law PT-IV in `.agent_governance/rules/pr-topology.md`.
+
 3. **If signed commit creation fails because GPG is locked**:
    - Stop before any fallback commit attempt.
    - Prompt the operator exactly: `Run gpg-unlock, enter the passphrase in the terminal, then reply "continue".`
