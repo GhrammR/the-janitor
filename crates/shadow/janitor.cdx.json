@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:ce306188-f0fc-4694-9052-3fba06bd96ec",
+  "serialNumber": "urn:uuid:ce6370a5-14bc-4920-99f2-346d5a97ffcc",
   "metadata": {
-    "timestamp": "2026-05-28T18:14:39.438650128Z",
+    "timestamp": "2026-05-28T09:11:53.875988024Z",
     "tools": [
       {
         "vendor": "CycloneDX",
@@ -14,16 +14,16 @@
     ],
     "component": {
       "type": "library",
-      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.11",
+      "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.10",
       "name": "shadow",
-      "version": "10.2.11",
+      "version": "10.2.10",
       "scope": "required",
       "licenses": [
         {
           "expression": "BUSL-1.1"
         }
       ],
-      "purl": "pkg:cargo/shadow@10.2.11?download_url=file://.",
+      "purl": "pkg:cargo/shadow@10.2.10?download_url=file://.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -33,10 +33,10 @@
       "components": [
         {
           "type": "library",
-          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.11 bin-target-0",
+          "bom-ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.10 bin-target-0",
           "name": "shadow",
-          "version": "10.2.11",
-          "purl": "pkg:cargo/shadow@10.2.11?download_url=file://.#src/lib.rs"
+          "version": "10.2.10",
+          "purl": "pkg:cargo/shadow@10.2.10?download_url=file://.#src/lib.rs"
         }
       ]
     },
@@ -334,7 +334,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.11",
+      "ref": "path+file:///home/ghrammr/dev/the-janitor/crates/shadow#10.2.10",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.102",
         "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.18",

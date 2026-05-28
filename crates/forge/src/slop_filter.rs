@@ -998,7 +998,13 @@ impl PRBouncer for PatchBouncer {
             self.repo_root.as_deref(),
         );
 
-        let pre_lang_payload_findings: Vec<String> = if raw_added.trim().is_empty() {
+        // CycloneDX SBOM artifacts (.cdx.json) legitimately contain third-party
+        // crate documentation URLs hosted on github.io in their externalReferences
+        // sections. These are metadata links, not production asset loads. Skip
+        // binary_hunter scan for SBOM files to prevent false positives on release diffs.
+        let pre_lang_payload_findings: Vec<String> = if raw_added.trim().is_empty()
+            || file_path.ends_with(".cdx.json")
+        {
             vec![]
         } else {
             advanced_threats::binary_hunter::scan(raw_added.as_bytes())
@@ -3613,6 +3619,27 @@ diff --git a/docs/review.md b/docs/review.md
         assert!(
             score.antipattern_score >= 50,
             "stratum finding must contribute Critical-tier pts (50)"
+        );
+    }
+
+    #[test]
+    fn test_cdx_json_sbom_github_io_not_flagged() {
+        // CycloneDX SBOM files legitimately contain third-party crate doc URLs
+        // on github.io in their externalReferences. These must not fire
+        // security:unpinned_asset — they are metadata links, not production asset loads.
+        let src = "\"url\": \"https://contain-rs.github.io/bit-set/bit_set\"\n";
+        let patch = make_patch("crates/cli/janitor.cdx.json", src);
+        let score = PatchBouncer::default()
+            .bounce(&patch, &empty_registry())
+            .unwrap();
+        let unpinned: Vec<&String> = score
+            .antipattern_details
+            .iter()
+            .filter(|d| d.contains("unpinned_asset"))
+            .collect();
+        assert!(
+            unpinned.is_empty(),
+            ".cdx.json github.io URL must not fire unpinned_asset: {unpinned:?}"
         );
     }
 
