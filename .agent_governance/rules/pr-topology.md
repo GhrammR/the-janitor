@@ -49,6 +49,40 @@ Pattern to enforce:
 The six-line `retain_mut` clone pattern triggers `logic_clones_found` in
 the Structural Firewall and will score 5 pts per clone (gate = 10).
 
+## Branch Source Mandate (before every `git checkout -b`)
+
+**Always branch new feature/sprint work from `origin/main`, never from a `release/vX.Y.Z` branch.**
+
+Release branches contain version-bump artifacts that are NOT in the PR that created them
+(SBOM `janitor.cdx.json` files per crate, `Cargo.toml`/`Cargo.lock` version pin,
+`docs/index.md`, `README.md`). If you branch from a release branch and that release
+PR squash-merges, your new branch base diverges from `main`'s squash commit — every
+subsequent PR will drag in all those release artifacts, immediately blowing the
+blast-radius gate.
+
+**Correct pattern:**
+```bash
+git fetch origin
+git checkout -b sprint<N>/feature origin/main
+```
+
+**Recovery** when you discover you branched from a release branch:
+```bash
+git fetch origin
+git rebase origin/main   # skips already-merged release commit automatically
+git push --force-with-lease origin <branch>
+```
+
+Then verify the diff is clean:
+```bash
+git diff --name-only origin/main...HEAD | sed 's|/.*||' | sort -u
+```
+
+**Root cause (Sprint 178, 2026-05-28):** `sprint178/p8-4-kernel-primitives` was cut from
+`release/v10.2.9` while still checked out. After PR #181 squash-merged the release branch,
+the PR #182 diff included all release artifacts (14 `janitor.cdx.json` files, `Cargo.toml`,
+`docs/index.md`, `README.md`) — blowing blast-radius and triggering the docs-isolation gate.
+
 ## Rebase Mandate (before every `gh pr create`)
 
 **Always rebase the feature branch onto `origin/main` before opening a PR.**

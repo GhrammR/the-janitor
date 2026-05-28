@@ -35,6 +35,12 @@ work.
    - **supersede-only**: dirty plus gate-blocked, self-review plus another
      terminal blocker, Structural Firewall blast radius, or mixed
      GitHub-visible docs/engine/campaign/workflow work.
+   - **release-branch-contaminated**: PR diff includes release artifacts
+     (`janitor.cdx.json`, version-bumped `Cargo.toml`, `docs/index.md`,
+     `README.md`) because the branch was cut from a `release/vX.Y.Z` branch
+     rather than `origin/main`. Fix: `git rebase origin/main` (auto-skips
+     the squash-merged release commit), then `git push --force-with-lease`.
+     Remove any docs files mixed into the commit before pushing.
 4. Act by class:
    - mergeable: merge or enable auto-merge.
    - review-blocked bot dependency: approve only after checking diff/checks, then enable auto-merge.
@@ -108,6 +114,7 @@ Report each PR as one of:
 - `WAIT_FOR_CHECKS`
 - `GOVERNOR_CHECK_TIMED_OUT`
 - `REBASE_OR_RECREATE`
+- `RELEASE_BRANCH_CONTAMINATION`
 - `CLOSE_SUPERSEDED`
 - `LEAVE_OPEN`
 

@@ -20,7 +20,30 @@
      Auto-Merge Watch at immediate, +1 minute, +5 minutes, and final +9
      minutes.
 
-2a. **PR Gate Presence Check (60 s after `gh pr create`):**
+2a. **Pre-`gh pr create` gate — run ALL three checks before opening any PR:**
+
+   **Check 1 — Blast radius (≤5 top-level dirs):**
+   ```bash
+   git diff --name-only origin/main...HEAD | sed 's|/.*||' | sort -u | wc -l
+   ```
+   If count > 5: split the PR by topic (Code / Infrastructure / Docs) per `pr-topology.md` before proceeding.
+
+   **Check 2 — Docs isolation (Law II-H):**
+   ```bash
+   git diff --name-only origin/main...HEAD | grep -E '^(README\.md|docs/)' && \
+   git diff --name-only origin/main...HEAD | grep -E '^(crates/|tools/|\.github/)'
+   ```
+   If BOTH match: docs files are mixed with engine/workflow files. Remove the docs files from the commit (restore with `git checkout origin/main -- <docs-file>`) and carry them in a separate docs-only PR.
+
+   **Check 3 — Branch source (never from release/vX.Y.Z):**
+   ```bash
+   git log --oneline origin/main..$(git merge-base HEAD origin/main) 2>/dev/null | head -3
+   ```
+   If this shows release-commit artifacts (`chore: release`, SBOM diffs, `Cargo.toml` version bump), the branch was cut from a release branch. Rebase with `git rebase origin/main` before opening the PR.
+
+   **Only proceed to `gh pr create` after all three checks pass.**
+
+2b. **PR Gate Presence Check (60 s after `gh pr create`):**
    ```bash
    gh pr checks <N> 2>&1 | grep -q "Janitor PR Gate"
    ```
