@@ -11,7 +11,7 @@ hide:
 
 # The Janitor
 
-**vv10.2.11 — Rust static-analysis security research platform. 23 grammars. IFDS + Z3 SMT. Kani proof obligations. Exploit-witness synthesis. Post-quantum provenance. Zero-upload local execution.**
+**v10.2.11 — Rust static-analysis security research platform. 23 grammars. IFDS + Z3 SMT. Kani proof obligations. Exploit-witness synthesis. Post-quantum provenance. Zero-upload local execution.**
 
 ---
 
