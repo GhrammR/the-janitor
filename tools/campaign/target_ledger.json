@@ -1336,7 +1336,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "security:financial_pii_to_external_llm Informational in codex-cli/scripts/run_in_container.sh \u2014 Threat Model Pre-Filter: shell script, no PII processing execution path. Sprint 181."
     },
     {
       "engagement": "opensea_targets",

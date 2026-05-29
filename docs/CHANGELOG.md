@@ -7056,3 +7056,47 @@ All three hunts → LOW_YIELD only. Tri-Ledger applied.
 * **apache/superset** (Sprint 170 targeted hunt of `views/` + `utils/`): `jwt_validation_bypass` in `oauth2.py` (admin-config-bound algorithm, not user-controlled); `oauth_missing_state_validation` in `users/api.py` (user profile API, not OAuth callback); `config_taint_*` mass batch (internal form data routing, not HTTP sourced). All → LOW_YIELD.
 
 **Verification**: `cargo test -p forge` 1,360+ passed, 0 failed. P17-3A bounded_overflow + ld_preload eradicated from INNOVATION_LOG. Java OAuth gate ships with 2 regression tests. Push protection enabled on GH repo. 7 new LOW_YIELD entries.
+
+---
+
+## Sprint 181 — 2026-05-28
+
+### Phase 0: Justfile Sanity Gate
+
+Verified `just release` perl substitution command: `perl -i -e 's/\*\*v\d+\.\d+\.\d+/\*\*v$VERSION/g'` — no double-v bug. No change required.
+
+### Phase 1: IQ-11 — Go No-Op Verification Function Detector (CVE-2026-42248 class)
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `is_go_noop_body(block, source)`: source-text comparison strips braces + whitespace-normalizes body, matches `""` / `"return nil"` / `"return true"`. `find_go_noop_verify_nodes(node, source, findings)`: recursive tree-sitter walk on Go AST, fires `security:noop_verification_function` (KevCritical) on `function_declaration` named `Verify*`/`Validate*`/`Check*`/`Assert*` with no-op body. `find_go_noop_verify(eng, parsed, file_path)`: pre-filter via AhoCorasick byte scan + test-file path gate before tree-sitter parse. 3 unit tests (fire on bare `return nil`, no-fire with conditional logic, no-fire in `_test.go`).
+* `.INNOVATION_LOG.md` *(modified)* — IQ-11 block hard-deleted (Eradication Law).
+
+### Phase 2: IQ-9 — Python AI Agent Disabled-Auth Config Detector (CVE-2026-44338 class)
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_python_disabled_auth(source, file_path)`: line-by-line AhoCorasick scan, 4 key/value patterns (`AUTH_ENABLED`/`= False`, `AUTH_TOKEN`/`= None|""|''`, `auth_required`/`= False`, `DISABLE_AUTH`/`= True`). Emits `security:ai_agent_disabled_auth` at `Severity::High`. Test-file path gate applied. 3 unit tests (fire on disabled config, no-fire in test file, no-fire when auth is enabled).
+* `.INNOVATION_LOG.md` *(modified)* — IQ-9 block hard-deleted (Eradication Law).
+
+### Phase 3: Janitor Integrity Check Branch Protection
+
+`Janitor Integrity Check` was already present in required_status_checks contexts. No API modification required.
+
+### Phase 4: CycloneDX SBOM False-Positive Suppression
+
+* `crates/forge/src/slop_filter.rs` *(modified)* — `pre_lang_payload_findings` assignment gates `binary_hunter::scan()` behind `!file_path.ends_with(".cdx.json")`.
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_slop` language-agnostic scanner block gates `find_supply_chain_slop_with_context` behind `!file_path.ends_with(".cdx.json")`. Both suppression points required: `binary_hunter` and `find_supply_chain_slop_with_context` fire independently.
+
+### Phase 5: Hunt Sweep ×3 — openai/codex, chime/terraform-aws-alternat, pinterest/querybook
+
+All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_LEDGER.md`.
+
+* **openai/codex**: `security:financial_pii_to_external_llm` Informational in `codex-cli/scripts/run_in_container.sh` — Threat Model Pre-Filter: shell script bootstrap, no PII processing path.
+* **chime/terraform-aws-alternat**: `security:ci_persistence_vector` Informational ×3 in `scripts/alternat.sh` — AWS NAT failover automation, all sites are legitimate infrastructure management.
+* **pinterest/querybook**: `security:rag_trust:unprioritized_retrieval` Informational (`base_vector_store.py:88` → `llm.invoke`) + `security:oauth_missing_state_validation` Informational ×2 downgraded by `blueprint_auth_hook_covers_route` oracle.
+
+### Phase 6: ARTICLE_REVIEW Batch 3 — AR-019/021/024/027 Closed
+
+* AR-019 (Ars Technica Daemon Tools): `fetch_failed_persistent` — arstechnica.com blocked across 2 sessions.
+* AR-021 (VentureBeat RAG Era): `fetch_failed_persistent` — VentureBeat 429 across 2 sessions.
+* AR-024 (Calcalistech): `skip_malformed_url` — URL contains embedded prose, unfetchable.
+* AR-027 (VentureBeat OpenClaw): `fetch_failed_persistent` — VentureBeat 429 recurring; title maps to P2-22 + P2-28 (already filed).
+
+**Verification**: `cargo test -p forge` 1,424+ passed, 0 failed. IQ-9 + IQ-11 eradicated from INNOVATION_LOG. 3 LOW_YIELD entries written. 4 AR dispositions closed.
