@@ -102,6 +102,23 @@ jobs:
           category: janitor
         continue-on-error: true
 
+      - name: Generate SBOM snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p cli -- export --format cbom \
+            --output /tmp/pr_sbom.cdx.json 2>/dev/null || true
+
+      - name: Upload SBOM artifact
+        if: always() && hashFiles('/tmp/pr_sbom.cdx.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom-pr-snapshot-${{ github.event.pull_request.number }}
+          path: /tmp/pr_sbom.cdx.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: sccache stats
         if: always()
         shell: bash

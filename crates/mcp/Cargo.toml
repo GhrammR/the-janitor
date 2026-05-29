@@ -12,6 +12,7 @@ forge = { path = "../forge" }
 polyglot = { path = "../polyglot" }
 vault = { path = "../vault" }
 anyhow.workspace = true
+walkdir.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

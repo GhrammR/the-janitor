@@ -7173,6 +7173,13 @@ fn find_go_ssrf_slop(source: &[u8]) -> Vec<SlopFinding> {
 fn find_go_filepath_traversal(source: &[u8]) -> Vec<SlopFinding> {
     const JOIN_NEEDLE: &[u8] = b"filepath.Join(";
     const CLEAN_NEEDLES: &[&[u8]] = &[b"filepath.Clean(", b"path.Clean(", b"filepath.Base("];
+    // Oracle: suppress findings where the first Join argument is a well-known
+    // framework-controlled base path (e.g. Mattermost GetBundlePath), not user input.
+    const BUNDLE_PATH_ORACLES: &[&[u8]] = &[
+        b"GetBundlePath()",
+        b"GetBasePath()",
+        b"GetPluginPath()",
+    ];
 
     let mut findings = Vec::new();
     let lines: Vec<&[u8]> = source.split(|&b| b == b'\n').collect();
@@ -7203,6 +7210,16 @@ fn find_go_filepath_traversal(source: &[u8]) -> Vec<SlopFinding> {
         if CLEAN_NEEDLES
             .iter()
             .any(|n| window.windows(n.len()).any(|w| w == *n))
+        {
+            continue;
+        }
+
+        // Oracle: suppress if the first argument is a framework-controlled base path.
+        // GetBundlePath/GetBasePath/GetPluginPath return plugin installation dirs,
+        // not user-controlled inputs — Mattermost plugin FP class (Sprint 182).
+        if BUNDLE_PATH_ORACLES
+            .iter()
+            .any(|oracle| window.windows(oracle.len()).any(|w| w == *oracle))
         {
             continue;
         }
@@ -12671,6 +12688,35 @@ mod phase4_rd_tests {
                 .iter()
                 .any(|f| f.description.contains("tls_verification_bypass")),
             "find_slop(go) must dispatch to Phase 4 Go AST walk"
+        );
+    }
+
+    // ── GetBundlePath oracle suppressor (Phase 5, Sprint 183) ───────────────
+
+    #[test]
+    fn test_go_filepath_traversal_bundle_path_suppressed() {
+        // Mattermost plugin pattern: first arg is GetBundlePath() — not user-controlled.
+        let src =
+            b"bundlePath, _ := p.API.GetBundlePath()\npath := filepath.Join(bundlePath, \"assets\")\n";
+        let findings = find_go_filepath_traversal(src);
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("path_traversal")),
+            "filepath.Join with GetBundlePath() first arg must be suppressed (oracle); got: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_go_filepath_traversal_user_input_still_fires() {
+        // User-supplied string in join — must still fire.
+        let src = b"path := filepath.Join(userInput, \"data\")\n";
+        let findings = find_go_filepath_traversal(src);
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("path_traversal")),
+            "filepath.Join with user-supplied first arg must still fire"
         );
     }
 

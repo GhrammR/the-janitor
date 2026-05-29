@@ -37372,6 +37372,36 @@
       "language_tags": [],
       "matched_attack_keywords": [],
       "priority_score": 12
+    },
+    {
+      "name": "hashicorp/terraform",
+      "urls": [
+        "https://github.com/hashicorp/terraform"
+      ],
+      "program": "HashiCorp HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: protobuf_any_unguarded_decode High \u00d73 (stackplan/from_proto.go:59, stackstate/from_proto.go:81, plans/planfile/tfplan.go:52) \u2014 all fail Threat Model Pre-Filter gate 2: Terraform reads state/plan files from operator-controlled backends; attacker requires backend write access (admin-equivalent) to inject malicious protobuf. path_traversal High \u00d74 (checkpoint.go:50,60, local/backend.go:251,425) \u2014 all operator-controlled local file paths. embedding_trust_transposition Critical lattice_gap_proposal on s3/backend.go \u2014 FP class (S3 backend, not vector store). All LOW_YIELD."
+    },
+    {
+      "name": "grafana/grafana",
+      "urls": [
+        "https://github.com/grafana/grafana"
+      ],
+      "program": "Grafana HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: ssrf_dynamic_url KevCritical \u00d76 \u2014 all in TypeScript frontend files (packages/grafana-runtime/src/services/pluginMeta/plugins.ts:21,45,61; public/app/core/services/context_srv.ts:250; public/app/plugins/datasource/loki/tracking.ts:161; public/swagger/K8sNameLookup.tsx:37) \u2014 client-side fetch() FP class (Bounty Extraction Law: client-side fetch \u2260 SSRF). One Go SSRF (pkg/services/publicdashboards/internal/commands/generate_datasources/generate.go:60) \u2014 baseUrl is config-controlled in code generation command, not production API endpoint. All LOW_YIELD."
+    },
+    {
+      "name": "cilium/cilium",
+      "urls": [
+        "https://github.com/cilium/cilium"
+      ],
+      "program": "Cilium GitHub Security Advisory",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: ssrf_dynamic_url KevCritical at cilium-cli/features/summary.go:184 \u2014 source 'String' is generic Go struct field in CLI tool, not network service endpoint; fails Threat Model Pre-Filter gate 1 (not user-controlled at network boundary). protobuf_any_type_field Critical \u00d74 (api/v1/datapathplugins, api/v1/flow, api/v1/observer, pkg/ztunnel/pb) \u2014 proto field annotations only (Informational class), not unguarded decodes. vector_filter_polymorphism High at pkg/datapath/linux/devices_controller.go:437 \u2014 FP on eBPF networking code. financial_pii_to_external_llm in Documentation/ .rst file \u2014 gate 3 fail (non-executable). All LOW_YIELD."
     }
   ]
 }

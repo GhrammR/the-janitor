@@ -7144,3 +7144,36 @@ All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_L
 * `.INNOVATION_LOG.md` *(modified)* — IQ-10 block hard-deleted (Eradication Law).
 
 **Verification**: `cargo test -p forge` 1,425 passed, 0 failed. `cargo run -p crucible` 185/185 SANCTUARY INTACT. `cargo clippy -p forge -p crucible -- -D warnings` 0 errors. 3 IQ items eradicated (IQ-10, IQ-12, IQ-13). policy_drift.rs (346 lines) deleted. 3 LOW_YIELD hunt entries.
+
+---
+
+## Sprint 183 — 2026-05-28
+
+### Phase 1: pinterest/querybook OAuth CSRF — BOUNTY Promotion
+
+* `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — querybook `security:oauth_missing_state_validation` promoted from CANDIDATE (70%) to BOUNTY (85%). Structural proof: `oauth_session` is a `@property` recreating `OAuth2Session` per call (`oauth_auth.py:34-40`); `login():65` discards state via `_`; `oauth_callback():80-82` reads `code` without any state comparison; `requests_oauthlib` auto-state-check cannot fire. `okta_auth.py:84-109` confirms same pattern. ExploitWitness: CSRF trigger via `<img src="/oauth2callback?code=ATTACKER_CODE">` — exchanges attacker's code, logs victim session as attacker's account. Submission target: Pinterest Bugcrowd.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — querybook 70% CANDIDATE row deleted.
+
+### Phase 2: `find_dead_pub_mods` detector — Systems/Build Infrastructure Entropy Pivot
+
+* `crates/anatomist/src/manifest.rs` *(modified)* — `find_dead_pub_mods(source: &[u8], file_path: &str) -> Vec<SlopFinding>`: gates on `lib.rs`/`mod.rs` files; AhoCorasick line scan for `pub mod <ident>;`; cross-checks `use crate::<X>` or `use forge::<X>` in same buffer; emits `security:phantom_pub_mod_declaration` (Warning) for undeclared modules. Motivated by policy_drift.rs incident (Sprint 182). 2 unit tests: `unused_alpha` fires; `used_beta` with `use crate::used_beta::` suppressed.
+* `crates/mcp/src/lib.rs` *(modified)* — `run_dep_check_with_ci` wires `find_dead_pub_mods` via WalkDir over project root (depth ≤ 4), collecting `dead_pub_mods` array in the JSON response alongside zombie deps and KEV findings.
+* `crates/mcp/Cargo.toml` *(modified)* — `walkdir.workspace = true` added.
+
+### Phase 3: SBOM Diff Gate in janitor-pr-gate.yml
+
+* `.github/workflows/janitor-pr-gate.yml` *(modified)* — Two new steps added after SARIF upload: `Generate SBOM snapshot` (`cargo run -p cli -- export --format cbom --output /tmp/pr_sbom.cdx.json || true`) and `Upload SBOM artifact` (`sbom-pr-snapshot-<PR>`, retention 30 days, `if-no-files-found: ignore`). Every PR that triggers the gate now produces a downloadable SBOM artifact for supply-chain comparison.
+
+### Phase 4: Hunt Sweep ×3 — terraform, grafana, cilium
+
+All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_LEDGER.md`. 3 new entries in `target_ledger.json`.
+
+* **hashicorp/terraform**: `protobuf_any_unguarded_decode` High ×3 (Terraform Stacks state/plan files) + `path_traversal` High ×4 (local config paths) — all fail Threat Model Pre-Filter gate 2: operator-controlled filesystem inputs, not unauthenticated network boundary. `embedding_trust_transposition` in S3 backend is FP class. LOW_YIELD.
+* **grafana/grafana**: `ssrf_dynamic_url` KevCritical ×6 — all TypeScript frontend client-side `fetch()` calls (FP class per Bounty Extraction Law). One Go SSRF in code generation command tool with config-sourced URL. LOW_YIELD.
+* **cilium/cilium**: `ssrf_dynamic_url` KevCritical (generic 'String' field in CLI tool), `protobuf_any_type_field` Critical ×4 (proto annotations only), `vector_filter_polymorphism` High (FP on eBPF networking code), `financial_pii_to_external_llm` in documentation .rst file (gate 3 fail). LOW_YIELD.
+
+### Phase 5: GetBundlePath FP Oracle Suppressor
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_go_filepath_traversal`: `BUNDLE_PATH_ORACLES` constant added (`GetBundlePath()`, `GetBasePath()`, `GetPluginPath()`); oracle check gate added in ±3-line window scan (same window used for Clean checks); if any oracle pattern present → suppress finding. Eliminates Sprint 182 Mattermost plugin FP class. 2 new unit tests: `GetBundlePath()` in window → suppressed; user-supplied string → fires.
+
+**Verification**: `cargo test -p forge` 1,429 passed, 0 failed. `cargo test -p anatomist` 2 new tests pass (187 + 2 = 189 total, pre-existing `test_find_janitor_dir_returns_none_when_absent` failure unrelated to sprint). `cargo clippy -p forge -p anatomist -p mcp -- -D warnings` 0 errors.

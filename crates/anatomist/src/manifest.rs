@@ -1968,6 +1968,83 @@ fn ruby_option_value(line: &str, key: &str) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
+// Dead pub mod detector (policy_drift accumulation class)
+// ---------------------------------------------------------------------------
+
+/// Scan a `lib.rs` or `mod.rs` source buffer for `pub mod <X>;` declarations
+/// where `<X>` has no corresponding `use crate::<X>` or `use forge::<X>` reference
+/// within the same buffer.
+///
+/// Motivation: the `policy_drift.rs` dead-module incident (Sprint 182) revealed
+/// that 346-line modules can accumulate with zero callers undetected.  This
+/// detector fires at [`Severity::Low`] so CI surfaces the signal without blocking.
+///
+/// Returns one finding per declared-but-unreferenced module name.  The caller
+/// should cross-reference findings against a workspace-wide `rg` sweep before
+/// escalating.
+pub fn find_dead_pub_mods(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
+    // Gate: only lib.rs and mod.rs files contain module declarations worth scanning.
+    let fname = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if fname != "lib.rs" && fname != "mod.rs" {
+        return Vec::new();
+    }
+
+    let Ok(src) = std::str::from_utf8(source) else {
+        return Vec::new();
+    };
+
+    const PUB_MOD: &str = "pub mod ";
+    let mut findings = Vec::new();
+
+    for (line_idx, line) in src.lines().enumerate() {
+        let trimmed = line.trim();
+        // Match `pub mod <ident>;` — skip re-exports (`pub mod X { ... }`) and doc-hidden mods.
+        let Some(rest) = trimmed.strip_prefix(PUB_MOD) else {
+            continue;
+        };
+        // Extract the identifier before any `;` or `{`.
+        let mod_name: &str = rest
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .next()
+            .unwrap_or("");
+        if mod_name.is_empty() {
+            continue;
+        }
+        // Skip if the module name appears in a `use crate::` or `use forge::` reference
+        // within the same buffer — indicates at least one local caller.
+        let use_crate = format!("use crate::{mod_name}");
+        let use_forge = format!("use forge::{mod_name}");
+        let mod_inline = format!("crate::{mod_name}::");
+        if src.contains(&use_crate) || src.contains(&use_forge) || src.contains(&mod_inline) {
+            continue;
+        }
+
+        let byte_offset: usize = src
+            .lines()
+            .take(line_idx)
+            .map(|l| l.len() + 1)
+            .sum();
+        findings.push(SlopFinding {
+            start_byte: byte_offset,
+            end_byte: byte_offset + line.len(),
+            description: format!(
+                "security:phantom_pub_mod_declaration — `pub mod {mod_name};` declared \
+                 in `{file_path}` but no `use crate::{mod_name}` or `use forge::{mod_name}` \
+                 reference found in the same file. Run `rg 'use forge::{mod_name}\\|use crate::{mod_name}' crates/` \
+                 to verify workspace-wide caller coverage before deleting. \
+                 (Policy-drift accumulation class — Sprint 182 policy_drift.rs incident.)"
+            ),
+            domain: forge::metadata::DOMAIN_ALL,
+            severity: Severity::Warning,
+        });
+    }
+    findings
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -3151,6 +3228,35 @@ BUNDLED WITH
                 .find(|e| e.name == "devise")
                 .map(|e| e.version.as_str()),
             Some("4.9.3")
+        );
+    }
+
+    // ── find_dead_pub_mods tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_find_dead_pub_mods_fires_on_undeclared_module() {
+        // A lib.rs that declares a pub mod with no internal use — must fire.
+        let src = b"pub mod unused_alpha;\n";
+        let findings = super::find_dead_pub_mods(src, "src/lib.rs");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("phantom_pub_mod_declaration")
+                    && f.description.contains("unused_alpha")),
+            "expected phantom_pub_mod_declaration for unused_alpha, got: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_find_dead_pub_mods_no_fire_when_used_in_same_buffer() {
+        // Declaring and then using the module in the same buffer — not a phantom.
+        let src = b"pub mod used_beta;\nuse crate::used_beta::Foo;\n";
+        let findings = super::find_dead_pub_mods(src, "src/lib.rs");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("used_beta")),
+            "used_beta is referenced via use — must not fire; got: {findings:?}"
         );
     }
 }

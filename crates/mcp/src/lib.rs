@@ -463,6 +463,36 @@ fn run_dep_check_with_ci(path: &str, ci_mode: bool) -> Result<serde_json::Value>
 
     let registry = anatomist::manifest::scan_manifests(root);
     let zombies = anatomist::manifest::find_zombie_deps(root, &registry);
+
+    // Dead pub-mod scan: walk lib.rs / mod.rs files up to 4 levels deep.
+    let dead_pub_mods: Vec<String> = walkdir::WalkDir::new(root)
+        .max_depth(4)
+        .into_iter()
+        .filter_entry(|e| {
+            let n = e.file_name().to_string_lossy();
+            n != "target" && n != "node_modules"
+        })
+        .flatten()
+        .filter(|e| {
+            e.file_type().is_file()
+                && matches!(
+                    e.file_name().to_str(),
+                    Some("lib.rs") | Some("mod.rs")
+                )
+        })
+        .flat_map(|e| {
+            std::fs::read(e.path())
+                .ok()
+                .map(|src| {
+                    let fp = e.path().to_string_lossy().into_owned();
+                    anatomist::manifest::find_dead_pub_mods(&src, &fp)
+                        .into_iter()
+                        .map(|f| f.description)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        })
+        .collect();
     let janitor_dir = root.join(".janitor");
     let kev_findings = match std::fs::read(root.join("Cargo.lock")) {
         Ok(lock) if ci_mode => anatomist::manifest::check_kev_deps_required(&lock, &janitor_dir)
@@ -483,6 +513,8 @@ fn run_dep_check_with_ci(path: &str, ci_mode: bool) -> Result<serde_json::Value>
             .into_iter()
             .map(|f| f.description)
             .collect::<Vec<_>>(),
+        "dead_pub_mod_count": dead_pub_mods.len(),
+        "dead_pub_mods": dead_pub_mods,
     }))
 }
 
