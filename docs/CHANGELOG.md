@@ -7100,3 +7100,47 @@ All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_L
 * AR-027 (VentureBeat OpenClaw): `fetch_failed_persistent` — VentureBeat 429 recurring; title maps to P2-22 + P2-28 (already filed).
 
 **Verification**: `cargo test -p forge` 1,424+ passed, 0 failed. IQ-9 + IQ-11 eradicated from INNOVATION_LOG. 3 LOW_YIELD entries written. 4 AR dispositions closed.
+
+---
+
+## Sprint 182 — 2026-05-28
+
+### Phase 1: IQ-13 — MariaDB JSON_SCHEMA_VALID Taint Path (CVE-2026-32710 CVSS 9.9)
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_json_schema_valid_injection(source, file_path)`: AhoCorasick line scan for `JSON_SCHEMA_VALID(` in `.php` and `.py` files. PHP variant checks for `.`, concatenation or `$` interpolation signals; Python variant checks for `%`, `.format(`, `f"`. Parameterized placeholder (`?`, `:param`, `prepare(`) gates suppress false positives. Emits `security:sql_injection` (KevCritical) citing CVE-2026-32710. Wired into `"php"` arm (block expansion) and `"py"` arm. 2 unit tests: PHP concatenation fires; parameterized PDO suppresses.
+* `.INNOVATION_LOG.md` *(modified)* — IQ-13 block hard-deleted (Eradication Law).
+
+### Phase 2: IQ-12 — MCP Server External Auto-Load Config Detector
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_mcp_external_autoload(source, file_path)`: line scan for `"url":` + `http://`/`https://` without `localhost`/`127.0.0.1`/`::1`/`0.0.0.0`. Emits `security:mcp_external_autoload` (High) — TrustFall research class (machine compromise on clone). Wired into language-agnostic block gated by `.mcp.json`, `.claude.json`, `.cursor/mcp.json`, `.vscode/mcp.json`. 2 unit tests: external HTTPS fires; localhost suppresses.
+* `.INNOVATION_LOG.md` *(modified)* — IQ-12 block hard-deleted (Eradication Law).
+
+### Phase 3: Architectural Oracle Fix — `policy_drift.rs` Dead Module Removal (346 lines)
+
+* `crates/forge/src/lib.rs` *(modified)* — `pub mod policy_drift;` declaration removed.
+* `crates/forge/src/policy_drift.rs` *(deleted)* — 346-line dead module with zero external callers across the entire workspace. Phantom Call Detector class fix executed in < 50 lines per Architectural Oracle Execution Law.
+
+### Phase 4: Crucible Threat Gallery Fixtures for IQ-9/IQ-11
+
+* `crates/crucible/src/main.rs` *(modified)* — 4 new `Entry` records added:
+  * Go: `VerifyAlpha()` returning `nil` → must intercept `noop_verification_function`.
+  * Go: `VerifyAlpha(token string)` with conditional logic → safe (no intercept).
+  * Python: `AUTH_ENABLED_ALPHA = False` → must intercept `ai_agent_disabled_auth`.
+  * Python: `AUTH_ENABLED_ALPHA = True` → safe (no intercept).
+* Fixed `find_python_disabled_auth` path gate: `!file_path.is_empty() && !file_path.ends_with(".py")` — empty path (crucible dispatch) now allowed through.
+* Crucible result: 185/185 SANCTUARY INTACT.
+
+### Phase 5: Hunt Sweep ×3 — chainlink-contracts, ts-immutable-sdk, mattermost-plugin-confluence
+
+All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_LEDGER.md`.
+
+* **smartcontractkit/chainlink-contracts**: 0 findings — Solidity coverage gap; reentrancy/overflow detectors not yet in grammar set.
+* **immutable/ts-immutable-sdk**: 57 findings, all Informational — `dom_xss_innerHTML` ×1, `ssrf_dynamic_url` ×6, `config_taint` ×8, `non_constant_time_comparison` ×1, `oauth_account_fusion_pretakeover` ×41. No finding reaches KevCritical + ReachabilityProof threshold.
+* **mattermost/mattermost-plugin-confluence**: `path_traversal` High ×4 — all use `GetBundlePath()` Mattermost server API as base path (NOT user-controlled). Threat Model Pre-Filter gate 1 fail. Structural FP class; oracle suppressor candidate.
+
+### Phase 6: IQ-10 — npm IIFE-Appended CJS Backdoor Detector
+
+* `crates/forge/src/slop_hunter.rs` *(modified)* — `find_npm_iife_appended_payload(source, file_path)`: gates on `.js`/`.cjs` files, finds last `module.exports` byte offset, checks tail bytes for IIFE patterns (`(function(`, `(()=>`, `(() =>`, `!function(`). If IIFE appears after `module.exports`, emits `security:npm_cjs_iife_appended_payload` (Critical). Secondary coverage via `(function (` pattern. 2 unit tests: IIFE-after-exports fires; IIFE-before-exports suppresses.
+* `.INNOVATION_LOG.md` *(modified)* — IQ-10 block hard-deleted (Eradication Law).
+
+**Verification**: `cargo test -p forge` 1,425 passed, 0 failed. `cargo run -p crucible` 185/185 SANCTUARY INTACT. `cargo clippy -p forge -p crucible -- -D warnings` 0 errors. 3 IQ items eradicated (IQ-10, IQ-12, IQ-13). policy_drift.rs (346 lines) deleted. 3 LOW_YIELD hunt entries.

@@ -1389,6 +1389,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
             ));
             f.extend(crate::sidechannel::find_secret_dependent_branches(source));
             f.extend(find_python_disabled_auth(source, file_path));
+            f.extend(find_json_schema_valid_injection(source, file_path));
             f
         }
         "js" | "jsx" | "ts" | "tsx" => {
@@ -1426,6 +1427,7 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
                 source, file_path,
             ));
             f.extend(crate::sidechannel::find_secret_dependent_branches(source));
+            f.extend(find_npm_iife_appended_payload(source, file_path));
             f
         }
         // Phase 1 byte-level Tier 2 + Phase 2 AST-walk Tier 1 for Java
@@ -1478,7 +1480,11 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
             f
         }
         // Phase 5 R&D: PHP, Kotlin, Scala, Swift AST walks
-        "php" => find_php_slop(eng, parsed),
+        "php" => {
+            let mut f = find_php_slop(eng, parsed);
+            f.extend(find_json_schema_valid_injection(source, file_path));
+            f
+        }
         "kt" | "kts" => find_kotlin_slop(eng, parsed),
         "scala" => find_scala_slop(eng, parsed),
         "swift" => find_swift_slop(eng, parsed),
@@ -1513,7 +1519,65 @@ pub fn find_slop(language: &str, parsed: &ParsedUnit<'_>, file_path: &str) -> Ve
     if !file_path.ends_with(".cdx.json") {
         findings.extend(find_supply_chain_slop_with_context(language, parsed));
     }
+    // MCP server config files with external network URLs are a machine-compromise
+    // vector on clone (TrustFall research class). Gate by filename only.
+    if file_path.ends_with(".mcp.json")
+        || file_path.ends_with(".claude.json")
+        || file_path.contains(".cursor/mcp.json")
+        || file_path.contains(".vscode/mcp.json")
+    {
+        findings.extend(find_mcp_external_autoload(source, file_path));
+    }
     filter_standard_sast_suppressions(source, findings)
+}
+
+/// Detects MCP server config files that register external network commands.
+///
+/// An external MCP server auto-loaded by a CI/CD runner or developer IDE on
+/// clone can execute arbitrary code without further user confirmation.
+/// Fires when `"url":` references a non-localhost HTTP/HTTPS host in a file
+/// named `.mcp.json`, `.claude.json`, `.cursor/mcp.json`, or `.vscode/mcp.json`.
+fn find_mcp_external_autoload(source: &[u8], _file_path: &str) -> Vec<SlopFinding> {
+    const URL_KEY: &[u8] = b"\"url\":";
+    const HTTP: &[u8] = b"http://";
+    const HTTPS: &[u8] = b"https://";
+    const LOCAL_GATES: &[&[u8]] = &[b"localhost", b"127.0.0.1", b"::1", b"0.0.0.0"];
+
+    let mut findings = Vec::new();
+    let mut line_start = 0usize;
+
+    for line in source.split(|&b| b == b'\n') {
+        let line_end = line_start + line.len();
+
+        if line.windows(URL_KEY.len()).any(|w| w == URL_KEY) {
+            let has_http = line.windows(HTTP.len()).any(|w| w == HTTP)
+                || line.windows(HTTPS.len()).any(|w| w == HTTPS);
+
+            if has_http {
+                let is_local = LOCAL_GATES
+                    .iter()
+                    .any(|gate| line.windows(gate.len()).any(|w| w == *gate));
+
+                if !is_local {
+                    findings.push(SlopFinding {
+                        start_byte: line_start,
+                        end_byte: line_end,
+                        description: "security:mcp_external_autoload — MCP server config \
+                            registers an external network command: malicious repo machine \
+                            compromise on clone (TrustFall research class); use a \
+                            localhost or relative-path server only"
+                            .to_string(),
+                        domain: DOMAIN_FIRST_PARTY,
+                        severity: Severity::High,
+                    });
+                }
+            }
+        }
+
+        line_start = line_end + 1;
+    }
+
+    findings
 }
 
 fn is_oauth_authorization_surface(language: &str) -> bool {
@@ -5751,7 +5815,12 @@ fn walk_python_slopsquat_imports(node: Node<'_>, source: &[u8], findings: &mut V
 ///
 /// Gate: file must end in `.py` and must not be a test file.
 fn find_python_disabled_auth(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
-    if !file_path.ends_with(".py") || file_path.contains("test") || file_path.contains("spec") {
+    // Allow empty path (find_slop language-arm dispatch already constrains to "py").
+    // Block non-.py extensions and test/spec paths.
+    if (!file_path.is_empty() && !file_path.ends_with(".py"))
+        || file_path.contains("test")
+        || file_path.contains("spec")
+    {
         return Vec::new();
     }
 
@@ -6872,6 +6941,141 @@ fn find_path_traversal_js(node: Node<'_>, source: &[u8], findings: &mut Vec<Slop
     for child in node.children(&mut cursor) {
         find_path_traversal_js(child, source, findings);
     }
+}
+
+// ---------------------------------------------------------------------------
+// npm registry-watch: IIFE-appended CJS backdoor pattern (supply chain)
+// ---------------------------------------------------------------------------
+
+/// Detects Immediately Invoked Function Expressions (IIFEs) appended AFTER a
+/// `module.exports` assignment in a CommonJS file.
+///
+/// Legitimate packages end with `module.exports = …;` and have no further
+/// executable code. A backdoored CJS file appends an IIFE after exports to
+/// execute credential-theft or exfiltration payloads on `require()`.
+fn find_npm_iife_appended_payload(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
+    let ext = file_path.rsplit('.').next().unwrap_or("");
+    if ext != "js" && ext != "cjs" {
+        return Vec::new();
+    }
+    if file_path.contains("test") || file_path.contains("spec") || file_path.contains("min.js") {
+        return Vec::new();
+    }
+
+    const EXPORTS: &[u8] = b"module.exports";
+    // IIFE opening patterns
+    const IIFE_PATS: &[&[u8]] = &[
+        b"(function(",
+        b"(function (",
+        b"(()=>",
+        b"(() =>",
+        b"!function(",
+    ];
+
+    // Find last byte offset of `module.exports`
+    let exports_pos = source
+        .windows(EXPORTS.len())
+        .enumerate()
+        .filter(|(_, w)| *w == EXPORTS)
+        .map(|(i, _)| i)
+        .next_back();
+
+    let Some(exports_last) = exports_pos else {
+        return Vec::new();
+    };
+
+    let tail = &source[exports_last..];
+    for pat in IIFE_PATS {
+        if let Some(rel_pos) = tail
+            .windows(pat.len())
+            .enumerate()
+            .find(|(_, w)| *w == *pat)
+            .map(|(i, _)| i)
+        {
+            // IIFE appears after module.exports — malicious appended payload
+            let abs_start = exports_last + rel_pos;
+            let abs_end = (abs_start + 120).min(source.len());
+            return vec![SlopFinding {
+                start_byte: abs_start,
+                end_byte: abs_end,
+                description: "security:npm_cjs_iife_appended_payload — IIFE appears \
+                    after `module.exports` assignment in a CommonJS file; this is the \
+                    canonical supply-chain backdoor pattern (node-ipc class); \
+                    review the appended block for exfiltration or execution sinks"
+                    .to_string(),
+                domain: DOMAIN_FIRST_PARTY,
+                severity: Severity::Critical,
+            }];
+        }
+    }
+
+    Vec::new()
+}
+
+// ---------------------------------------------------------------------------
+// CVE-2026-32710 — MariaDB JSON_SCHEMA_VALID heap overflow taint path
+// ---------------------------------------------------------------------------
+
+/// Detects PHP and Python code passing unparameterized external input directly
+/// to `JSON_SCHEMA_VALID()` in a database query string.
+///
+/// Matches CVE-2026-32710 (MariaDB <= 10.11.x heap overflow, CVSS 9.9): any
+/// string-interpolated or concatenated `JSON_SCHEMA_VALID(` call that lacks a
+/// parameterized placeholder (`?` or `:param`) immediately inside the argument.
+fn find_json_schema_valid_injection(source: &[u8], file_path: &str) -> Vec<SlopFinding> {
+    let ext = file_path.rsplit('.').next().unwrap_or("");
+    if ext != "php" && ext != "py" {
+        return Vec::new();
+    }
+    if file_path.contains("test") || file_path.contains("spec") {
+        return Vec::new();
+    }
+
+    const SINK: &[u8] = b"JSON_SCHEMA_VALID(";
+    // PHP interpolation/concat signals
+    const PHP_INTERP: &[&[u8]] = &[b" . $", b"\" . ", b"' . ", b"${", b"\"${"];
+    // Python interpolation signals
+    const PY_INTERP: &[&[u8]] = &[b" % ", b".format(", b"f\"", b"f'"];
+    // Parameterized gates — if present, suppress (safe usage)
+    const SAFE_GATES: &[&[u8]] = &[b"(?)", b"(?)\"", b"(:param", b"prepare("];
+
+    let mut findings = Vec::new();
+    let mut line_start = 0usize;
+
+    for line in source.split(|&b| b == b'\n') {
+        let line_end = line_start + line.len();
+
+        if line.windows(SINK.len()).any(|w| w == SINK) {
+            // Check if any safe gate suppresses this line
+            let is_safe = SAFE_GATES
+                .iter()
+                .any(|gate| line.windows(gate.len()).any(|w| w == *gate));
+
+            if !is_safe {
+                let signals: &[&[u8]] = if ext == "php" { PHP_INTERP } else { PY_INTERP };
+                let fires = signals
+                    .iter()
+                    .any(|sig| line.windows(sig.len()).any(|w| w == *sig));
+                if fires {
+                    findings.push(SlopFinding {
+                        start_byte: line_start,
+                        end_byte: line_end,
+                        description: "security:sql_injection — JSON_SCHEMA_VALID with \
+                            unparameterized user input detected: CVE-2026-32710 class \
+                            (MariaDB heap overflow, CVSS 9.9); use a prepared statement \
+                            with a `?` placeholder instead"
+                            .to_string(),
+                        domain: DOMAIN_FIRST_PARTY,
+                        severity: Severity::KevCritical,
+                    });
+                }
+            }
+        }
+
+        line_start = line_end + 1;
+    }
+
+    findings
 }
 
 // ---------------------------------------------------------------------------
@@ -12552,6 +12756,88 @@ mod phase4_rd_tests {
                 .iter()
                 .all(|f| !f.description.contains("ai_agent_disabled_auth")),
             "auth_beta_required = True must not fire ai_agent_disabled_auth"
+        );
+    }
+
+    // ── IQ-10: npm IIFE-appended CJS backdoor ────────────────────────────────
+
+    #[test]
+    fn test_iife_after_exports_fires() {
+        // Abstract export name moduleAlpha (Law III-E)
+        let src = b"module.exports = moduleAlpha;\n(function(){doEvil();}());\n";
+        let findings = find_npm_iife_appended_payload(src, "index.js");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("npm_cjs_iife_appended_payload")),
+            "IIFE after module.exports must fire npm_cjs_iife_appended_payload"
+        );
+    }
+
+    #[test]
+    fn test_iife_before_exports_no_fire() {
+        // IIFE appears before module.exports — normal pattern (module init wrapper)
+        let src = b"(function(){init();}())\nmodule.exports = moduleAlpha;\n";
+        let findings = find_npm_iife_appended_payload(src, "index.js");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("npm_cjs_iife_appended_payload")),
+            "IIFE before module.exports must not fire npm_cjs_iife_appended_payload"
+        );
+    }
+
+    // ── IQ-13: MariaDB JSON_SCHEMA_VALID taint path (CVE-2026-32710) ─────────
+
+    #[test]
+    fn test_json_schema_valid_php_concat_fires() {
+        // Abstract var name $inputAlpha (Law III-E) — concatenated into query.
+        let src = b"$pdo->query(\"SELECT JSON_SCHEMA_VALID(\" . $inputAlpha);\n";
+        let findings = find_json_schema_valid_injection(src, "schema.php");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("sql_injection")),
+            "PHP string concatenation into JSON_SCHEMA_VALID must fire sql_injection"
+        );
+    }
+
+    #[test]
+    fn test_json_schema_valid_parameterized_no_fire() {
+        // Parameterized PDO with ? placeholder — must be suppressed.
+        let src = b"$pdo->prepare(\"SELECT JSON_SCHEMA_VALID(?)\");\n";
+        let findings = find_json_schema_valid_injection(src, "schema.php");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("sql_injection")),
+            "Parameterized PDO with (?) must suppress JSON_SCHEMA_VALID sql_injection"
+        );
+    }
+
+    // ── IQ-12: MCP server external auto-load config detector ─────────────────
+
+    #[test]
+    fn test_mcp_external_autoload_fires() {
+        let src = b"  \"url\": \"https://evil.example.com/mcp\"\n";
+        let findings = find_mcp_external_autoload(src, ".mcp.json");
+        assert!(
+            findings
+                .iter()
+                .any(|f| f.description.contains("mcp_external_autoload")),
+            "External HTTPS URL in MCP config must fire mcp_external_autoload"
+        );
+    }
+
+    #[test]
+    fn test_mcp_localhost_no_fire() {
+        let src = b"  \"url\": \"http://localhost:3000\"\n";
+        let findings = find_mcp_external_autoload(src, ".mcp.json");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("mcp_external_autoload")),
+            "localhost URL in MCP config must not fire mcp_external_autoload"
         );
     }
 

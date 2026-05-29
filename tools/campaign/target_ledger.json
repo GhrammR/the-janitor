@@ -962,7 +962,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: 0 findings \u2014 Solidity coverage gap; no reentrancy/overflow detectors. LOW_YIELD by coverage."
     },
     {
       "engagement": "immunefi_targets",
@@ -1008,7 +1011,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: dom_xss_innerHTML \u00d71 + ssrf_dynamic_url \u00d76 + config_taint \u00d78 + non_constant_time \u00d71 + oauth_account_fusion_pretakeover \u00d741 \u2014 all Informational. No finding reaches KevCritical+ReachabilityProof. Immunefi in-scope but below threshold."
     },
     {
       "engagement": "infinite_athlete_targets",
@@ -1168,7 +1174,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: path_traversal High \u00d74 (atlassian_connect.go:37, controller.go:92, plugin.go:65, plugin.go:169) \u2014 all use GetBundlePath() server API, NOT user-controlled taint source. Threat Model Pre-Filter gate 1 fail. Bugcrowd in-scope but FP class."
     },
     {
       "engagement": "mattermost_targets",

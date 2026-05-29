@@ -86,7 +86,6 @@ pub mod oauth_scope;
 pub mod oidc_scope_guard;
 pub mod optimizer_authority;
 pub mod patch_proof;
-pub mod policy_drift;
 pub mod pr_collider;
 pub mod proof_obligation;
 pub mod rag_source_registry;

@@ -1516,6 +1516,38 @@ window.location = authorizeUrl;\n",
         must_intercept: false,
         desc_fragment: None,
     },
+    // ── IQ-11: Go no-op verification function (Sprint 181) ───────────────────
+    Entry {
+        name: "Go/noop verify function — INTERCEPT",
+        lang: "go",
+        source: b"\
+package auth\nfunc VerifyAlpha() error { return nil }\n",
+        must_intercept: true,
+        desc_fragment: Some("noop_verification_function"),
+    },
+    Entry {
+        name: "Go/real verify with body — SAFE",
+        lang: "go",
+        source: b"\
+package auth\nimport \"errors\"\nfunc VerifyAlpha(token string) error {\n    if token == \"\" {\n        return errors.New(\"missing token\")\n    }\n    return nil\n}\n",
+        must_intercept: false,
+        desc_fragment: None,
+    },
+    // ── IQ-9: Python disabled-auth config key (Sprint 181) ───────────────────
+    Entry {
+        name: "Python/disabled auth config — INTERCEPT",
+        lang: "py",
+        source: b"AUTH_ENABLED_ALPHA = False\n",
+        must_intercept: true,
+        desc_fragment: Some("ai_agent_disabled_auth"),
+    },
+    Entry {
+        name: "Python/enabled auth config — SAFE",
+        lang: "py",
+        source: b"AUTH_ENABLED_ALPHA = True\n",
+        must_intercept: false,
+        desc_fragment: Some("ai_agent_disabled_auth"),
+    },
 ];
 
 // ---------------------------------------------------------------------------
