@@ -102,13 +102,14 @@ jobs:
           category: janitor
         continue-on-error: true
 
-      - name: Generate SBOM snapshot
+      - name: Generate dependency snapshot
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          cargo run -p cli -- export --format cbom \
-            --output /tmp/pr_sbom.cdx.json 2>/dev/null || true
+          cargo metadata --format-version 1 --no-deps 2>/dev/null \
+            | jq '{schema: "dep-snapshot/v1", generated: "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'", packages: [.packages[] | {name, version, source}]}' \
+            > /tmp/pr_sbom.cdx.json || true
 
       - name: Upload SBOM artifact
         if: always() && hashFiles('/tmp/pr_sbom.cdx.json') != ''

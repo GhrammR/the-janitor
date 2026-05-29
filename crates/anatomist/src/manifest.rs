@@ -3259,4 +3259,18 @@ BUNDLED WITH
             "used_beta is referenced via use — must not fire; got: {findings:?}"
         );
     }
+
+    #[test]
+    fn test_find_dead_pub_mods_no_fire_on_inline_crate_call() {
+        // AR-2026-05-14-009 gap fix: inline `crate::X::func()` without a `use` import
+        // must suppress the phantom-pub-mod finding (Sprint 184 Phase 3).
+        let src = b"pub mod inline_used;\nfn example() { crate::inline_used::some_func(); }\n";
+        let findings = super::find_dead_pub_mods(src, "src/lib.rs");
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.description.contains("inline_used")),
+            "inline_used is called via crate:: prefix — must not fire; got: {findings:?}"
+        );
+    }
 }

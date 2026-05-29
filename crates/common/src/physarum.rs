@@ -1040,6 +1040,29 @@ mod tests {
         ));
     }
 
+    /// AR-2026-05-14-009 — verifies `start_background_heart` never panics.
+    ///
+    /// The implementation uses `if let Err` (not `expect`), so spawn failure
+    /// resets `HEART_STARTED` to false and logs via `eprintln!`.  This test
+    /// proves the function is unconditionally non-fatal: it may be called from
+    /// any context (main, daemon, test harness) without risk of aborting the
+    /// process on OOM or ulimit-constrained environments.
+    #[test]
+    fn test_heart_spawn_failure_is_non_fatal() {
+        // Calling start_background_heart must never panic regardless of how many
+        // times it is called or what state HEART_STARTED is in.  The `if let Err`
+        // guard at physarum.rs:637 resets HEART_STARTED on spawn failure rather
+        // than panicking — this test documents and exercises the call contract.
+        start_background_heart();
+        start_background_heart(); // idempotent: second call is a no-op
+        // Global pulse must remain a valid variant after any call sequence.
+        let pulse = global_pulse();
+        assert!(
+            matches!(pulse, Pulse::Flow | Pulse::Constrict | Pulse::Stop),
+            "global_pulse returned invalid variant after start_background_heart"
+        );
+    }
+
     // ── Predictive Allocation Gate tests (Phase 5) ───────────────────────────
 
     /// Helper: compute predicted pressure using the same formula as

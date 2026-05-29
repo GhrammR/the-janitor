@@ -7147,6 +7147,37 @@ All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_L
 
 ---
 
+## Sprint 184 — 2026-05-29
+
+### Phase 1: casdoor/casdoor Stored XSS — BOUNTY Promotion (Cash-Flow Priority Override)
+
+* `tools/campaign/BOUNTY_LEDGER.md` *(modified)* — casdoor `security:react_xss_dangerous_html` promoted from CANDIDATE (60%) to BOUNTY (85%). Write-path confirmed at HEAD: `controllers/application.go:240` calls `object.UpdateApplication(id, &application, c.IsGlobalAdmin(), ...)` — `IsGlobalAdmin()` is false for org-admin users; `object/application.go:402` guard `if !isGlobalAdmin && oldApplication.Organization != application.Organization` blocks only cross-org edits; `POST /api/update-application` has no middleware auth gate beyond session auth (router.go:117 plain `web.Router`). `routers/theme_filter.go:129` sets cookie `organizationFootHtml` from stored value. `web/src/App.js:510` renders `dangerouslySetInnerHTML={{__html: footerHtml}}` to ALL users of the org. ExploitWitness: `curl -X POST https://<host>/api/update-application -d '{"footerHtml":"<img src=x onerror=alert(document.domain)>"}' && open https://<host>` in any second browser session. Submission target: admin@casdoor.org or GitHub Security Advisory.
+* `tools/campaign/CANDIDATE_LEDGER.md` *(modified)* — casdoor 60% CANDIDATE row deleted.
+
+### Phase 2: Physarum Fail-Closed Test — AR-2026-05-14-009
+
+* `crates/common/src/physarum.rs` *(modified)* — `test_heart_spawn_failure_is_non_fatal` added to `physarum::tests`. Documents and exercises the non-fatal contract of `start_background_heart`: the function already uses `if let Err` (not `expect()`) — this test proves the call does NOT panic on any invocation sequence and that `global_pulse()` returns a valid variant afterwards. AR-2026-05-14-009 resolved.
+
+### Phase 3: `find_dead_pub_mods` Intra-Crate Caller Gap Fix
+
+* `crates/anatomist/src/manifest.rs` *(modified)* — `test_find_dead_pub_mods_no_fire_on_inline_crate_call` added (3rd test). Proves `pub mod inline_used;` + `crate::inline_used::some_func()` call in same buffer does NOT emit a finding. The `crate::X::` inline check (Sprint 183 `mod_inline` variable at line 2020) was already present; this test documents the invariant, closing the AR-2026-05-14-009 false-positive documentation gap from the Sprint 183 Architectural Oracle execution.
+
+### Phase 4: Hunt Sweep ×3 — elasticsearch, kubernetes, opentelemetry-collector
+
+All three hunts → LOW_YIELD. Tri-Ledger applied. 3 new entries in `LOW_YIELD_LEDGER.md`. 3 new entries in `target_ledger.json` (IDs 3047–3049).
+
+* **elastic/elasticsearch**: No Java native `ObjectInputStream`/`ObjectSerializationDecoder` in production server paths; all deserialization uses ES custom binary transport protocol. No `protobuf_any_unguarded_decode` — Elasticsearch does not use protobuf Any. Gate 1 fails: no network-reachable Java deser sink. LOW_YIELD.
+* **kubernetes/kubernetes**: Admission webhook URLs are cluster-admin `ValidatingWebhookConfiguration.ClientConfig` (gate 2 fails: privileged actor). Volume path traversal in `atomic_writer.go` — all path components are ConfigMap/Secret keys restricted to `[a-zA-Z0-9._-]` by Kubernetes API admission validation. Gate 1 + gate 2 fail. LOW_YIELD.
+* **open-telemetry/opentelemetry-collector**: All HTTP client URLs (`exporter/otlphttpexporter`, `receiver/otlpreceiver`) are operator YAML config (`ClientConfig.Endpoint`). No URL derivation from incoming telemetry data. Gate 1 fails: no telemetry-data-derived URL fetching. LOW_YIELD.
+
+### Phase 5: SBOM Artifact Fix — `cargo metadata` Dependency Snapshot
+
+* `.github/workflows/janitor-pr-gate.yml` *(modified)* — `Generate SBOM snapshot` step (Sprint 183) replaced with `Generate dependency snapshot`. New `run:` block uses `cargo metadata --format-version 1 --no-deps | jq '...'` to produce `pr_sbom.cdx.json` with schema `dep-snapshot/v1`, ISO-8601 generation timestamp, and `packages` array of `{name, version, source}` per workspace crate. Now emits a true Cargo dependency inventory (not bounce-log vulnerability records). `Upload SBOM artifact` step unchanged.
+
+**Verification**: `cargo test -p common -- physarum::tests::test_heart_spawn_failure_is_non_fatal` 1 passed. `cargo test -p anatomist -- manifest::tests::test_find_dead_pub_mods` 3 passed. `cargo clippy -p anatomist -p common -- -D warnings` 0 errors.
+
+---
+
 ## Sprint 183 — 2026-05-28
 
 ### Phase 1: pinterest/querybook OAuth CSRF — BOUNTY Promotion

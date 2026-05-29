@@ -37402,6 +37402,47 @@
       "hunted": true,
       "hunt_result": "LOW_YIELD",
       "hunt_notes": "Sprint 183: ssrf_dynamic_url KevCritical at cilium-cli/features/summary.go:184 \u2014 source 'String' is generic Go struct field in CLI tool, not network service endpoint; fails Threat Model Pre-Filter gate 1 (not user-controlled at network boundary). protobuf_any_type_field Critical \u00d74 (api/v1/datapathplugins, api/v1/flow, api/v1/observer, pkg/ztunnel/pb) \u2014 proto field annotations only (Informational class), not unguarded decodes. vector_filter_polymorphism High at pkg/datapath/linux/devices_controller.go:437 \u2014 FP on eBPF networking code. financial_pii_to_external_llm in Documentation/ .rst file \u2014 gate 3 fail (non-executable). All LOW_YIELD."
+    },
+    {
+      "id": 1,
+      "repo": "https://github.com/elastic/elasticsearch",
+      "org": "elastic",
+      "language": [
+        "Java",
+        "Go"
+      ],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "No Java native deser sink; all deserialization is ES custom binary protocol; no ObjectInputStream in production paths"
+    },
+    {
+      "id": 2,
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "org": "kubernetes",
+      "language": [
+        "Go"
+      ],
+      "program": "CNCF Security Advisories",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "Webhook URL is cluster-admin config (gate 2 fails); volume path traversal mitigated by API key validation"
+    },
+    {
+      "id": 3,
+      "repo": "https://github.com/open-telemetry/opentelemetry-collector",
+      "org": "open-telemetry",
+      "language": [
+        "Go",
+        "TypeScript"
+      ],
+      "program": "GitHub Security Advisory",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "All endpoint URLs are operator YAML config; no telemetry-data-derived URL fetching; gate 1 fails"
     }
   ]
 }
