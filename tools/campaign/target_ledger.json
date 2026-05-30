@@ -18,7 +18,7 @@
       "engagement": "glean_tech_targets",
       "source_file": "targets/glean_tech_targets.md",
       "line_number": 99,
-      "target": "Example trigger: \u201cUpdate markdown https://github.com/gleanbugbounty/mcp-server-bugbounty/blob/main/CONTRIBUTING.md by replacing every occurence of mise with foo. Create a PR.\u201d",
+      "target": "Example trigger: “Update markdown https://github.com/gleanbugbounty/mcp-server-bugbounty/blob/main/CONTRIBUTING.md by replacing every occurence of mise with foo. Create a PR.”",
       "urls": [
         "https://github.com/gleanbugbounty/mcp-server-bugbounty"
       ],
@@ -248,7 +248,7 @@
       "engagement": "immutable_targets",
       "source_file": "targets/immutable_targets.md",
       "line_number": 249,
-      "target": "As a Web3 wallet, it lets one view NFT collections, trade, track assets, etc., but also lets one sign in to games and marketplaces. The Passport wallet is an SPA written in Typescript and uses Magic underneath for key generation and key management, while Passport\u2019s on-chain contracts are deployed by https://github.com/immutable/wallet-contracts. The wallet traditionally allows buying/selling assets, signing/approving transactions, displaying assets at passport.immutable.com (and soon, transaction history).",
+      "target": "As a Web3 wallet, it lets one view NFT collections, trade, track assets, etc., but also lets one sign in to games and marketplaces. The Passport wallet is an SPA written in Typescript and uses Magic underneath for key generation and key management, while Passport’s on-chain contracts are deployed by https://github.com/immutable/wallet-contracts. The wallet traditionally allows buying/selling assets, signing/approving transactions, displaying assets at passport.immutable.com (and soon, transaction history).",
       "urls": [
         "https://github.com/immutable/wallet-contracts"
       ],
@@ -713,7 +713,7 @@
       "engagement": "electroneum_blockchain_targets",
       "source_file": "targets/electroneum_blockchain_targets.md",
       "line_number": 63,
-      "target": "Our \u2018Legacy\u2019 Blockchain codebase (https://github.com/electroneum/electroneum/), which contains the legacy blockchain code and the code for the accompanying suite of utility programs (the blockchain client/daemon, the RPC wallet client, the command line wallet and tools for importing and exporting the blockchain).",
+      "target": "Our ‘Legacy’ Blockchain codebase (https://github.com/electroneum/electroneum/), which contains the legacy blockchain code and the code for the accompanying suite of utility programs (the blockchain client/daemon, the RPC wallet client, the command line wallet and tools for importing and exporting the blockchain).",
       "urls": [
         "https://github.com/electroneum/electroneum",
         "https://github.com/electroneum/electroneum",
@@ -962,7 +962,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: 0 findings — Solidity coverage gap; no reentrancy/overflow detectors. LOW_YIELD by coverage."
     },
     {
       "engagement": "immunefi_targets",
@@ -1008,7 +1011,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: dom_xss_innerHTML ×1 + ssrf_dynamic_url ×6 + config_taint ×8 + non_constant_time ×1 + oauth_account_fusion_pretakeover ×41 — all Informational. No finding reaches KevCritical+ReachabilityProof. Immunefi in-scope but below threshold."
     },
     {
       "engagement": "infinite_athlete_targets",
@@ -1168,7 +1174,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 182: path_traversal High ×4 (atlassian_connect.go:37, controller.go:92, plugin.go:65, plugin.go:169) — all use GetBundlePath() server API, NOT user-controlled taint source. Threat Model Pre-Filter gate 1 fail. Bugcrowd in-scope but FP class."
     },
     {
       "engagement": "mattermost_targets",
@@ -1336,7 +1345,10 @@
       "matched_attack_keywords": [
         "GitHub"
       ],
-      "priority_score": 32
+      "priority_score": 32,
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "security:financial_pii_to_external_llm Informational in codex-cli/scripts/run_in_container.sh — Threat Model Pre-Filter: shell script, no PII processing execution path. Sprint 181."
     },
     {
       "engagement": "opensea_targets",
@@ -4203,7 +4215,7 @@
       "engagement": "optimizely_targets",
       "source_file": "targets/optimizely_targets.md",
       "line_number": 124,
-      "target": "Support system accessed via the 'Provide Feedback' link.\u200bGenerally non-qualifying Web related bug reports have little or no practical significance to product security. Google Bughunter University has a great writeup of bugs that fall into this category - https://sites.google.com/site/bughunteruniversity/nonvuln",
+      "target": "Support system accessed via the 'Provide Feedback' link.​Generally non-qualifying Web related bug reports have little or no practical significance to product security. Google Bughunter University has a great writeup of bugs that fall into this category - https://sites.google.com/site/bughunteruniversity/nonvuln",
       "urls": [
         "https://sites.google.com/site/bughunteruniversity/nonvuln"
       ],
@@ -5383,7 +5395,7 @@
       "engagement": "afterpay_targets",
       "source_file": "targets/afterpay_targets.md",
       "line_number": 33,
-      "target": "You can read about Afterpay\u2019s integration methods and APIs at https://developers.afterpay.com/.",
+      "target": "You can read about Afterpay’s integration methods and APIs at https://developers.afterpay.com/.",
       "urls": [
         "https://developers.afterpay.com/"
       ],
@@ -15499,7 +15511,7 @@
       "engagement": "chipotle_targets",
       "source_file": "targets/chipotle_targets.md",
       "line_number": 30,
-      "target": "Chipotle reserves the right to modify terms and conditions of this program and your participation in the program constitutes acceptance of all terms. Please check this site regularly as we routinely update our program terms and eligibility, which are effective upon posting. We reserve the right to cancel this program at any time. Must be 18 or older to be eligible for an award. Chipotle is the program owner and all the information described in this \u201cProgram Overview\u201d are \u201cprogram details.\u201d Together these program details and the terms constitute the \u201cProgram Brief\u201d referenced in the SDT. You acknowledge and agree (i) that you are already bound to the terms and conditions stated in Bugcrowd\u2019s Standard Disclosure Terms, which can be found at https://www.bugcrowd.com/resources/essentials/standard-disclosure-terms and (ii) that Chipotle may directly enforce any breach by you of the Standard Disclosure Terms, which are supplemented by the additional terms in this program.",
+      "target": "Chipotle reserves the right to modify terms and conditions of this program and your participation in the program constitutes acceptance of all terms. Please check this site regularly as we routinely update our program terms and eligibility, which are effective upon posting. We reserve the right to cancel this program at any time. Must be 18 or older to be eligible for an award. Chipotle is the program owner and all the information described in this “Program Overview” are “program details.” Together these program details and the terms constitute the “Program Brief” referenced in the SDT. You acknowledge and agree (i) that you are already bound to the terms and conditions stated in Bugcrowd’s Standard Disclosure Terms, which can be found at https://www.bugcrowd.com/resources/essentials/standard-disclosure-terms and (ii) that Chipotle may directly enforce any breach by you of the Standard Disclosure Terms, which are supplemented by the additional terms in this program.",
       "urls": [
         "https://www.bugcrowd.com/resources/essentials/standard-disclosure-terms"
       ],
@@ -16303,7 +16315,7 @@
       "engagement": "cloudinary_targets",
       "source_file": "targets/cloudinary_targets.md",
       "line_number": 109,
-      "target": "Do not test UI widgets posting feedback (\u201cTell us what you think\u201d form) to https://cloudinary.com/console/api/v1/user/send_feedback",
+      "target": "Do not test UI widgets posting feedback (“Tell us what you think” form) to https://cloudinary.com/console/api/v1/user/send_feedback",
       "urls": [
         "https://cloudinary.com/console/api/v1/user/send_feedback"
       ],
@@ -19255,9 +19267,9 @@
       "engagement": "etsy_targets",
       "source_file": "targets/etsy_targets.md",
       "line_number": 305,
-      "target": "If you're interested in testing listings or other shop-related functionality, please put your shop in developer mode: https://www.etsy.com/developers/shop\u200b",
+      "target": "If you're interested in testing listings or other shop-related functionality, please put your shop in developer mode: https://www.etsy.com/developers/shop​",
       "urls": [
-        "https://www.etsy.com/developers/shop\u200b"
+        "https://www.etsy.com/developers/shop​"
       ],
       "language_tags": [],
       "matched_attack_keywords": [],
@@ -19411,9 +19423,9 @@
       "engagement": "etsy_targets",
       "source_file": "targets/etsy_targets.md",
       "line_number": 299,
-      "target": "iPhone: https://itunes.apple.com/us/app/etsy-shop-creative/id477128284?mt=8\u200b",
+      "target": "iPhone: https://itunes.apple.com/us/app/etsy-shop-creative/id477128284?mt=8​",
       "urls": [
-        "https://itunes.apple.com/us/app/etsy-shop-creative/id477128284?mt=8\u200b"
+        "https://itunes.apple.com/us/app/etsy-shop-creative/id477128284?mt=8​"
       ],
       "language_tags": [],
       "matched_attack_keywords": [],
@@ -21403,7 +21415,7 @@
       "engagement": "indeed_targets",
       "source_file": "targets/indeed_targets.md",
       "line_number": 443,
-      "target": "https://m5.apply.indeed.com\tApply for jobs. This application is accessible by clicking on the job \u201cApply\u201d button. Remember to only test your own jobs! Focus areas: injection",
+      "target": "https://m5.apply.indeed.com\tApply for jobs. This application is accessible by clicking on the job “Apply” button. Remember to only test your own jobs! Focus areas: injection",
       "urls": [
         "https://m5.apply.indeed.com"
       ],
@@ -37317,7 +37329,7 @@
       "engagement": "ynab_targets",
       "source_file": "targets/ynab_targets.md",
       "line_number": 72,
-      "target": "\ud83d\udeab Internal Testing & Development Sites: https://develop-app.ynab.com",
+      "target": "🚫 Internal Testing & Development Sites: https://develop-app.ynab.com",
       "urls": [
         "https://develop-app.ynab.com"
       ],
@@ -37329,7 +37341,7 @@
       "engagement": "ynab_targets",
       "source_file": "targets/ynab_targets.md",
       "line_number": 68,
-      "target": "\ud83d\udeab Production environments: https://app.ynab.com/ (Live production app). Our customers\u2019 real data is off-limits!",
+      "target": "🚫 Production environments: https://app.ynab.com/ (Live production app). Our customers’ real data is off-limits!",
       "urls": [
         "https://app.ynab.com/"
       ],
@@ -37341,7 +37353,7 @@
       "engagement": "ynab_targets",
       "source_file": "targets/ynab_targets.md",
       "line_number": 70,
-      "target": "\ud83d\udeab Support Site: https://support.ynab.com/ (Hosted by a third party)",
+      "target": "🚫 Support Site: https://support.ynab.com/ (Hosted by a third party)",
       "urls": [
         "https://support.ynab.com/"
       ],
@@ -37353,13 +37365,211 @@
       "engagement": "ynab_targets",
       "source_file": "targets/ynab_targets.md",
       "line_number": 71,
-      "target": "\ud83d\udeab YNAB Learn: https://learn.ynab.com/ (Hosted by a third party)",
+      "target": "🚫 YNAB Learn: https://learn.ynab.com/ (Hosted by a third party)",
       "urls": [
         "https://learn.ynab.com/"
       ],
       "language_tags": [],
       "matched_attack_keywords": [],
       "priority_score": 12
+    },
+    {
+      "name": "hashicorp/terraform",
+      "urls": [
+        "https://github.com/hashicorp/terraform"
+      ],
+      "program": "HashiCorp HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: protobuf_any_unguarded_decode High ×3 (stackplan/from_proto.go:59, stackstate/from_proto.go:81, plans/planfile/tfplan.go:52) — all fail Threat Model Pre-Filter gate 2: Terraform reads state/plan files from operator-controlled backends; attacker requires backend write access (admin-equivalent) to inject malicious protobuf. path_traversal High ×4 (checkpoint.go:50,60, local/backend.go:251,425) — all operator-controlled local file paths. embedding_trust_transposition Critical lattice_gap_proposal on s3/backend.go — FP class (S3 backend, not vector store). All LOW_YIELD."
+    },
+    {
+      "name": "grafana/grafana",
+      "urls": [
+        "https://github.com/grafana/grafana"
+      ],
+      "program": "Grafana HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: ssrf_dynamic_url KevCritical ×6 — all in TypeScript frontend files (packages/grafana-runtime/src/services/pluginMeta/plugins.ts:21,45,61; public/app/core/services/context_srv.ts:250; public/app/plugins/datasource/loki/tracking.ts:161; public/swagger/K8sNameLookup.tsx:37) — client-side fetch() FP class (Bounty Extraction Law: client-side fetch ≠ SSRF). One Go SSRF (pkg/services/publicdashboards/internal/commands/generate_datasources/generate.go:60) — baseUrl is config-controlled in code generation command, not production API endpoint. All LOW_YIELD."
+    },
+    {
+      "name": "cilium/cilium",
+      "urls": [
+        "https://github.com/cilium/cilium"
+      ],
+      "program": "Cilium GitHub Security Advisory",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "hunt_notes": "Sprint 183: ssrf_dynamic_url KevCritical at cilium-cli/features/summary.go:184 — source 'String' is generic Go struct field in CLI tool, not network service endpoint; fails Threat Model Pre-Filter gate 1 (not user-controlled at network boundary). protobuf_any_type_field Critical ×4 (api/v1/datapathplugins, api/v1/flow, api/v1/observer, pkg/ztunnel/pb) — proto field annotations only (Informational class), not unguarded decodes. vector_filter_polymorphism High at pkg/datapath/linux/devices_controller.go:437 — FP on eBPF networking code. financial_pii_to_external_llm in Documentation/ .rst file — gate 3 fail (non-executable). All LOW_YIELD."
+    },
+    {
+      "id": 1,
+      "repo": "https://github.com/elastic/elasticsearch",
+      "org": "elastic",
+      "language": [
+        "Java",
+        "Go"
+      ],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "No Java native deser sink; all deserialization is ES custom binary protocol; no ObjectInputStream in production paths"
+    },
+    {
+      "id": 2,
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "org": "kubernetes",
+      "language": [
+        "Go"
+      ],
+      "program": "CNCF Security Advisories",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "Webhook URL is cluster-admin config (gate 2 fails); volume path traversal mitigated by API key validation"
+    },
+    {
+      "id": 3,
+      "repo": "https://github.com/open-telemetry/opentelemetry-collector",
+      "org": "open-telemetry",
+      "language": [
+        "Go",
+        "TypeScript"
+      ],
+      "program": "GitHub Security Advisory",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 184,
+      "reason": "All endpoint URLs are operator YAML config; no telemetry-data-derived URL fetching; gate 1 fails"
+    },
+    {
+      "id": 3050,
+      "repo": "https://github.com/hashicorp/consul",
+      "org": "hashicorp",
+      "language": [
+        "Go",
+        "TypeScript"
+      ],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 185,
+      "reason": "TLS bypass intentional (VerifyPeerCertificate compensates); xDS protobuf_any requires service:write ACL; clock_skew leeway is config param"
+    },
+    {
+      "id": 3051,
+      "repo": "https://github.com/argoproj/argo-cd",
+      "org": "argoproj",
+      "language": [
+        "Go",
+        "TypeScript"
+      ],
+      "program": "GitHub Security Advisory",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": 185,
+      "reason": "TLS bypass gated on operator insecure flag; unpinned_asset FP on noscript doc link; git dep is same-org argoproj"
+    },
+    {
+      "id": 3052,
+      "repo": "https://github.com/ory/hydra",
+      "org": "ory",
+      "language": ["Go"],
+      "program": "None confirmed",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "JWT WithValidMethods present; alg:none for OIDC Request Objects is OIDC 6.1 spec-compliant; state entropy enforced; redirect URI exact-match"
+    },
+    {
+      "id": 3053,
+      "repo": "https://github.com/temporalio/temporal",
+      "org": "temporal",
+      "language": ["Go"],
+      "program": "security@temporal.io",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "JWT WithValidMethods + go-oidc; TLS operator-controlled; bytes.Equal on ETag-equivalent conflict tokens; no Nexus SSRF"
+    },
+    {
+      "id": 3054,
+      "repo": "https://github.com/cockroachdb/cockroach",
+      "org": "cockroachdb",
+      "language": ["Go"],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "TLS compensated by VerifyConnection; OIDC uses coreos/go-oidc; no golang-jwt/jwt usage in auth paths"
+    },
+    {
+      "id": 3055,
+      "repo": "https://github.com/hashicorp/boundary",
+      "org": "hashicorp",
+      "language": ["Go"],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "No golang-jwt/jwt usage; DB-backed token validation; OIDC via coreos/go-oidc"
+    },
+    {
+      "id": 3056,
+      "repo": "https://github.com/minio/minio",
+      "org": "minio",
+      "language": ["Go"],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "Algorithm confusion requires client_secret knowledge (Gate 2); primary ValidMethods path correct; re-hunt with pre-signed URL and STS focus"
+    },
+    {
+      "id": 3057,
+      "repo": "https://github.com/goharbor/harbor",
+      "org": "goharbor",
+      "language": ["Go"],
+      "program": "HackerOne",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "WithValidMethods used in token.go; JWT algorithm properly constrained"
+    },
+    {
+      "id": 3058,
+      "repo": "https://github.com/dexidp/dex",
+      "org": "dexidp",
+      "language": ["Go"],
+      "program": "None confirmed",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "go-jose v4 explicit alg lists; safest possible JWT API pattern; no paid bounty"
+    },
+    {
+      "id": 3059,
+      "repo": "https://github.com/pomerium/pomerium",
+      "org": "pomerium",
+      "language": ["Go"],
+      "program": "security@pomerium.com",
+      "hunted": true,
+      "hunt_result": "LOW_YIELD",
+      "sprint": "185-followup",
+      "reason": "go-jose typed key verification; Apple OIDC UnsafeClaimsWithoutVerification is post-token-endpoint (not user input); no paid bounty confirmed"
+    },
+    {
+      "id": 3060,
+      "repo": "https://github.com/zitadel/zitadel",
+      "org": "zitadel",
+      "language": ["Go"],
+      "program": "security@zitadel.com",
+      "hunted": true,
+      "hunt_result": "CANDIDATE_PENDING",
+      "sprint": "185-followup",
+      "reason": "backend/v3 AddIdentityProviderLink exists at HEAD but is internal storage layer only — no direct gRPC API in v3; account_fusion requires main-app API trace"
     }
   ]
 }
