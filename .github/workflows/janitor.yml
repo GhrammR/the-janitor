@@ -52,7 +52,7 @@ jobs:
           mkdir -p "$SCCACHE_DIR"
 
       - name: Restore sccache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ github.workspace }}/.cache/sccache
           key: ${{ runner.os }}-sccache-janitor-main-${{ hashFiles('Cargo.lock') }}
@@ -63,7 +63,7 @@ jobs:
       # and self-attestation hits share the same cache entry.
       - name: Cache Janitor Binary
         id: cache-build
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: /tmp/the-janitor/target/release/janitor
           key: ${{ runner.os }}-rust-stable-janitor-v3-${{ hashFiles('**/Cargo.lock', 'crates/**/*.rs', 'crates/**/Cargo.toml') }}
