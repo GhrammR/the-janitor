@@ -73,7 +73,7 @@ jobs:
 
       - name: Upload SARIF to Security tab
         if: always() && hashFiles('rw_report.sarif') != ''
-        uses: github/codeql-action/upload-sarif@006d029c8dc7b906d4ce5b7c700d32f20f2d35dd # v3
+        uses: github/codeql-action/upload-sarif@f133996fb588ff4e83f1e1d4911404720ac9cb17 # v3
         with:
           sarif_file: rw_report.sarif
 
